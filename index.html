@@ -199,6 +199,14 @@ tr:last-child td{border-bottom:none}
 .ra-btn.ol{background:#fff;color:var(--pd);border:1.5px solid var(--pink);box-shadow:var(--sh)}
 .ra-btn.so{background:var(--grad);color:#fff;box-shadow:0 3px 12px rgba(80,70,224,.28)}
 
+/* ── Toggle switch ── */
+.toggle-track{position:relative;display:inline-block;width:46px;height:26px;flex-shrink:0;cursor:pointer}
+.toggle-track input{opacity:0;width:0;height:0;position:absolute}
+.toggle-slider{position:absolute;inset:0;background:var(--border);border-radius:13px;transition:.25s}
+.toggle-slider:before{content:'';position:absolute;height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:.25s;box-shadow:0 1px 4px rgba(0,0,0,.2)}
+.toggle-track input:checked + .toggle-slider{background:var(--pink)}
+.toggle-track input:checked + .toggle-slider:before{transform:translateX(20px)}
+
 /* ── Toast ── */
 .toast{position:fixed;top:calc(env(safe-area-inset-top,0) + 14px);left:50%;transform:translateX(-50%) translateY(-80px);background:var(--text);color:#fff;padding:10px 20px;border-radius:28px;font-size:13px;font-weight:600;z-index:300;transition:transform .3s cubic-bezier(.175,.885,.32,1.275);display:flex;align-items:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.2);max-width:90vw;white-space:nowrap}
 .toast.show{transform:translateX(-50%) translateY(0)}
@@ -404,6 +412,35 @@ tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- Makeup Punch Sheet -->
+<div class="overlay" id="makeupSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hd"><div class="sh-title">🔧 補打卡申請</div><button class="sh-close" onclick="closeSheet('makeupSheet')">✕</button></div>
+    <div class="sh-body" id="makeupFormBody"></div>
+    <div class="sh-btns two">
+      <button class="sbtn cancel" onclick="closeSheet('makeupSheet')">取消</button>
+      <button class="sbtn confirm" id="makeupSubmitBtn" onclick="submitMakeup()">📤 送出申請</button>
+    </div>
+  </div>
+</div>
+
+<!-- Makeup GPS Sheet -->
+<div class="overlay" id="makeupGpsSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hd"><div class="sh-title" id="makeupGpsTitle">📍 定位驗證</div><button class="sh-close" onclick="closeSheet('makeupGpsSheet')">✕</button></div>
+    <div class="sh-body">
+      <div class="gps-box"><div class="gps-dot loading" id="makeupGpsDot"></div><div><div class="gps-text" id="makeupGpsText">取得GPS中...</div><div class="gps-coord" id="makeupGpsCoord"></div><div id="makeupDistBadge"></div></div></div>
+      <div style="font-size:13px;color:var(--t2);line-height:1.8" id="makeupGpsBody"></div>
+    </div>
+    <div class="sh-btns two">
+      <button class="sbtn cancel" onclick="closeSheet('makeupGpsSheet')">取消</button>
+      <button class="sbtn confirm" id="makeupGpsConfirmBtn" disabled onclick="confirmMakeupGps()">✅ 確認定位</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"><span id="tIcon"></span><span id="tMsg"></span></div>
 
 <script>
@@ -413,7 +450,7 @@ tr:last-child td{border-bottom:none}
 const WDAY=['日','一','二','三','四','五','六'];
 const RULE_LABEL={subtract:'直接相減',deduct_lunch:'扣午休1h',deduct_both:'扣午休+晚餐'};
 const LEAVE_LABEL={annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'};
-const COMPANY_DEFAULTS={lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300};
+const COMPANY_DEFAULTS={lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
 
 const LS={
   get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
@@ -444,6 +481,7 @@ function seedData(){
   }
   if(!LS.get('records')) LS.set('records',[]);
   if(!LS.get('leaveApps')) LS.set('leaveApps',[]);
+  if(!LS.get('makeupApps')) LS.set('makeupApps',[]);
   if(!LS.get('leaveQuota')) LS.set('leaveQuota',{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0});
   if(!LS.get('companySettings')) LS.set('companySettings',COMPANY_DEFAULTS);
   if(!LS.get('workRules')) LS.set('workRules',{default:'deduct_lunch'});
@@ -454,6 +492,7 @@ const getAccounts=()=>LS.get('accounts')||[];
 const getEmps=()=>LS.get('employees')||[];
 const getRecs=()=>LS.get('records')||[];
 const getApps=()=>LS.get('leaveApps')||[];
+const getMakeupApps=()=>LS.get('makeupApps')||[];
 const getQuota=()=>LS.get('leaveQuota')||{};
 const getCfg=()=>LS.get('companySettings')||COMPANY_DEFAULTS;
 const getEmpById=id=>getEmps().find(e=>e.id===id)||null;
@@ -580,7 +619,9 @@ function empTab(tab){
 
 function updateEmpBadge(){
   if(!currentUser) return;
-  const p=getApps().filter(a=>a.empId===currentUser.id&&a.status==='pending').length;
+  const leavePending=getApps().filter(a=>a.empId===currentUser.id&&a.status==='pending').length;
+  const makeupPending=getMakeupApps().filter(a=>a.empId===currentUser.id&&a.status==='pending').length;
+  const p=leavePending+makeupPending;
   const b=document.getElementById('empLeaveBadge');
   if(b){b.style.display=p?'inline':'none';b.textContent=p;}
 }
@@ -601,7 +642,13 @@ function renderEmpClock(s){
     buildPunchCard(inT,outT,hours,OT,emp),
     buildInfoGrid(inT,outT,mRecs.length,mOT),
     '<div class="sec-title fu fu2"><span>&#x1F4CB; 最近打卡</span></div>',
-    '<div class="card fu fu2" id="recentRowsContainer"></div>'
+    '<div class="card fu fu2" id="recentRowsContainer"></div>',
+    '<div class="sec-title fu fu3"><span>&#x1F527; 補打卡申請</span></div>',
+    '<div class="card fu fu3" onclick="openMakeupSheet()" style="cursor:pointer;display:flex;align-items:center;gap:12px;border:1.5px dashed var(--border)">',
+    '<div style="width:40px;height:40px;border-radius:12px;background:var(--ol);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">&#x1F527;</div>',
+    '<div><div style="font-size:13px;font-weight:700">忘記打卡？申請補打卡</div>',
+    '<div style="font-size:11px;color:var(--t3);margin-top:2px">需定位驗證 + 主管審核</div></div>',
+    '<div style="margin-left:auto;color:var(--t3);font-size:18px">›</div></div>'
   ].join('');
 
   document.getElementById('recentRowsContainer').innerHTML=recentRows(emp,5);
@@ -755,30 +802,93 @@ function renderLeaveList(s){
 function renderAppsRows(empId){
   const apps=getApps().filter(a=>a.empId===empId).sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
   if(!apps.length) return '<div style="text-align:center;padding:18px;color:var(--t3);font-size:13px">尚無申請紀錄</div>';
-  const sColor={pending:'var(--yellow)',approved:'var(--green)',rejected:'var(--pd)'};
-  const sLabel={pending:'審核中',approved:'已核准',rejected:'已拒絕'};
-  return apps.map(a=>`<div class="list-row"><div class="lr-av" style="background:${sColor[a.status]}22;color:${sColor[a.status]};font-size:12px;font-weight:800">${(LEAVE_LABEL[a.type]||a.type)[0]}</div><div class="lr-info"><div class="lr-name">${LEAVE_LABEL[a.type]||a.type}</div><div class="lr-sub">${a.startDate}${a.startDate!==a.endDate?' ~ '+a.endDate:''} · ${a.reason}</div></div><span class="bgg" style="background:${sColor[a.status]}22;color:${sColor[a.status]}">${sLabel[a.status]||a.status}</span></div>`).join('');
+  return apps.map(function(a){
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="font-size:12px;font-weight:800;'
+      +(a.status==='approved'?'background:var(--gl);color:var(--green)':a.status==='rejected'?'background:#ffe4e4;color:var(--pd)':'background:var(--yl);color:var(--yellow)')
+      +'">'+(LEAVE_LABEL[a.type]||a.type)[0]+'</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+      +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+      +'</div>'
+      +leaveStatusBadge(a)
+      +'</div>';
+  }).join('');
 }
 
 // ── Leave status ───────────────────────────────────
+function leaveStatusBadge(a){
+  if(a.status==='rejected') return '<span class="bgg bg-r">&#x274C; 已拒絕</span>';
+  if(a.status==='approved') return '<span class="bgg bg-g">&#x2705; 全數核准</span>';
+  if(a.status==='sup_approved') return '<span class="bgg bg-b">&#x1F4CB; HR審核中</span>';
+  return '<span class="bgg bg-y">&#x23F3; 主管審核中</span>';
+}
+function leaveStageBar(a){
+  var s1=a.status==='rejected'&&a.stage==='sup'?'rejected':a.status==='sup_approved'||a.status==='approved'||a.status==='rejected'?'done':'active';
+  var s2=a.status==='approved'?'done':a.status==='rejected'&&a.stage==='hr'?'rejected':a.status==='sup_approved'?'active':'wait';
+  var c={'done':'var(--green)','active':'var(--blue)','rejected':'var(--pd)','wait':'var(--t3)'};
+  var l={'done':'&#x2705;','active':'&#x23F3;','rejected':'&#x274C;','wait':'&#x25CB;'};
+  return '<div style="display:flex;align-items:center;gap:6px;margin:8px 0 4px;font-size:11px">'
+    +'<span style="color:'+c[s1]+'">'+l[s1]+'</span>'
+    +'<span style="color:'+c[s1]+';font-weight:600">直屬主管</span>'
+    +'<span style="color:var(--t3);flex:1;border-top:1px dashed var(--border);margin:0 4px"></span>'
+    +'<span style="color:'+c[s2]+'">'+l[s2]+'</span>'
+    +'<span style="color:'+c[s2]+';font-weight:600">HR主管</span>'
+    +'</div>';
+}
 function renderLeaveStatus(s){
   const apps=getApps().filter(a=>a.empId===currentUser.id).sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
-  const sColor={pending:'var(--yellow)',approved:'var(--green)',rejected:'var(--pd)'};
-  const sLabel={pending:'審核中',approved:'已核准',rejected:'已拒絕'};
-  s.innerHTML=`
-  <div class="sec-title fu"><span>📋 假期申請狀態</span></div>
-  ${apps.length===0?'<div class="card fu fu1" style="text-align:center;padding:24px;color:var(--t3)">尚無申請紀錄</div>':
-  apps.map((a,i)=>`<div class="card fu" style="animation-delay:${i*.05}s">
-    <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:8px">
-      <div><div style="font-size:14px;font-weight:700">${LEAVE_LABEL[a.type]||a.type}</div><div style="font-size:11px;color:var(--t3);margin-top:2px">${a.startDate}${a.startDate!==a.endDate?' ～ '+a.endDate:''}</div></div>
-      <span class="bgg" style="background:${sColor[a.status]}22;color:${sColor[a.status]}">${sLabel[a.status]||a.status}</span>
-    </div>
-    <div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7">
-      <div>原因：${a.reason}</div><div>代理人：${a.proxy||'--'}</div>
-      ${a.managerNote?`<div style="color:var(--t3)">主管備註：${a.managerNote}</div>`:''}
-    </div>
-    <div style="font-size:10px;color:var(--t3);margin-top:6px">申請：${a.appliedAt.slice(0,16).replace('T',' ')}</div>
-  </div>`).join('')}`;
+  // 補打卡申請也在此頁顯示
+  var makeupApps=getMakeupApps().filter(function(a){return a.empId===currentUser.id;}).sort(function(a,b){return b.appliedAt.localeCompare(a.appliedAt);});
+  var html='<div class="sec-title fu"><span>&#x1F4CB; 假期申請狀態</span></div>';
+  if(!apps.length){
+    html+='<div class="card fu fu1" style="text-align:center;padding:24px;color:var(--t3)">尚無申請紀錄</div>';
+  } else {
+    apps.forEach(function(a,i){
+      var supEmp=getEmpById(a.supId||'');
+      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
+        +'<div><div style="font-size:14px;font-weight:700">'+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div style="font-size:11px;color:var(--t3);margin-top:2px">'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div></div>'
+        +leaveStatusBadge(a)
+        +'</div>'
+        +leaveStageBar(a)
+        +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7;margin-top:6px">'
+        +'<div>原因：'+a.reason+'</div>'
+        +'<div>直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
+        +'<div>代理人：'+(a.proxy||'--')+'</div>'
+        +(a.attachName?'<div>&#x1F4CE; 附件：'+a.attachName+'</div>':'')
+        +(a.supNote?'<div style="color:var(--t3)">主管備註：'+a.supNote+'</div>':'')
+        +(a.hrNote?'<div style="color:var(--t3)">HR備註：'+a.hrNote+'</div>':'')
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--t3);margin-top:6px">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
+        +'</div>';
+    });
+  }
+  // 補打卡紀錄
+  if(makeupApps.length){
+    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F527; 補打卡申請狀態</span></div>';
+    makeupApps.forEach(function(a,i){
+      var sc=a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='sup_approved'?'var(--blue)':'var(--yellow)';
+      var sl=a.status==='approved'?'&#x2705; 已核准':a.status==='rejected'?'&#x274C; 已拒絕':a.status==='sup_approved'?'&#x1F4CB; HR審核中':'&#x23F3; 審核中';
+      var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
+        +'<div><div style="font-size:14px;font-weight:700">&#x1F527; 補打卡 — '+typeLabel+'</div>'
+        +'<div style="font-size:11px;color:var(--t3);margin-top:2px">'+a.date+' '+a.punchTime+'</div></div>'
+        +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+        +'</div>'
+        +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7">'
+        +'<div>原因：'+a.reason+'</div>'
+        +(a.gps&&a.gps.lat?'<div>&#x1F4CD; 定位：'+a.gps.lat+', '+a.gps.lng+'（精度±'+a.gps.acc+'m）</div>':'<div style="color:var(--t3)">&#x1F4CD; 無定位紀錄</div>')
+        +(a.supNote?'<div>主管備註：'+a.supNote+'</div>':'')
+        +(a.hrNote?'<div>HR備註：'+a.hrNote+'</div>':'')
+        +'</div>'
+        +'<div style="font-size:10px;color:var(--t3);margin-top:6px">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
+        +'</div>';
+    });
+  }
+  s.innerHTML=html;
 }
 
 // ── Quota ──────────────────────────────────────────
@@ -970,7 +1080,9 @@ function adminTab(tab){
 }
 
 function updateAdminBadge(){
-  const p=getApps().filter(a=>a.status==='pending').length;
+  const lp=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
+  const mp=getMakeupApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
+  const p=lp+mp;
   const b=document.getElementById('adminApproveBadge');
   if(b){b.style.display=p?'inline':'none';b.textContent=p;}
 }
@@ -1054,47 +1166,300 @@ function renderGPSMap(s){
 // ── Approve ────────────────────────────────────────
 let reviewingId=null;
 function renderApprove(s){
+  const myId=currentUser.id;
+  const isHR=currentUser.role==='admin';
   const apps=getApps().sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
-  const pending=apps.filter(a=>a.status==='pending');
-  const done=apps.filter(a=>a.status!=='pending');
-  const sColor={approved:'var(--green)',rejected:'var(--pd)',pending:'var(--yellow)'};
-  const sLabel={approved:'已核准',rejected:'已拒絕',pending:'審核中'};
-  s.innerHTML=`
-  <div class="sec-title fu"><span>⏳ 待審核（${pending.length}）</span></div>
-  <div class="card fu fu1">${pending.length===0?'<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">🎉 無待審申請</div>':
-  pending.map(a=>`<div class="list-row"><div class="lr-av" style="background:var(--pl);color:var(--pd)">${a.empName[0]}</div><div class="lr-info"><div class="lr-name">${a.empName} — ${LEAVE_LABEL[a.type]||a.type}</div><div class="lr-sub">${a.startDate}${a.startDate!==a.endDate?' ~ '+a.endDate:''} · ${a.reason}</div></div><button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer" onclick="openReview('${a.id}')">審核</button></div>`).join('')}
-  </div>
-  <div class="sec-title fu fu2"><span>📁 已處理（${done.length}）</span></div>
-  <div class="card fu fu2">${done.length===0?'<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">尚無紀錄</div>':
-  done.map(a=>`<div class="list-row"><div class="lr-av" style="background:${sColor[a.status]}22;color:${sColor[a.status]}">${a.empName[0]}</div><div class="lr-info"><div class="lr-name">${a.empName} — ${LEAVE_LABEL[a.type]||a.type}</div><div class="lr-sub">${a.startDate}${a.startDate!==a.endDate?' ~ '+a.endDate:''} · ${a.reason}${a.managerNote?' · 備註:'+a.managerNote:''}</div></div><span class="bgg" style="background:${sColor[a.status]}22;color:${sColor[a.status]}">${sLabel[a.status]}</span></div>`).join('')}
-  </div>`;
+  // 待我審核：我是直屬主管且status=pending，或我是HR且status=sup_approved
+  const myPending=apps.filter(function(a){
+    if(a.status==='pending' && a.supId===myId) return true;
+    if(a.status==='sup_approved' && isHR) return true;
+    return false;
+  });
+  const done=apps.filter(a=>a.status==='approved'||a.status==='rejected');
+  const waiting=apps.filter(a=>a.status==='pending'&&a.supId!==myId);
+
+  var html='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPending.length+'）</span></div>'
+    +'<div class="card fu fu1">';
+  if(!myPending.length){
+    html+='<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審申請</div>';
+  } else {
+    myPending.forEach(function(a){
+      var stage=a.status==='pending'?'直屬主管審核':'HR最終審核';
+      var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:var(--pl);color:var(--pd)">'+a.empName[0]+'</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+a.empName+' &#x2014; '+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+        +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stage+'</div>'
+        +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+a.attachName+'</div>':'')
+        +'</div>'
+        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\x27"+a.id+"\x27)">審核</button>'
+        +'</div>';
+    });
+  }
+  html+='</div>';
+
+  if(waiting.length){
+    html+='<div class="sec-title fu fu1"><span>&#x1F552; 等待其他主管（'+waiting.length+'）</span></div>'
+      +'<div class="card fu fu1">';
+    waiting.forEach(function(a){
+      var supE=getEmpById(a.supId||'');
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:var(--yl);color:var(--yellow)">'+a.empName[0]+'</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+a.empName+' &#x2014; '+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+'</div>'
+        +'<div class="lr-sub" style="color:var(--t3)">待主管：'+(supE?supE.name:'--')+'</div>'
+        +'</div>'
+        +'<span class="bgg bg-y">待主管</span>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
+
+  html+='<div class="sec-title fu fu2"><span>&#x1F4C1; 已完成（'+done.length+'）</span></div>'
+    +'<div class="card fu fu2">';
+  if(!done.length){
+    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">尚無紀錄</div>';
+  } else {
+    done.forEach(function(a){
+      var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+      var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+a.empName[0]+'</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+a.empName+' &#x2014; '+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+        +(a.supNote?'<div class="lr-sub">主管：'+a.supNote+'</div>':'')
+        +(a.hrNote?'<div class="lr-sub">HR：'+a.hrNote+'</div>':'')
+        +'</div>'
+        +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+        +'</div>';
+    });
+  }
+  html+='</div>';
+
+  // ── 補打卡申請審核 ──
+  var myMakeup=getMakeupApps().filter(function(a){
+    if(a.status==='pending' && a.supId===myId) return true;
+    if(a.status==='sup_approved' && isHR) return true;
+    return false;
+  });
+  var doneMakeup=getMakeupApps().filter(function(a){return a.status==='approved'||a.status==='rejected';});
+  if(myMakeup.length||doneMakeup.length){
+    html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x1F527; 補打卡審核（'+myMakeup.length+'）</span></div>'
+      +'<div class="card fu">';
+    if(!myMakeup.length){
+      html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審</div>';
+    } else {
+      myMakeup.forEach(function(a){
+        var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+        var stageLabel=a.status==='pending'?'直屬主管審核':'HR最終審核';
+        var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:var(--ol);color:var(--orange)">&#x1F527;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+a.empName+' &#x2014; 補'+typeLabel+'</div>'
+          +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
+          +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
+          +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\x27'+a.id+'\x27)">審核</button>'
+          +'</div>';
+      });
+    }
+    html+='</div>';
+  }
+
+  s.innerHTML=html;
+}
+
+function openMakeupReview(id){
+  var a=getMakeupApps().find(function(x){return x.id===id;});
+  if(!a) return;
+  reviewingId='MAKEUP:'+id;
+  var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+  var isSup=a.status==='pending';
+  var stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
+  var stageColor=isSup?'var(--blue)':'var(--orange)';
+  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
+    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
+    +'<div>&#x1F527; 補'+typeLabel+'</div>'
+    +'<div>&#x1F4C5; '+a.date+' '+a.punchTime+'</div>'
+    +'<div>&#x1F4DD; '+a.reason+'</div>'
+    +(a.gps&&a.gps.lat?'<div>&#x1F4CD; 座標：'+a.gps.lat+', '+a.gps.lng+' （精度±'+a.gps.acc+'m）</div>':'<div style="color:var(--t3)">&#x1F4CD; 無定位紀錄</div>')
+    +'</div>'
+    +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
+  if(!isSup&&a.supNote){
+    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+a.supNote+'</div>';
+  }
+  body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
+  document.getElementById('reviewBody').innerHTML=body;
+  openSheet('reviewSheet');
 }
 
 function openReview(id){
   const a=getApps().find(x=>x.id===id);if(!a)return;
   reviewingId=id;
-  document.getElementById('reviewBody').innerHTML=`
-    <div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:13px">
-      <div>👤 <strong>${a.empName}</strong></div>
-      <div>📌 ${LEAVE_LABEL[a.type]||a.type}</div>
-      <div>📅 ${a.startDate}${a.startDate!==a.endDate?' ～ '+a.endDate:''}</div>
-      <div>📝 ${a.reason}</div>
-      <div>🤝 代理：${a.proxy||'--'}</div>
-    </div>
-    <div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>`;
+  const supEmp=getEmpById(a.supId||'');
+  const isSup=a.status==='pending';
+  const stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
+  const stageColor=isSup?'var(--blue)':'var(--orange)';
+  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
+    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
+    +'<div>&#x1F4CC; '+(LEAVE_LABEL[a.type]||a.type)+(a.days?' · '+a.days+'天':'')+'</div>'
+    +'<div>&#x1F4C5; '+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+'</div>'
+    +'<div>&#x1F4DD; '+a.reason+'</div>'
+    +'<div>&#x1F91D; 代理：'+(a.proxy||'--')+'</div>'
+    +'<div>&#x1F464; 直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
+    +(a.attachName?'<div>&#x1F4CE; 附件：'+a.attachName+'</div>':'')
+    +'</div>'
+    +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
+  // 顯示附件預覽
+  if(a.attachData){
+    if(a.attachData.startsWith('data:image')){
+      body+='<div style="margin-bottom:12px"><img src="'+a.attachData+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
+    } else {
+      body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
+    }
+  }
+  // 若第2層，顯示第1層備註
+  if(!isSup && a.supNote){
+    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+a.supNote+'</div>';
+  }
+  body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
+  document.getElementById('reviewBody').innerHTML=body;
   openSheet('reviewSheet');
 }
+
+function doMakeupReview(status){
+  var realId=reviewingId.replace('MAKEUP:','');
+  var apps=getMakeupApps();
+  var idx=apps.findIndex(function(a){return a.id===realId;});
+  if(idx===-1) return;
+  var note=document.getElementById('reviewNote')?document.getElementById('reviewNote').value||'':'';
+  var now=new Date().toISOString();
+  var a=apps[idx];
+  if(status==='rejected'){
+    a.status='rejected';
+    if(a.status==='pending'){a.supNote=note;a.supReviewedAt=now;}
+    else{a.hrNote=note;a.hrReviewedAt=now;}
+    a.supNote=a.supNote||note;
+    a.hrNote=a.stage==='hr'?note:a.hrNote;
+    a.status='rejected';
+  } else {
+    if(a.status==='pending'){
+      a.status='sup_approved';
+      a.stage='hr';
+      a.supNote=note;
+      a.supReviewedAt=now;
+    } else if(a.status==='sup_approved'){
+      // 最終核准，寫入打卡紀錄
+      a.status='approved';
+      a.stage='done';
+      a.hrNote=note;
+      a.hrReviewedAt=now;
+      applyMakeupToRecord(a);
+    }
+  }
+  apps[idx]=a;
+  LS.set('makeupApps',apps);
+  closeSheet('reviewSheet');
+  var msg=status==='rejected'?'已拒絕 '+a.empName+' 的補打卡':a.status==='sup_approved'?'第1層核准！已通知HR':'&#x2705; 補打卡已核准並寫入紀錄';
+  toast(status==='rejected'?'&#x274C;':'&#x2705;',msg);
+  renderApprove(document.getElementById('adminScroll'));
+  updateAdminBadge();
+}
+
+function applyMakeupToRecord(a){
+  // 補打卡核准後，自動寫入/更新打卡紀錄
+  var recs=getRecs();
+  var existing=recs.find(function(r){return r.date===a.date&&r.empId===a.empId;});
+  var emp=getEmpById(a.empId);
+  var timeISO=a.date+'T'+a.punchTime+':00';
+  if(existing){
+    if(a.punchType==='in'&&!existing.in){
+      existing.in=timeISO;
+      existing.gpsIn={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
+    } else if(a.punchType==='out'&&!existing.out){
+      existing.out=timeISO;
+      existing.gpsOut={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
+    }
+    LS.set('records',recs);
+  } else {
+    var newRec={date:a.date,empId:a.empId,in:null,out:null,gpsIn:null,gpsOut:null};
+    if(a.punchType==='in'){
+      newRec.in=timeISO;
+      newRec.gpsIn={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
+    } else {
+      newRec.out=timeISO;
+      newRec.gpsOut={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
+    }
+    recs.push(newRec);
+    LS.set('records',recs);
+  }
+}
+
 function doReview(status){
   if(!reviewingId) return;
+  // 補打卡審核
+  if(reviewingId.startsWith('MAKEUP:')){
+    doMakeupReview(status);
+    return;
+  }
   const apps=getApps();
   const idx=apps.findIndex(a=>a.id===reviewingId);
   if(idx===-1) return;
-  apps[idx].status=status;
-  apps[idx].managerNote=document.getElementById('reviewNote')?.value||'';
-  apps[idx].reviewedAt=new Date().toISOString();
+  const note=document.getElementById('reviewNote')?.value||'';
+  const now=new Date().toISOString();
+  const a=apps[idx];
+  const isHR=currentUser.role==='admin';
+
+  if(status==='rejected'){
+    // 任一層拒絕即結束
+    a.status='rejected';
+    a.stage=a.status==='pending'?'sup':'hr';
+    if(a.status==='pending'){a.supNote=note;a.supReviewedAt=now;}
+    else{a.hrNote=note;a.hrReviewedAt=now;}
+    a.stage=a.status==='sup_approved'||isHR?'hr':'sup';
+    a.supNote=a.supNote||note;
+    a.hrNote=isHR?note:a.hrNote;
+    a.status='rejected';
+  } else {
+    // 核准
+    if(a.status==='pending'){
+      // 第1層直屬主管核准 → 進入HR審核
+      a.status='sup_approved';
+      a.stage='hr';
+      a.supNote=note;
+      a.supReviewedAt=now;
+      // Email 通知HR
+      var hrEmps=getAccounts().filter(acc=>acc.role==='admin');
+      var hrEmpData=hrEmps.length?getEmpById(hrEmps[0].id):null;
+      var hrEmail=hrEmpData?hrEmpData.email:'';
+      if(hrEmail){
+        var subj=encodeURIComponent('[請假待HR審核] '+a.empName+' '+{annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'}[a.type]);
+        var body2=encodeURIComponent('HR主管您好：\n\n'+a.empName+' 的請假申請已通過直屬主管審核，請登入系統進行最終審核。\n假期：'+({annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'}[a.type]||a.type)+'\n期間：'+a.startDate+'\n主管備註：'+note);
+        el.href='mailto:'+hrEmail+'?subject='+subj+'&body='+body2;
+        el.style.display='none';
+        document.body.appendChild(el);
+        el.click();
+        document.body.removeChild(el);
+      }
+    } else if(a.status==='sup_approved'){
+      // 第2層HR核准 → 最終核准，自動扣假期
+      a.status='approved';
+      a.stage='done';
+      a.hrNote=note;
+      a.hrReviewedAt=now;
+    }
+  }
+  apps[idx]=a;
   LS.set('leaveApps',apps);
   closeSheet('reviewSheet');
-  toast(status==='approved'?'✅':'❌',status==='approved'?`已核准 ${apps[idx].empName} 的假期`:`已拒絕 ${apps[idx].empName} 的申請`);
+  var msg=status==='rejected'?'已拒絕 '+a.empName+' 的申請':a.status==='sup_approved'?'第1層核准！已通知HR審核':'&#x2705; 全數核准！假期已自動扣除';
+  toast(status==='rejected'?'&#x274C;':'&#x2705;',msg);
   renderApprove(document.getElementById('adminScroll'));
   updateAdminBadge();
 }
@@ -1119,7 +1484,7 @@ function renderEmployees(s){
       </div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;font-size:11px">
         <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">工號</div><div style="font-weight:700;font-size:10px">${emp.id}</div></div>
-        <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">工時規則</div><div style="font-weight:700;font-size:10px">${RULE_LABEL[emp.workRule]||emp.workRule}</div></div>
+        <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">直屬主管</div><div style="font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.supervisorId?getEmpById(emp.supervisorId)?.name||'--':'--'}</div></div>
         <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">今日工時</div><div style="font-weight:700;color:var(--pd)">${h>0?h.toFixed(1)+'h':'--'}</div></div>
       </div>
     </div>`;
@@ -1129,6 +1494,10 @@ function renderEmployees(s){
 function openEditEmp(empId){
   const emp=getEmps().find(e=>e.id===empId);if(!emp)return;
   const acc=getAccounts().find(a=>a.id===empId);
+  // 其他員工作為主管選項（排除自己）
+  const otherEmps=getEmps().filter(e=>e.id!==empId);
+  const supOptions='<option value="">-- 無 / 未設定 --</option>'
+    +otherEmps.map(e=>'<option value="'+e.id+'"'+(emp.supervisorId===e.id?' selected':'')+'>'+e.name+' ('+e.dept+')</option>').join('');
   document.getElementById('empSheetBody').innerHTML=`
     <div class="fg"><label>姓名</label><input id="ee_name" value="${emp.name}"></div>
     <div class="fr2">
@@ -1138,6 +1507,9 @@ function openEditEmp(empId){
     <div class="fr2">
       <div class="fg"><label>月薪</label><input type="number" id="ee_sal" value="${emp.salary}"></div>
       <div class="fg"><label>Email</label><input type="email" id="ee_email" value="${emp.email||''}"></div>
+    </div>
+    <div class="fg"><label>直屬主管</label>
+      <select id="ee_sup">${supOptions}</select>
     </div>
     <div class="fg"><label>工時計算規則</label>
       <select id="ee_rule">
@@ -1173,6 +1545,7 @@ function saveEmp(empId){
   emps[idx].salary=Number(document.getElementById('ee_sal').value)||0;
   emps[idx].email=document.getElementById('ee_email').value;
   emps[idx].workRule=document.getElementById('ee_rule').value;
+  emps[idx].supervisorId=document.getElementById('ee_sup')?document.getElementById('ee_sup').value||'':'';
   LS.set('employees',emps);
   // update account role & password
   const accs=getAccounts();
@@ -1189,6 +1562,9 @@ function saveEmp(empId){
 }
 
 function openAddEmp(){
+  // 動態建立直屬主管選項
+  const existEmpsForSup=getEmps();
+  const supOptHtml=existEmpsForSup.map(e=>'<option value="'+e.id+'">'+e.name+' ('+e.dept+')</option>').join('');
   document.getElementById('empSheetBody').innerHTML=`
     <div class="fg">
       <label>員工工號（即登入帳號）</label>
@@ -1217,6 +1593,11 @@ function openAddEmp(){
         <option value="deduct_both">扣除午休＋晚餐</option>
       </select>
     </div>
+    <div class="fg"><label>直屬主管</label>
+      <select id="ne_sup">
+        <option value="">-- 無 / 稍後設定 --</option>
+      </select>
+    </div>
     <div style="background:var(--pl);border-radius:10px;padding:11px 13px;margin-bottom:13px;border:1px solid var(--border)">
       <div style="font-size:12px;font-weight:700;color:var(--pd);margin-bottom:6px">🔑 預設登入密碼</div>
       <div style="position:relative">
@@ -1227,6 +1608,9 @@ function openAddEmp(){
     <div id="addEmpError" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:9px 13px;border-radius:10px;margin-bottom:10px"></div>
     <button class="save-btn" onclick="doAddEmp()">✅ 建立員工帳號</button>`;
   openSheet('empSheet');
+  // 填入主管選項
+  const supSel=document.getElementById('ne_sup');
+  if(supSel) supSel.innerHTML='<option value="">-- 無 / 稍後設定 --</option>'+supOptHtml;
 }
 
 function doAddEmp(){
@@ -1265,6 +1649,7 @@ function doAddEmp(){
     salary:Number(document.getElementById('ne_sal').value)||0,
     email:document.getElementById('ne_email').value,
     workRule:document.getElementById('ne_rule').value,
+    supervisorId:document.getElementById('ne_sup')?document.getElementById('ne_sup').value||'':'',
     color:colors[existEmps.length%colors.length]
   };
   existEmps.push(emp);
@@ -1381,6 +1766,16 @@ function renderSettings(s){
       <div class="fg"><label>經度 (Lng)</label><input type="number" step="0.0001" id="cfg_lng" value="${cfg.lng}"></div>
     </div>
     <div class="fg"><label>打卡允許範圍（公尺）</label><input type="number" id="cfg_range" value="${cfg.rangeM}"></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 0;border-top:1px solid var(--border);margin-top:4px">
+      <div>
+        <div style="font-size:13px;font-weight:700">定位失敗時禁止打卡</div>
+        <div style="font-size:11px;color:var(--t3);margin-top:2px">關閉後，定位失敗仍可打卡（不建議）</div>
+      </div>
+      <label class="toggle-track">
+        <input type="checkbox" id="cfg_requireGPS" ${cfg.requireGPS!==false?'checked':''}>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
     <div style="background:var(--bg);border-radius:9px;padding:10px 12px;font-size:11px;color:var(--t2);margin-bottom:12px">📍 預設：台北市大同區市民大道一段209號12樓<br>座標：25.0473, 121.5124</div>
     <button class="save-btn" onclick="saveSettings()">💾 儲存公司設定</button>
   </div>
@@ -1403,7 +1798,15 @@ function renderSettings(s){
 }
 
 function saveSettings(){
-  LS.set('companySettings',{name:document.getElementById('cfg_name').value,address:document.getElementById('cfg_addr').value,lat:parseFloat(document.getElementById('cfg_lat').value),lng:parseFloat(document.getElementById('cfg_lng').value),rangeM:parseInt(document.getElementById('cfg_range').value)||300});
+  var requireGPS=document.getElementById('cfg_requireGPS')?document.getElementById('cfg_requireGPS').checked:true;
+  LS.set('companySettings',{
+    name:document.getElementById('cfg_name').value,
+    address:document.getElementById('cfg_addr').value,
+    lat:parseFloat(document.getElementById('cfg_lat').value),
+    lng:parseFloat(document.getElementById('cfg_lng').value),
+    rangeM:parseInt(document.getElementById('cfg_range').value)||300,
+    requireGPS:requireGPS
+  });
   toast('✅','公司設定已儲存');
 }
 function saveQuota(){
@@ -1434,34 +1837,142 @@ function openPunch(action){
   getGPS();
 }
 
+// 安全取得 GPS DOM 元素（彈窗關閉後元素不存在，避免報錯）
+function gpsEl(id){ return document.getElementById(id); }
+function gpsPanelOpen(){ return !!gpsEl('gpsDot'); }
+
 function getGPS(){
-  const cfg=getCfg();
-  if(navigator.geolocation){
-    navigator.geolocation.getCurrentPosition(pos=>{
-      const lat=pos.coords.latitude, lng=pos.coords.longitude;
-      currentGPS={lat:parseFloat(lat.toFixed(6)),lng:parseFloat(lng.toFixed(6)),acc:Math.round(pos.coords.accuracy)};
-      const dist=haversine(lat,lng,cfg.lat,cfg.lng);
-      document.getElementById('gpsDot').className='gps-dot ok';
-      document.getElementById('gpsText').textContent=`位置驗證成功（精度 ±${currentGPS.acc}m）`;
-      document.getElementById('gpsCoord').textContent=`座標：${currentGPS.lat}, ${currentGPS.lng}`;
-      const isOK=dist<=cfg.rangeM, isWarn=dist<=cfg.rangeM*2;
-      document.getElementById('distBadge').innerHTML=`<span class="dist-badge ${isOK?'dist-ok':isWarn?'dist-warn':'dist-far'}">📏 距公司 ${dist}m ${isOK?'✅ 範圍內':isWarn?'⚠️ 稍遠':'❌ 範圍外'}</span>`;
-      document.getElementById('punchConfirmBtn').disabled=false;
-      if(!isOK) document.getElementById('punchConfirmBtn').textContent='⚠️ 仍要打卡';
-    },()=>simulateGPS(),{enableHighAccuracy:true,timeout:10000});
-  } else simulateGPS();
+  var cfg=getCfg();
+  if(!navigator.geolocation){
+    showGPSError('此裝置不支援定位功能');
+    return;
+  }
+  try {
+    navigator.geolocation.getCurrentPosition(
+      function(pos){
+        try { onGPSSuccess(pos,cfg); }
+        catch(e){ console.warn('GPS success handler error:',e); }
+      },
+      function(err){
+        try { onGPSError(err,cfg); }
+        catch(e){ console.warn('GPS error handler error:',e); }
+      },
+      {enableHighAccuracy:false, timeout:8000, maximumAge:30000}
+    );
+  } catch(e) {
+    console.warn('geolocation error:',e);
+    showGPSError('定位功能發生錯誤，請重試');
+  }
 }
 
-function simulateGPS(){
-  const cfg=getCfg();
-  setTimeout(()=>{
-    currentGPS={lat:cfg.lat,lng:cfg.lng,acc:15,simulated:true};
-    document.getElementById('gpsDot').className='gps-dot ok';
-    document.getElementById('gpsText').textContent='位置驗證成功（模擬定位）';
-    document.getElementById('gpsCoord').textContent=`座標：${currentGPS.lat}, ${currentGPS.lng}（模擬）`;
-    document.getElementById('distBadge').innerHTML=`<span class="dist-badge dist-ok">📏 距公司 0m ✅ 範圍內</span>`;
-    document.getElementById('punchConfirmBtn').disabled=false;
-  },1000);
+function onGPSSuccess(pos,cfg){
+  if(!gpsPanelOpen()) return; // 彈窗已關閉，不處理
+  var lat=pos.coords.latitude, lng=pos.coords.longitude;
+  currentGPS={lat:parseFloat(lat.toFixed(6)),lng:parseFloat(lng.toFixed(6)),acc:Math.round(pos.coords.accuracy)};
+  var dist=haversine(lat,lng,cfg.lat,cfg.lng);
+  if(gpsEl('gpsDot')) gpsEl('gpsDot').className='gps-dot ok';
+  if(gpsEl('gpsText')) gpsEl('gpsText').textContent='位置取得成功（精度 ±'+currentGPS.acc+'m）';
+  if(gpsEl('gpsCoord')) gpsEl('gpsCoord').textContent='座標：'+currentGPS.lat+', '+currentGPS.lng;
+  var isOK=dist<=cfg.rangeM, isWarn=dist<=cfg.rangeM*2;
+  if(gpsEl('distBadge')) gpsEl('distBadge').innerHTML='<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">&#x1F4CF; 距公司 '+dist+'m '+(isOK?'&#x2705; 範圍內':isWarn?'&#x26A0;&#xFE0F; 稍遠':'&#x274C; 範圍外')+'</span>';
+  if(gpsEl('punchConfirmBtn')){
+    gpsEl('punchConfirmBtn').disabled=false;
+    gpsEl('punchConfirmBtn').textContent=isOK?'✅ 確認打卡':'⚠️ 仍要打卡';
+  }
+  // 若精度超過100m，嘗試高精度重取
+  if(currentGPS.acc>100 && gpsPanelOpen()){
+    if(gpsEl('gpsText')) gpsEl('gpsText').textContent='位置取得成功，嘗試提升精度中...（精度 ±'+currentGPS.acc+'m）';
+    try {
+      navigator.geolocation.getCurrentPosition(
+        function(pos2){
+          try { if(gpsPanelOpen()) onGPSSuccess(pos2,cfg); }
+          catch(e){}
+        },
+        function(){},
+        {enableHighAccuracy:true, timeout:10000, maximumAge:0}
+      );
+    } catch(e){}
+  }
+}
+
+function onGPSError(err,cfg){
+  var msg='';
+  switch(err.code){
+    case 1:
+      msg='定位權限被拒絕';
+      showGPSPermissionGuide();
+      break;
+    case 2:
+      msg='無法取得位置，請確認已開啟位置服務';
+      break;
+    case 3:
+      msg='定位超時';
+      break;
+    default:
+      msg='定位失敗（錯誤碼：'+err.code+'）';
+  }
+  var requireGPS=cfg.requireGPS!==false; // 預設為 true（必須定位）
+  if(!gpsPanelOpen()) return; // 彈窗已關閉，不處理
+  if(gpsEl('gpsDot')) gpsEl('gpsDot').className='gps-dot err';
+
+  if(requireGPS){
+    if(gpsEl('gpsText')) gpsEl('gpsText').textContent='❌ '+msg+'，無法打卡';
+    if(gpsEl('gpsCoord')) gpsEl('gpsCoord').textContent='';
+    if(gpsEl('distBadge')) gpsEl('distBadge').innerHTML=
+      '<div style="margin-top:8px;background:#ffe4e4;border-radius:9px;padding:9px 12px;font-size:12px;color:var(--pd);font-weight:600">'
+      +'&#x1F6AB; 定位失敗，系統設定為「無法定位時禁止打卡」<br>'
+      +'<span style="font-weight:400;font-size:11px">請開啟定位權限後重試</span>'
+      +'</div>'
+      +'<button onclick="getGPS()" style="margin-top:8px;width:100%;padding:10px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:13px;font-weight:700;cursor:pointer">&#x1F504; 重新取得定位</button>';
+    if(gpsEl('punchConfirmBtn')){
+      gpsEl('punchConfirmBtn').disabled=true;
+      gpsEl('punchConfirmBtn').textContent='❌ 無法打卡';
+    }
+    if(err.code===1) showGPSPermissionGuide();
+  } else {
+    if(gpsEl('gpsText')) gpsEl('gpsText').textContent='⚠️ '+msg+'（定位失敗，仍可打卡）';
+    if(gpsEl('gpsCoord')) gpsEl('gpsCoord').textContent='座標：無法取得';
+    if(gpsEl('distBadge')) gpsEl('distBadge').innerHTML=
+      '<div style="margin-top:6px;background:var(--yl);border-radius:8px;padding:7px 10px;font-size:11px;color:var(--yellow)">'
+      +'&#x26A0;&#xFE0F; 未取得定位，將以「無定位」記錄打卡'
+      +'</div>'
+      +'<button onclick="getGPS()" style="margin-top:7px;width:100%;padding:9px;border-radius:10px;border:none;background:var(--border);color:var(--t2);font-size:12px;font-weight:700;cursor:pointer">&#x1F504; 重試定位</button>';
+    currentGPS={lat:null,lng:null,acc:null,failed:true};
+    if(gpsEl('punchConfirmBtn')){
+      gpsEl('punchConfirmBtn').disabled=false;
+      gpsEl('punchConfirmBtn').textContent='⚠️ 無定位打卡';
+    }
+  }
+}
+
+function showGPSPermissionGuide(){
+  if(!gpsPanelOpen()) return;
+  if(document.getElementById('gpsPermGuide')) return; // 已顯示過
+  var distBadge=gpsEl('distBadge');
+  if(!distBadge) return;
+  var guideHTML='<div id="gpsPermGuide" style="margin-top:8px;background:#ede8ff;border-radius:10px;padding:10px 12px;font-size:12px;line-height:1.8;color:var(--pd)">'
+    +'<strong>&#x1F4F1; 如何開啟定位權限：</strong><br>'
+    +'<strong>Android Chrome：</strong>網址列左邊 🔒 → 位置 → 允許<br>'
+    +'<strong>或：</strong>設定 → 應用程式 → Chrome → 權限 → 位置 → 允許<br>'
+    +'<strong>iPhone Safari：</strong>設定 → 隱私權 → 定位服務 → Safari → 允許<br>'
+    +'設定後請重新整理頁面再打卡'
+    +'</div>';
+  distBadge.innerHTML+=guideHTML;
+}
+
+function showGPSError(msg){
+  if(!gpsPanelOpen()) return;
+  var cfg=getCfg();
+  var requireGPS=cfg.requireGPS!==false;
+  if(gpsEl('gpsDot')) gpsEl('gpsDot').className='gps-dot err';
+  if(gpsEl('gpsText')) gpsEl('gpsText').textContent=(requireGPS?'❌ ':'⚠️ ')+msg;
+  if(gpsEl('punchConfirmBtn')) gpsEl('punchConfirmBtn').disabled=requireGPS;
+  if(requireGPS){
+    if(gpsEl('punchConfirmBtn')) gpsEl('punchConfirmBtn').textContent='❌ 無法打卡';
+    if(gpsEl('distBadge')) gpsEl('distBadge').innerHTML=
+      '<div style="margin-top:8px;background:#ffe4e4;border-radius:9px;padding:9px 12px;font-size:12px;color:var(--pd);font-weight:600">'
+      +'&#x1F6AB; 此裝置不支援定位，無法打卡</div>';
+  }
 }
 
 function confirmPunch(){
@@ -1493,11 +2004,34 @@ function confirmPunch(){
 // ══════════════════════════════════════════════════
 function openLeaveSheet(){
   const today=new Date().toISOString().slice(0,10);
-  document.getElementById('leaveFormBody').innerHTML=`
-    <div class="fg"><label>假期類型</label><select id="lType"><option value="annual">🌴 特休假</option><option value="sick">🤒 病假</option><option value="personal">🎉 事假</option><option value="marriage">💐 婚假</option><option value="funeral">😢 喪假</option><option value="official">🏛️ 公假</option></select></div>
-    <div class="fr2"><div class="fg"><label>開始日期</label><input type="date" id="lStart" value="${today}"></div><div class="fg"><label>結束日期</label><input type="date" id="lEnd" value="${today}"></div></div>
-    <div class="fg"><label>代理人</label><input id="lProxy" placeholder="代理人姓名"></div>
-    <div class="fg"><label>請假原因</label><textarea id="lReason" placeholder="請說明原因..."></textarea></div>`;
+  const emp=currentUser.empData;
+  const emps=getEmps().filter(e=>e.id!==currentUser.id);
+    const defaultSup=emp?emp.supervisorId||'':'';
+  const supOptions=emps.map(e=>'<option value="'+e.id+'"'+(e.id===defaultSup?' selected':'')+'>'+e.name+' ('+e.dept+')</option>').join('');
+  document.getElementById('leaveFormBody').innerHTML=
+    '<div class="fg"><label>假期類型</label><select id="lType">'
+    +'<option value="annual">&#x1F334; 特休假</option>'
+    +'<option value="sick">&#x1F912; 病假</option>'
+    +'<option value="personal">&#x1F389; 事假</option>'
+    +'<option value="marriage">&#x1F490; 婚假</option>'
+    +'<option value="funeral">&#x1F622; 喪假</option>'
+    +'<option value="official">&#x1F3DB; 公假</option>'
+    +'</select></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>開始日期</label><input type="date" id="lStart" value="'+today+'"></div>'
+    +'<div class="fg"><label>結束日期</label><input type="date" id="lEnd" value="'+today+'"></div>'
+    +'</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="lSup">'
+    +'<option value="">-- 請選擇主管 --</option>'
+    +supOptions
+    +'</select></div>'
+    +'<div class="fg"><label>代理人</label><input id="lProxy" placeholder="代理人姓名"></div>'
+    +'<div class="fg"><label>請假原因</label><textarea id="lReason" placeholder="請說明原因..."></textarea></div>'
+    +'<div class="fg"><label>附件（選填，如診斷書）</label>'
+    +'<input type="file" id="lAttach" accept="image/*,.pdf" style="font-size:13px;padding:8px">'
+    +'<div style="font-size:10px;color:var(--t3);margin-top:4px">支援圖片或 PDF，檔案將儲存於本機</div>'
+    +'</div>'
+    +'<div id="leaveFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:4px"></div>';
   openSheet('leaveSheet');
 }
 
@@ -1507,17 +2041,269 @@ function submitLeave(){
   const end=document.getElementById('lEnd')?.value;
   const reason=document.getElementById('lReason')?.value.trim();
   const proxy=document.getElementById('lProxy')?.value.trim()||'';
-  if(!start||!end){toast('⚠️','請填寫日期');return}
-  if(start>end){toast('⚠️','結束日期不能早於開始');return}
-  if(!reason){toast('⚠️','請填寫原因');return}
+  const supId=document.getElementById('lSup')?.value||'';
+  const errEl=document.getElementById('leaveFormErr');
+  if(!start||!end){errEl.textContent='⚠️ 請填寫日期';errEl.style.display='block';return;}
+  if(start>end){errEl.textContent='⚠️ 結束日期不能早於開始';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫請假原因';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  errEl.style.display='none';
   const emp=currentUser.empData;
-  const apps=getApps();
-  apps.push({id:'LA'+Date.now(),empId:currentUser.id,empName:emp?.name||currentUser.id,type,startDate:start,endDate:end,reason,proxy,status:'pending',appliedAt:new Date().toISOString()});
-  LS.set('leaveApps',apps);
-  closeSheet('leaveSheet');
-  toast('✅','假期申請已送出！');
-  if(currentUser.role==='employee') empTab('status');
+  const fileInput=document.getElementById('lAttach');
+  const file=fileInput&&fileInput.files&&fileInput.files[0];
+
+  // 計算請假天數（排除週末）
+  var days=0,cur=new Date(start),endD=new Date(end);
+  while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
+
+  // 取得主管 email
+  const supEmp=getEmpById(supId);
+  const supEmail=supEmp?getEmps().find(e=>e.id===supId)?.email||'':'';
+
+  function saveAndNotify(attachData){
+    const apps=getApps();
+    const appId='LA'+Date.now();
+    apps.push({
+      id:appId,
+      empId:currentUser.id,
+      empName:emp?.name||currentUser.id,
+      type,startDate:start,endDate:end,days,
+      reason,proxy,supId,
+      attachName:file?file.name:'',
+      attachData:attachData||'',
+      // 2層審核: pending → sup_approved → approved / rejected
+      status:'pending',
+      stage:'sup', // 目前在哪一層: sup=直屬主管, hr=HR主管
+      supNote:'',supReviewedAt:'',
+      hrNote:'',hrReviewedAt:'',
+      appliedAt:new Date().toISOString()
+    });
+    LS.set('leaveApps',apps);
+    closeSheet('leaveSheet');
+    // Email 通知直屬主管（mailto）
+    var supName=supEmp?supEmp.name:'主管';
+    var subj=encodeURIComponent('[請假通知] '+emp.name+' 申請 '+days+'天 '+{annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'}[type]);
+    var body=encodeURIComponent('\u60a8\u597d\uff0c\n\n'+emp.name+' \u7533\u8acb\u88dc\u6253\u5361\uff0c\u8acb\u81f3\u7cfb\u7d71\u5be9\u6838\u3002\n\u65e5\u671f\uff1a'+d.date+'\n\u985e\u578b\uff1a'+typeLabel+'\u6253\u5361 '+d.time+'\n\u539f\u56e0\uff1a'+d.reason);
+    if(supEmail){
+      var mailLink='mailto:'+supEmail+'?subject='+subj+'&body='+body;
+      // 建立隱藏連結點擊
+      var a=document.createElement('a');
+      a.href=mailLink;
+      a.style.display='none';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+    toast('✅','假期申請已送出！Email 通知已發送給主管');
+    if(currentUser.role==='employee') empTab('status');
+    updateEmpBadge();
+  }
+
+  if(file){
+    var reader=new FileReader();
+    reader.onload=function(e){saveAndNotify(e.target.result);};
+    reader.onerror=function(){saveAndNotify('');};
+    reader.readAsDataURL(file);
+  } else {
+    saveAndNotify('');
+  }
 }
+
+// ══════════════════════════════════════════════════
+//  MAKEUP PUNCH (補打卡)
+// ══════════════════════════════════════════════════
+var makeupGpsData=null; // 儲存補打卡定位結果
+var makeupPendingData=null; // 暫存補打卡表單資料
+
+function openMakeupSheet(){
+  var today=new Date().toISOString().slice(0,10);
+  var emp=currentUser.empData;
+  var emps=getEmps().filter(function(e){return e.id!==currentUser.id;});
+  var defaultSupId=emp?emp.supervisorId||'':'';
+  var supOptions=emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===defaultSupId?' selected':'')+'>'+e.name+' ('+e.dept+')</option>';}).join('');
+
+  document.getElementById('makeupFormBody').innerHTML=
+    '<div style="background:var(--ol);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--orange);line-height:1.6">'
+    +'&#x26A0;&#xFE0F; 補打卡需要<strong>現場定位驗證</strong>，系統將記錄您申請時的 GPS 座標，送出後需主管審核。'
+    +'</div>'
+    +'<div class="fg"><label>補打卡日期</label><input type="date" id="mk_date" value="'+today+'"></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>類型</label><select id="mk_type">'
+    +'<option value="in">&#x1F446; 上班打卡</option>'
+    +'<option value="out">&#x1F44B; 下班打卡</option>'
+    +'</select></div>'
+    +'<div class="fg"><label>實際時間</label><input type="time" id="mk_time"></div>'
+    +'</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="mk_sup"><option value="">-- 請選擇主管 --</option>'+supOptions+'</select></div>'
+    +'<div class="fg"><label>補打卡原因</label><textarea id="mk_reason" placeholder="請說明忘記打卡的原因..."></textarea></div>'
+    +'<div id="makeupFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:4px"></div>'
+    +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--t2);line-height:1.6">'
+    +'&#x1F4CD; 點「送出申請」後，系統會先進行 <strong>GPS 定位驗證</strong>，驗證成功才會送出申請。'
+    +'</div>';
+  openSheet('makeupSheet');
+}
+
+function submitMakeup(){
+  var date=document.getElementById('mk_date')&&document.getElementById('mk_date').value;
+  var type=document.getElementById('mk_type')&&document.getElementById('mk_type').value;
+  var time=document.getElementById('mk_time')&&document.getElementById('mk_time').value;
+  var supId=document.getElementById('mk_sup')&&document.getElementById('mk_sup').value;
+  var reason=document.getElementById('mk_reason')&&document.getElementById('mk_reason').value.trim();
+  var errEl=document.getElementById('makeupFormErr');
+
+  if(!date){errEl.textContent='⚠️ 請填寫補打卡日期';errEl.style.display='block';return;}
+  if(!time){errEl.textContent='⚠️ 請填寫實際打卡時間';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫補打卡原因';errEl.style.display='block';return;}
+
+  // 檢查日期不能是未來
+  if(date>new Date().toISOString().slice(0,10)){
+    errEl.textContent='⚠️ 補打卡日期不能是未來日期';errEl.style.display='block';return;
+  }
+  errEl.style.display='none';
+
+  // 儲存表單資料，進入 GPS 驗證流程
+  makeupPendingData={date:date,type:type,time:time,supId:supId,reason:reason};
+  closeSheet('makeupSheet');
+  openMakeupGps();
+}
+
+function openMakeupGps(){
+  var emp=currentUser.empData;
+  var d=makeupPendingData;
+  var typeLabel=d.type==='in'?'上班打卡':'下班打卡';
+  makeupGpsData=null;
+
+  document.getElementById('makeupGpsTitle').textContent='&#x1F4CD; 補打卡定位驗證';
+  document.getElementById('makeupGpsDot').className='gps-dot loading';
+  document.getElementById('makeupGpsText').textContent='取得 GPS 位置中...';
+  document.getElementById('makeupGpsCoord').textContent='';
+  document.getElementById('makeupDistBadge').innerHTML='';
+  document.getElementById('makeupGpsConfirmBtn').disabled=true;
+  document.getElementById('makeupGpsConfirmBtn').textContent='✅ 確認定位';
+  document.getElementById('makeupGpsBody').innerHTML=
+    '<div style="font-size:13px;color:var(--t2);line-height:1.9;background:var(--bg);border-radius:10px;padding:12px 14px">'
+    +'<div>&#x1F4C5; 補打卡日期：<strong>'+d.date+'</strong></div>'
+    +'<div>&#x23F0; 補打類型：<strong>'+typeLabel+' '+d.time+'</strong></div>'
+    +'<div>&#x1F464; 員工：<strong>'+emp.name+'</strong></div>'
+    +'</div>';
+
+  openSheet('makeupGpsSheet');
+  getMakeupGPS();
+}
+
+function getMakeupGPS(){
+  var cfg=getCfg();
+  if(!navigator.geolocation){
+    if(document.getElementById('makeupGpsDot')) document.getElementById('makeupGpsDot').className='gps-dot err';
+    if(document.getElementById('makeupGpsText')) document.getElementById('makeupGpsText').textContent='❌ 此裝置不支援定位，無法申請補打卡';
+    return;
+  }
+  try{
+    navigator.geolocation.getCurrentPosition(
+      function(pos){
+        try{onMakeupGpsSuccess(pos,cfg);}catch(e){console.warn('makeup gps success error:',e);}
+      },
+      function(err){
+        try{onMakeupGpsError(err,cfg);}catch(e){console.warn('makeup gps error:',e);}
+      },
+      {enableHighAccuracy:false, timeout:8000, maximumAge:30000}
+    );
+  }catch(e){
+    if(document.getElementById('makeupGpsDot')) document.getElementById('makeupGpsDot').className='gps-dot err';
+    if(document.getElementById('makeupGpsText')) document.getElementById('makeupGpsText').textContent='❌ 定位發生錯誤，無法申請補打卡';
+  }
+}
+
+function onMakeupGpsSuccess(pos,cfg){
+  if(!document.getElementById('makeupGpsDot')) return;
+  var lat=pos.coords.latitude, lng=pos.coords.longitude;
+  makeupGpsData={lat:parseFloat(lat.toFixed(6)),lng:parseFloat(lng.toFixed(6)),acc:Math.round(pos.coords.accuracy)};
+  var dist=haversine(lat,lng,cfg.lat,cfg.lng);
+  var isOK=dist<=cfg.rangeM, isWarn=dist<=cfg.rangeM*2;
+  document.getElementById('makeupGpsDot').className='gps-dot ok';
+  document.getElementById('makeupGpsText').textContent='位置取得成功（精度 ±'+makeupGpsData.acc+'m）';
+  document.getElementById('makeupGpsCoord').textContent='座標：'+makeupGpsData.lat+', '+makeupGpsData.lng;
+  document.getElementById('makeupDistBadge').innerHTML=
+    '<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">&#x1F4CF; 距公司 '+dist+'m '
+    +(isOK?'&#x2705; 範圍內':isWarn?'&#x26A0;&#xFE0F; 稍遠':'&#x274C; 範圍外')+'</span>';
+  var requireGPS=cfg.requireGPS!==false;
+  if(requireGPS&&!isOK&&dist>cfg.rangeM*3){
+    document.getElementById('makeupGpsConfirmBtn').disabled=true;
+    document.getElementById('makeupGpsConfirmBtn').textContent='❌ 距離過遠';
+    document.getElementById('makeupDistBadge').innerHTML+='<div style="margin-top:6px;font-size:11px;color:var(--pd)">距公司過遠（超過 '+cfg.rangeM*3+'m），無法申請補打卡</div>';
+  } else {
+    document.getElementById('makeupGpsConfirmBtn').disabled=false;
+    document.getElementById('makeupGpsConfirmBtn').textContent=isOK?'✅ 確認送出':'⚠️ 仍要送出';
+  }
+}
+
+function onMakeupGpsError(err,cfg){
+  if(!document.getElementById('makeupGpsDot')) return;
+  var requireGPS=cfg.requireGPS!==false;
+  document.getElementById('makeupGpsDot').className='gps-dot err';
+  var msg=err.code===1?'定位權限被拒絕':err.code===2?'無法取得位置':err.code===3?'定位超時':'定位失敗';
+  if(requireGPS){
+    document.getElementById('makeupGpsText').textContent='❌ '+msg+'，無法申請補打卡';
+    document.getElementById('makeupDistBadge').innerHTML=
+      '<div style="background:#ffe4e4;border-radius:9px;padding:9px 12px;font-size:12px;color:var(--pd);margin-top:8px">'
+      +'&#x1F6AB; 定位失敗，無法申請補打卡，請開啟定位權限後重試</div>'
+      +'<button onclick="getMakeupGPS()" style="margin-top:8px;width:100%;padding:9px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:13px;font-weight:700;cursor:pointer">&#x1F504; 重新定位</button>';
+    document.getElementById('makeupGpsConfirmBtn').disabled=true;
+    document.getElementById('makeupGpsConfirmBtn').textContent='❌ 無法送出';
+  } else {
+    document.getElementById('makeupGpsText').textContent='⚠️ '+msg+'（無定位仍可申請）';
+    makeupGpsData={lat:null,lng:null,acc:null,failed:true};
+    document.getElementById('makeupGpsConfirmBtn').disabled=false;
+    document.getElementById('makeupGpsConfirmBtn').textContent='⚠️ 無定位送出';
+  }
+}
+
+function confirmMakeupGps(){
+  if(!makeupPendingData) return;
+  var d=makeupPendingData;
+  var emp=currentUser.empData;
+  var apps=getMakeupApps();
+  var supEmp=getEmpById(d.supId);
+
+  apps.push({
+    id:'MK'+Date.now(),
+    empId:currentUser.id,
+    empName:emp?emp.name:currentUser.id,
+    date:d.date,
+    punchType:d.type,       // 'in' | 'out'
+    punchTime:d.time,       // 'HH:MM'
+    supId:d.supId,
+    reason:d.reason,
+    gps:makeupGpsData,
+    status:'pending',        // pending → approved / rejected
+    stage:'sup',
+    supNote:'',supReviewedAt:'',
+    hrNote:'',hrReviewedAt:'',
+    appliedAt:new Date().toISOString()
+  });
+  LS.set('makeupApps',apps);
+  closeSheet('makeupGpsSheet');
+  makeupPendingData=null;
+  makeupGpsData=null;
+
+  // Email 通知直屬主管
+  if(supEmp&&supEmp.email){
+    var typeLabel2=d.type==='in'?'上班':'下班';
+    var subj2=encodeURIComponent('[補打卡審核] '+emp.name+' '+d.date+' '+typeLabel2+'補打卡');
+    var body2=encodeURIComponent(emp.name+' 申請補打卡，請至系統審核。日期：'+d.date+' 類型：'+typeLabel2+'打卡 '+d.time+' 原因：'+d.reason);
+    var el2=document.createElement('a');
+    el2.href='mailto:'+supEmp.email+'?subject='+subj2+'&body='+body2;
+    el2.style.display='none';
+    document.body.appendChild(el2);
+    el2.click();
+    document.body.removeChild(el2);
+  }
+    toast('✅','補打卡申請已送出！等待主管審核');
+  if(currentUser.role==='employee') empTab('clock');
+  updateEmpBadge();
+}
+
 
 // ══════════════════════════════════════════════════
 //  EXCEL EXPORT
@@ -1580,6 +2366,18 @@ function toast(icon,msg){
 }
 
 // Swipe down to close sheets
+// Add swipe-close for makeup sheets
+['makeupSheet','makeupGpsSheet'].forEach(function(id){
+  var ov=document.getElementById(id);
+  if(!ov) return;
+  var sy=0;
+  var sh=ov.querySelector('.sheet');
+  if(sh){
+    sh.addEventListener('touchstart',function(e){sy=e.touches[0].clientY;},{passive:true});
+    sh.addEventListener('touchend',function(e){if(e.changedTouches[0].clientY-sy>80)ov.classList.remove('show');},{passive:true});
+  }
+});
+
 document.querySelectorAll('.overlay').forEach(ov=>{
   let sy=0;
   const sh=ov.querySelector('.sheet');
