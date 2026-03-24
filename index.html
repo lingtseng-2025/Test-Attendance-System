@@ -281,6 +281,8 @@ tr:last-child td{border-bottom:none}
     </div>
     <button class="lf-btn" onclick="doLogin()">登入</button>
     <div style="margin-top:14px;text-align:center;font-size:11px;color:var(--t3)">如忘記密碼，請聯繫人資管理員重設</div>
+<button onclick="debugLogin()" style="margin-top:10px;width:100%;padding:10px;border-radius:10px;border:1.5px dashed #aaa;background:#f8f8ff;color:#666;font-size:12px;cursor:pointer">🔍 除錯診斷（點我）</button>
+<div id="debugOut" style="margin-top:8px;font-size:11px;color:#333;background:#f0f0f0;border-radius:8px;padding:10px;display:none;word-break:break-all;text-align:left;line-height:1.8"></div>
   </div>
 </div>
 
@@ -2736,6 +2738,25 @@ window.confirmMakeupGps=function(){
     toast('✅','補打卡申請已送出！等待主管審核');
     if(window.currentUser.role==='employee')empTab('clock');
     updateEmpBadge();
+  });
+};
+
+// ── Debug function ───────────────────────────────
+window.debugLogin=function(){
+  var out=document.getElementById('debugOut');
+  out.style.display='block';
+  var r='DB.accs:'+(DB.accs?DB.accs.length:'undef');
+  r+=' | DB.emps:'+(DB.emps?DB.emps.length:'undef');
+  if(DB.accs&&DB.accs.length){
+    r+=' | first acc:'+DB.accs[0].id+'/'+DB.accs[0].role+'/'+(DB.accs[0].pw?DB.accs[0].pw.slice(0,8):'null');
+  }
+  out.textContent=r;
+  sha256('93609058').then(function(h){
+    out.textContent+=(' | hash:'+h.slice(0,8));
+    sbq('employees',{select:'id,role,password_hash'}).then(function(rows){
+      out.textContent+=' | SB rows:'+rows.length;
+      if(rows[0]) out.textContent+=' | '+rows[0].id+':'+( rows[0].password_hash?rows[0].password_hash.slice(0,8):'null');
+    });
   });
 };
 
