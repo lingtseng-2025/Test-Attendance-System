@@ -2739,10 +2739,8 @@ window.confirmMakeupGps=function(){
   });
 };
 
-// ── Init: override seedData call ──────────────────
-document.addEventListener('DOMContentLoaded',function(){
-  window.seedData();
-});
+// ── Init: call immediately (DOM already ready since we run after </html>) ──
+window.seedData();
 
 })(); // end IIFE
 </script>
