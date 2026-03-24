@@ -342,6 +342,7 @@ tr:last-child td{border-bottom:none}
     <div class="tb-item" id="atab-employees" onclick="adminTab('employees')"><div class="tbi">👥</div><span>員工</span></div>
     <div class="tb-item" id="atab-reports" onclick="adminTab('reports')"><div class="tbi">📊</div><span>報表</span></div>
     <div class="tb-item" id="atab-settings" onclick="adminTab('settings')"><div class="tbi">⚙️</div><span>設定</span></div>
+    <div class="tb-item" id="atab-salary" onclick="adminTab('salary')"><div class="tbi">💰</div><span>薪資</span></div>
   </div>
 </div>
 
@@ -1057,6 +1058,7 @@ function adminTab(tab){
   else if(tab==='employees') renderEmployees(s);
   else if(tab==='reports') renderReports(s);
   else if(tab==='settings') renderSettings(s);
+  else if(tab==='salary') renderSalary(s);
   updateAdminBadge();
 }
 
@@ -2759,6 +2761,257 @@ window.debugLogin=function(){
     });
   });
 };
+
+// ── Salary Management ────────────────────────────
+// ── Salary Management ─────────────────────────────
+window.renderSalary = function(s) {
+  var emps = getEmps();
+  var now = new Date();
+  var defaultMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+
+  s.innerHTML = '<div style="display:flex;flex-direction:column;gap:16px;padding:0">'
+    // Header
+    + '<div style="background:var(--grad);border-radius:16px;padding:20px 24px;color:#fff">'
+    + '<div style="font-size:11px;opacity:.8;margin-bottom:4px">薪資管理系統</div>'
+    + '<div style="font-family:Nunito,sans-serif;font-size:24px;font-weight:900">💰 月薪計算與發放</div>'
+    + '<div style="font-size:12px;opacity:.8;margin-top:4px">自動計算工時、加班費、應扣款項</div>'
+    + '</div>'
+    // Controls
+    + '<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
+    + '<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">計算月份</label>'
+    + '<input type="month" id="salMonth" value="' + defaultMonth + '" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none"></div>'
+    + '<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">員工</label>'
+    + '<select id="salEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none">'
+    + '<option value="all">全部員工</option>'
+    + emps.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('')
+    + '</select></div>'
+    + '<button onclick="calcSalary()" style="padding:10px 24px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,var(--font);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap;margin-top:18px">🔍 計算薪資</button>'
+    + '</div>'
+    // Result area
+    + '<div id="salaryResult"></div>'
+    + '</div>';
+};
+
+window.calcSalary = function() {
+  var monthVal = document.getElementById('salMonth').value;
+  var empId = document.getElementById('salEmp').value;
+  var parts = monthVal.split('-');
+  var y = parseInt(parts[0]), m = parseInt(parts[1]);
+  var emps = empId === 'all' ? getEmps() : getEmps().filter(function(e){return e.id===empId;});
+  var container = document.getElementById('salaryResult');
+  if(!container) return;
+
+  var html = '<div style="display:flex;flex-direction:column;gap:14px">';
+
+  // Summary stats
+  var totalSalary = 0, totalOT = 0, totalDays = 0;
+
+  var rows = emps.map(function(emp) {
+    var recs = getMonthRecs(y, m-1, emp.id);
+    var leaveApps = getApps().filter(function(a){return a.empId===emp.id&&a.status==='approved';});
+    var daysInMonth = new Date(y, m, 0).getDate();
+    var workDays = 0, totalHours = 0, otHours = 0, leaveDays = 0;
+
+    for(var d=1; d<=daysInMonth; d++) {
+      var ds = y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+      var dow = new Date(ds).getDay();
+      if(dow===0||dow===6) continue; // skip weekends
+      var rec = recs.find(function(r){return r.date===ds;});
+      var leave = leaveApps.find(function(a){return ds>=a.startDate&&ds<=a.endDate;});
+      if(leave) { leaveDays++; workDays++; continue; }
+      if(rec && rec.in) {
+        workDays++;
+        var h = calcHours(rec.in, rec.out, emp.workRule);
+        totalHours += h;
+        otHours += Math.max(0, h-8);
+      }
+    }
+
+    // Salary calculation
+    var baseSalary = emp.salary || 0;
+    var dailyRate = baseSalary / 22; // 每月約22個工作天
+    var hourlyRate = dailyRate / 8;
+    var otPay = otHours * hourlyRate * 1.34; // 加班費 1.34倍
+    var sickLeaveDays = leaveApps.filter(function(a){
+      return a.empId===emp.id&&a.status==='approved'&&a.type==='sick';
+    }).reduce(function(sum,a){
+      var d2=0,cur=new Date(a.startDate),end=new Date(a.endDate);
+      while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)d2++;cur.setDate(cur.getDate()+1);}
+      return sum+d2;
+    }, 0);
+    // 病假前3天全薪，之後半薪
+    var sickDeduct = sickLeaveDays > 3 ? (sickLeaveDays-3)*dailyRate*0.5 : 0;
+    // 勞保費（固定估算）
+    var laborInsurance = Math.round(baseSalary * 0.0882 * 0.2); // 員工負擔20%
+    // 健保費
+    var healthInsurance = Math.round(baseSalary * 0.0517 * 0.3); // 員工負擔30%
+    // 所得稅預扣（薪資40001以上）
+    var incomeTax = baseSalary > 40000 ? Math.round((baseSalary - 40000) * 0.05) : 0;
+
+    var grossPay = baseSalary + otPay - sickDeduct;
+    var deductions = laborInsurance + healthInsurance + incomeTax;
+    var netPay = grossPay - deductions;
+
+    totalSalary += netPay;
+    totalOT += otHours;
+    totalDays += workDays;
+
+    return {emp:emp, workDays:workDays, totalHours:totalHours, otHours:otHours,
+      baseSalary:baseSalary, otPay:otPay, sickDeduct:sickDeduct,
+      laborInsurance:laborInsurance, healthInsurance:healthInsurance, incomeTax:incomeTax,
+      grossPay:grossPay, deductions:deductions, netPay:netPay, leaveDays:leaveDays};
+  });
+
+  // Summary cards
+  html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+    + '<div class="sc"><div class="sc-ico pk">👥</div><div><div class="sc-label">計算人數</div><div class="sc-val" style="color:var(--pd)">'+emps.length+'</div></div></div>'
+    + '<div class="sc"><div class="sc-ico gn">💰</div><div><div class="sc-label">總應發薪資</div><div class="sc-val" style="color:var(--green);font-size:16px">$'+Math.round(totalSalary).toLocaleString()+'</div></div></div>'
+    + '<div class="sc"><div class="sc-ico or">🔥</div><div><div class="sc-label">總加班時數</div><div class="sc-val" style="color:var(--orange)">'+totalOT.toFixed(1)+'h</div></div></div>'
+    + '</div>';
+
+  // Individual salary cards
+  rows.forEach(function(row) {
+    var emp = row.emp;
+    html += '<div class="card" style="border-left:4px solid '+emp.color+'">'
+      // Employee header
+      + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bg)">'
+      + '<div style="width:42px;height:42px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0">'+emp.name[0]+'</div>'
+      + '<div style="flex:1"><div style="font-size:15px;font-weight:700">'+emp.name+'</div><div style="font-size:11px;color:var(--t3)">'+emp.dept+' · '+emp.pos+'</div></div>'
+      + '<div style="text-align:right"><div style="font-size:11px;color:var(--t3)">實領薪資</div><div style="font-family:Nunito,sans-serif;font-size:22px;font-weight:900;color:var(--green)">$'+Math.round(row.netPay).toLocaleString()+'</div></div>'
+      + '</div>'
+      // Attendance summary
+      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
+      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">出勤天數</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--pd)">'+row.workDays+'</div></div>'
+      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">總工時</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--blue)">'+row.totalHours.toFixed(1)+'h</div></div>'
+      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">加班時數</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--orange)">'+row.otHours.toFixed(1)+'h</div></div>'
+      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">請假天數</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--yellow)">'+row.leaveDays+'</div></div>'
+      + '</div>'
+      // Salary breakdown
+      + '<div style="background:var(--bg);border-radius:12px;padding:14px">'
+      + '<div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">薪資明細</div>'
+      + salRow('本月底薪', row.baseSalary, 'var(--text)')
+      + salRow('加班費（'+row.otHours.toFixed(1)+'h × 1.34）', row.otPay, 'var(--orange)')
+      + (row.sickDeduct>0 ? salRowMinus('病假扣薪', row.sickDeduct) : '')
+      + '<div style="border-top:1.5px solid var(--border);margin:8px 0"></div>'
+      + salRow('應發合計', row.grossPay, 'var(--green)', true)
+      + '<div style="border-top:1px dashed var(--border);margin:8px 0"></div>'
+      + '<div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:6px">扣除項目</div>'
+      + salRowMinus('勞保費（員工負擔）', row.laborInsurance)
+      + salRowMinus('健保費（員工負擔）', row.healthInsurance)
+      + (row.incomeTax>0 ? salRowMinus('所得稅預扣', row.incomeTax) : '')
+      + '<div style="border-top:2px solid var(--border);margin:10px 0"></div>'
+      + '<div style="display:flex;justify-content:space-between;align-items:center">'
+      + '<div style="font-size:14px;font-weight:800;color:var(--text)">💰 實領金額</div>'
+      + '<div style="font-family:Nunito,sans-serif;font-size:22px;font-weight:900;color:var(--green)">$'+Math.round(row.netPay).toLocaleString()+'</div>'
+      + '</div>'
+      + '</div>'
+      // Action buttons
+      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px">'
+      + '<button onclick="exportSalaryExcel(\''+emp.id+'\','+y+','+m+')" style="padding:10px;border-radius:10px;border:1.5px solid var(--pink);background:#fff;color:var(--pd);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">📥 Excel</button>'
+      + '<button onclick="printSalarySlip(\''+emp.id+'\','+y+','+m+')" style="padding:10px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🖨️ 列印薪資單</button>'
+      + '</div>'
+      + '</div>';
+  });
+
+  html += '</div>';
+  container.innerHTML = html;
+};
+
+function salRow(label, val, color, bold) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">'
+    + '<div style="font-size:12px;color:var(--t2)">'+label+'</div>'
+    + '<div style="font-family:Nunito,sans-serif;font-size:'+(bold?'15':'13')+'px;font-weight:'+(bold?'800':'700')+';color:'+(color||'var(--text)')+'">$'+Math.round(val).toLocaleString()+'</div>'
+    + '</div>';
+}
+function salRowMinus(label, val) {
+  return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">'
+    + '<div style="font-size:12px;color:var(--t2)">− '+label+'</div>'
+    + '<div style="font-family:Nunito,sans-serif;font-size:13px;font-weight:700;color:var(--pd)">−$'+Math.round(val).toLocaleString()+'</div>'
+    + '</div>';
+}
+
+window.exportSalaryExcel = function(empId, y, m) {
+  var emp = getEmpById(empId); if(!emp) return;
+  var recs = getMonthRecs(y, m-1, emp.id);
+  var daysInMonth = new Date(y, m, 0).getDate();
+  var workDays=0, totalHours=0, otHours=0;
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var dow=new Date(ds).getDay(); if(dow===0||dow===6) continue;
+    var rec=recs.find(function(r){return r.date===ds;});
+    if(rec&&rec.in){workDays++;var h=calcHours(rec.in,rec.out,emp.workRule);totalHours+=h;otHours+=Math.max(0,h-8);}
+  }
+  var dailyRate=emp.salary/22, hourlyRate=dailyRate/8;
+  var otPay=otHours*hourlyRate*1.34;
+  var laborIns=Math.round(emp.salary*0.0882*0.2);
+  var healthIns=Math.round(emp.salary*0.0517*0.3);
+  var incomeTax=emp.salary>40000?Math.round((emp.salary-40000)*0.05):0;
+  var gross=emp.salary+otPay;
+  var deduct=laborIns+healthIns+incomeTax;
+  var net=gross-deduct;
+
+  var data=[
+    ['iROBOT MEDICINE 智能人醫 — 薪資單'],
+    ['員工：'+emp.name,'工號：'+emp.id,'部門：'+emp.dept],
+    ['月份：'+y+'年'+m+'月'],[''],
+    ['項目','金額（元）'],
+    ['本月底薪',emp.salary],
+    ['加班費（'+otHours.toFixed(1)+'h）',Math.round(otPay)],
+    ['應發合計',Math.round(gross)],[''],
+    ['－勞保費（員工負擔）',-laborIns],
+    ['－健保費（員工負擔）',-healthIns],
+    ['－所得稅預扣',-incomeTax],
+    [''],['實領金額',Math.round(net)],[''],
+    ['出勤天數',workDays],['總工時',totalHours.toFixed(1)+'h'],['加班時數',otHours.toFixed(1)+'h']
+  ];
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:20},{wch:15}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,emp.name+'_薪資單');
+  XLSX.writeFile(wb,'薪資單_'+emp.name+'_'+y+String(m).padStart(2,'0')+'.xlsx');
+  toast('📥','薪資單 Excel 下載完成！');
+};
+
+window.printSalarySlip = function(empId, y, m) {
+  var emp = getEmpById(empId); if(!emp) return;
+  var recs = getMonthRecs(y, m-1, emp.id);
+  var daysInMonth = new Date(y, m, 0).getDate();
+  var workDays=0, totalHours=0, otHours=0;
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var dow=new Date(ds).getDay(); if(dow===0||dow===6) continue;
+    var rec=recs.find(function(r){return r.date===ds;});
+    if(rec&&rec.in){workDays++;var h=calcHours(rec.in,rec.out,emp.workRule);totalHours+=h;otHours+=Math.max(0,h-8);}
+  }
+  var dailyRate=emp.salary/22, hourlyRate=dailyRate/8;
+  var otPay=otHours*hourlyRate*1.34;
+  var laborIns=Math.round(emp.salary*0.0882*0.2);
+  var healthIns=Math.round(emp.salary*0.0517*0.3);
+  var incomeTax=emp.salary>40000?Math.round((emp.salary-40000)*0.05):0;
+  var gross=emp.salary+otPay;
+  var net=gross-laborIns-healthIns-incomeTax;
+
+  var win=window.open('','_blank');
+  win.document.write('<html><head><title>薪資單</title><style>body{font-family:"Noto Sans TC",sans-serif;max-width:600px;margin:30px auto;color:#333}h2{color:#5046e0;border-bottom:2px solid #5046e0;padding-bottom:8px}.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f0f0}.total{font-size:18px;font-weight:800;color:#2eaa6e}.deduct{color:#e00}.section{background:#f8f8ff;border-radius:8px;padding:12px;margin:12px 0}</style></head><body>');
+  win.document.write('<h2>💰 薪資單</h2>');
+  win.document.write('<p><strong>iROBOT MEDICINE 智能人醫</strong></p>');
+  win.document.write('<p>員工：<strong>'+emp.name+'</strong>（'+emp.id+'） | 部門：'+emp.dept+' | 月份：'+y+'年'+m+'月</p>');
+  win.document.write('<div class="section">');
+  win.document.write('<div class="row"><span>本月底薪</span><span>$'+emp.salary.toLocaleString()+'</span></div>');
+  win.document.write('<div class="row"><span>加班費（'+otHours.toFixed(1)+'h × 1.34）</span><span>$'+Math.round(otPay).toLocaleString()+'</span></div>');
+  win.document.write('<div class="row" style="font-weight:700"><span>應發合計</span><span>$'+Math.round(gross).toLocaleString()+'</span></div>');
+  win.document.write('</div><div class="section">');
+  win.document.write('<div class="row deduct"><span>− 勞保費（員工負擔）</span><span>−$'+laborIns.toLocaleString()+'</span></div>');
+  win.document.write('<div class="row deduct"><span>− 健保費（員工負擔）</span><span>−$'+healthIns.toLocaleString()+'</span></div>');
+  if(incomeTax>0) win.document.write('<div class="row deduct"><span>− 所得稅預扣</span><span>−$'+incomeTax.toLocaleString()+'</span></div>');
+  win.document.write('</div>');
+  win.document.write('<div class="row total"><span>💰 實領金額</span><span>$'+Math.round(net).toLocaleString()+'</span></div>');
+  win.document.write('<p style="margin-top:20px;font-size:12px;color:#999">出勤'+workDays+'天 | 工時'+totalHours.toFixed(1)+'h | 加班'+otHours.toFixed(1)+'h | 列印：'+new Date().toLocaleDateString()+'</p>');
+  win.document.write('</body></html>');
+  win.document.close();
+  win.print();
+};
+
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
 window.seedData();
