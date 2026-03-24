@@ -28,6 +28,7 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
+body.admin-mode{max-width:100%!important;}
 
 /* ── Safe area ── */
 .sab{height:env(safe-area-inset-top,0);background:var(--sb);flex-shrink:0}
@@ -470,13 +471,13 @@ function seedData(){
     LS.set('accounts',accs);
     LS.set('employees',emps);
   }
-  // 確保 IRM-004 管理員帳號永遠存在
-  if(!accs.find(a=>a.id==='IRM-004')){
-    accs.push({id:'IRM-004',pw:'93609058',role:'admin'});
+  // 確保 admin 帳號永遠存在
+  if(!accs.find(a=>a.id==='admin')){
+    accs.push({id:'admin',pw:'93609058',role:'admin'});
     LS.set('accounts',accs);
   }
-  if(!emps.find(e=>e.id==='IRM-004')){
-    emps.push({id:'IRM-004',name:'系統管理員',dept:'人資部',pos:'HR 主任',workRule:'deduct_lunch',salary:0,email:'',color:'#5046e0'});
+  if(!emps.find(e=>e.id==='admin')){
+    emps.push({id:'admin',name:'系統管理員',dept:'人資部',pos:'HR 主任',workRule:'deduct_lunch',salary:0,email:'',color:'#5046e0'});
     LS.set('employees',emps);
   }
   if(!LS.get('records')) LS.set('records',[]);
@@ -1137,7 +1138,7 @@ function renderGPSMap(s){
     const icon=m.type==='company'?'🏢':m.type==='in'?'🟢':'🔵';
     return `L.marker([${m.lat},${m.lng}]).addTo(map).bindPopup('<b>${icon} ${m.label}</b><br>${m.lat}, ${m.lng}');`;
   }).join('\n');
-  const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}</style></head><body><div id="map"></div><script>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}<\/script></body></html>`;
+  const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}</style></head><body><div id="map"></div><script>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
   const blob=new Blob([mapHTML],{type:'text/html'});
   const blobURL=URL.createObjectURL(blob);
   s.innerHTML=`
@@ -2392,3 +2393,378 @@ seedData();
 </script>
 </body>
 </html>
+<script>
+// ══════════════════════════════════════════════════
+//  SUPABASE PATCH - 完全覆蓋 localStorage 資料層
+//  安全插入：不修改原始程式碼，只覆寫函數
+// ══════════════════════════════════════════════════
+(function(){
+'use strict';
+
+var SB_URL='https://umeulkubeusguewjtdn.supabase.co';
+var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVtZXVsa3ViZXVzZ3Vld2p0ZG4iLCJyb2xlIjoiYW5vbiIsImlhdCI6MTc3NDMyNzg3OSwiZXhwIjoyMDg5OTAzODc5fQ.PYdVMG0wm7fxBUPejlAA3QfHj3bduTe4GRU_ecEObOk';
+
+// ── REST helpers ──────────────────────────────────
+var H={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+function sbq(t,o){
+  var u=SB_URL+'/rest/v1/'+t,p=[];
+  o=o||{};
+  if(o.select)p.push('select='+encodeURIComponent(o.select));
+  if(o.filter)Object.keys(o.filter).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(o.filter[k]));});
+  if(o.order)p.push('order='+encodeURIComponent(o.order));
+  if(p.length)u+='?'+p.join('&');
+  return fetch(u,{headers:H}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];});
+}
+function sbins(t,d){
+  return fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(d)})
+    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+}
+function sbups(t,d,oc){
+  var u=SB_URL+'/rest/v1/'+t+(oc?'?on_conflict='+oc:'');
+  return fetch(u,{method:'POST',headers:Object.assign({},H,{Prefer:'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(d)})
+    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+}
+function sbupd(t,d,f){
+  var u=SB_URL+'/rest/v1/'+t,p=[];
+  Object.keys(f).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(f[k]));});
+  if(p.length)u+='?'+p.join('&');
+  return fetch(u,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(d)})
+    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+}
+
+// ── SHA-256 ───────────────────────────────────────
+function sha256(s){
+  return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))
+    .then(function(b){return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');});
+}
+
+// ── In-memory cache ───────────────────────────────
+var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
+
+function toEmp(e){return{id:e.id,name:e.name,dept:e.dept||'',pos:e.pos||'',workRule:e.work_rule||'deduct_lunch',salary:e.salary||0,email:e.email||'',color:e.color||'#5046e0',supervisorId:e.supervisor_id||'',role:e.role||'employee'};}
+function toRec(r){return{date:r.date,empId:r.emp_id,in:r.time_in||null,out:r.time_out||null,gpsIn:r.gps_in||null,gpsOut:r.gps_out||null};}
+function toLea(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',type:a.type||'',startDate:a.start_date||'',endDate:a.end_date||'',days:a.days||0,reason:a.reason||'',proxy:a.proxy||'',supId:a.sup_id||'',attachName:a.attach_name||'',attachData:a.attach_data||'',status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||'',managerNote:a.sup_note||''};}
+function toMkp(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',date:a.date||'',punchType:a.punch_type||'',punchTime:a.punch_time||'',supId:a.sup_id||'',reason:a.reason||'',gps:a.gps||null,status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||''};}
+
+function loadAllData(){
+  return Promise.all([
+    sbq('employees',{select:'*'}),
+    sbq('records',{select:'*'}),
+    sbq('leave_apps',{select:'*',order:'applied_at.desc'}),
+    sbq('makeup_apps',{select:'*',order:'applied_at.desc'}),
+    sbq('leave_quota',{select:'*'}),
+    sbq('company_settings',{select:'*'})
+  ]).then(function(res){
+    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[];
+    DB.emps=emps.map(toEmp);
+    DB.accs=emps.map(function(e){return{id:e.id,pw:e.password_hash,role:e.role||'employee'};});
+    DB.recs=recs.map(toRec);
+    DB.leaves=leaves.map(toLea);
+    DB.makeups=makeups.map(toMkp);
+    var q=qRows[0]||{};
+    DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0};
+    var cfg=cfgRows[0]||{};
+    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false};
+  });
+}
+
+// ── Loading UI ────────────────────────────────────
+function showLoad(m){
+  var el=document.getElementById('_lo');
+  if(!el){
+    el=document.createElement('div');el.id='_lo';
+    el.style.cssText='position:fixed;inset:0;background:rgba(80,70,224,.95);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#fff;font-size:16px;font-weight:700;gap:16px';
+    el.innerHTML='<div style="font-size:42px">⏳</div><div id="_lm">載入中...</div>';
+    document.body.appendChild(el);
+  }
+  document.getElementById('_lm').textContent=m||'載入中...';
+  el.style.display='flex';
+}
+function hideLoad(){var el=document.getElementById('_lo');if(el)el.style.display='none';}
+
+// ── Override LS ───────────────────────────────────
+window.LS={
+  get:function(k){
+    if(k==='accounts')return DB.accs;
+    if(k==='employees')return DB.emps;
+    if(k==='records')return DB.recs;
+    if(k==='leaveApps')return DB.leaves;
+    if(k==='makeupApps')return DB.makeups;
+    if(k==='leaveQuota')return DB.quota;
+    if(k==='companySettings')return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
+    if(k==='workRules')return{default:'deduct_lunch'};
+    return null;
+  },
+  set:function(){}
+};
+
+// ── Override seedData ─────────────────────────────
+window.seedData=function(){
+  showLoad('連接資料庫中...');
+  loadAllData().then(function(){hideLoad();}).catch(function(e){hideLoad();alert('無法連接資料庫，請確認網路連線後重試。');});
+};
+
+// ── Override doLogin ──────────────────────────────
+window.doLogin=function(){
+  var id=document.getElementById('loginId').value.trim();
+  var pw=document.getElementById('loginPw').value;
+  if(!id||!pw){document.getElementById('loginError').classList.add('show');return;}
+  document.getElementById('loginError').classList.remove('show');
+  var btn=document.querySelector('.lf-btn');
+  if(btn){btn.textContent='登入中...';btn.disabled=true;}
+  sha256(pw).then(function(hash){
+    return loadAllData().then(function(){
+      var acc=(DB.accs||[]).find(function(a){return a.id===id&&a.pw===hash;});
+      if(!acc){
+        document.getElementById('loginError').classList.add('show');
+        document.getElementById('loginPw').value='';
+        if(btn){btn.textContent='登入';btn.disabled=false;}
+        return;
+      }
+      var emp=getEmpById(acc.id);
+      window.currentUser={id:acc.id,role:acc.role,empData:emp};
+      if(acc.role==='admin'){
+        document.body.classList.add('admin-mode');
+        showScreen('adminScreen');startAdminSession();
+      }else{showScreen('empScreen');startEmpSession();}
+      if(btn){btn.textContent='登入';btn.disabled=false;}
+    });
+  });
+};
+
+// ── Override doLogout ─────────────────────────────
+window.doLogout=function(){
+  (window.clockIntervals||[]).forEach(clearInterval);
+  window.clockIntervals=[];
+  window.currentUser=null;
+  document.body.classList.remove('admin-mode');
+  document.getElementById('loginId').value='';
+  document.getElementById('loginPw').value='';
+  showScreen('loginScreen');
+};
+
+// ── Override confirmPunch ─────────────────────────
+window.confirmPunch=function(){
+  var now=new Date(),empId=window.currentUser.id,emp=window.currentUser.empData,action=window.pendingAction;
+  closeSheet('punchSheet');
+  var dateStr=todayKey(),existing=getTodayRec(empId);
+  if(action==='in'){
+    sbups('records',{emp_id:empId,date:dateStr,time_in:now.toISOString(),gps_in:window.currentGPS},'emp_id,date')
+      .then(function(){return loadAllData();})
+      .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓');empTab('clock');});
+  }else{
+    if(!existing||!existing.in){toast('⚠️','請先上班打卡');return;}
+    var h=calcHours(existing.in,now.toISOString(),emp.workRule);
+    sbupd('records',{time_out:now.toISOString(),gps_out:window.currentGPS},{emp_id:empId,date:dateStr})
+      .then(function(){return loadAllData();})
+      .then(function(){toast('🎉','下班打卡！工時 '+h.toFixed(1)+'h');empTab('clock');});
+  }
+};
+
+// ── Override saveEmp ──────────────────────────────
+window.saveEmp=function(empId){
+  var newPw=document.getElementById('ee_pw')?document.getElementById('ee_pw').value:'';
+  var d={name:document.getElementById('ee_name').value,dept:document.getElementById('ee_dept').value,
+    pos:document.getElementById('ee_pos').value,salary:Number(document.getElementById('ee_sal').value)||0,
+    email:document.getElementById('ee_email').value,work_rule:document.getElementById('ee_rule').value,
+    supervisor_id:(document.getElementById('ee_sup')?document.getElementById('ee_sup').value:'')||'',
+    role:document.getElementById('ee_role').value};
+  var doSave=function(hash){
+    if(hash)d.password_hash=hash;
+    return sbupd('employees',d,{id:empId}).then(function(){return loadAllData();}).then(function(){
+      closeSheet('empSheet');toast('✅',d.name+' 資料已更新');
+      renderEmployees(document.getElementById('adminScroll'));
+    });
+  };
+  if(newPw)sha256(newPw).then(doSave);else doSave();
+};
+
+// ── Override doAddEmp ─────────────────────────────
+window.doAddEmp=function(){
+  var newId=document.getElementById('ne_id').value.trim();
+  var name=document.getElementById('ne_name').value.trim();
+  var pw=document.getElementById('ne_pw').value.trim()||'1234';
+  var errEl=document.getElementById('addEmpError');
+  if(!newId){errEl.textContent='⚠️ 請填寫員工工號';errEl.style.display='block';return;}
+  if(!name){errEl.textContent='⚠️ 請填寫員工姓名';errEl.style.display='block';return;}
+  if(pw.length<4){errEl.textContent='⚠️ 密碼至少4碼';errEl.style.display='block';return;}
+  if((DB.accs||[]).find(function(a){return a.id===newId;})){errEl.textContent='⚠️ 此工號已存在';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  var colors=['#5046e0','#2f5fd4','#7340c8','#2eaa6e','#e07c08','#16a085'];
+  sha256(pw).then(function(hash){
+    return sbins('employees',{id:newId,name:name,
+      dept:document.getElementById('ne_dept').value,pos:document.getElementById('ne_pos').value,
+      salary:Number(document.getElementById('ne_sal').value)||0,
+      email:document.getElementById('ne_email').value,work_rule:document.getElementById('ne_rule').value,
+      supervisor_id:(document.getElementById('ne_sup')?document.getElementById('ne_sup').value:'')||'',
+      role:document.getElementById('ne_role').value,
+      color:colors[(DB.emps||[]).length%colors.length],password_hash:hash});
+  }).then(function(){return loadAllData();}).then(function(){
+    closeSheet('empSheet');showNewEmpInfo(name,newId,pw);
+    renderEmployees(document.getElementById('adminScroll'));
+  });
+};
+
+// ── Override changePassword ───────────────────────
+window.changePassword=function(){
+  var curPw=document.getElementById('curPw').value;
+  var newPw=document.getElementById('newPw').value;
+  var confirmPw=document.getElementById('confirmPw').value;
+  var errEl=document.getElementById('pwError');
+  if(newPw.length<6){errEl.textContent='新密碼至少需要6個字元';errEl.style.display='block';return;}
+  if(newPw!==confirmPw){errEl.textContent='兩次密碼不一致';errEl.style.display='block';return;}
+  sha256(curPw).then(function(curHash){
+    var acc=(DB.accs||[]).find(function(a){return a.id===window.currentUser.id;});
+    if(!acc||acc.pw!==curHash){errEl.textContent='目前密碼錯誤';errEl.style.display='block';return;}
+    sha256(newPw).then(function(newHash){
+      sbupd('employees',{password_hash:newHash},{id:window.currentUser.id}).then(function(){return loadAllData();}).then(function(){
+        errEl.style.display='none';
+        ['curPw','newPw','confirmPw'].forEach(function(id){document.getElementById(id).value='';});
+        toast('🔒','密碼修改成功！');
+      });
+    });
+  });
+};
+
+// ── Override saveSettings ─────────────────────────
+window.saveSettings=function(){
+  var rg=document.getElementById('cfg_requireGPS')?document.getElementById('cfg_requireGPS').checked:true;
+  sbups('company_settings',{id:1,
+    name:document.getElementById('cfg_name').value,address:document.getElementById('cfg_addr').value,
+    lat:parseFloat(document.getElementById('cfg_lat').value),lng:parseFloat(document.getElementById('cfg_lng').value),
+    range_m:parseInt(document.getElementById('cfg_range').value)||300,require_gps:rg},'id')
+  .then(function(){return loadAllData();}).then(function(){toast('✅','公司設定已儲存');});
+};
+
+// ── Override saveQuota ────────────────────────────
+window.saveQuota=function(){
+  var keys=['annual','sick','personal','marriage','funeral','official'];
+  var row={id:1};
+  keys.forEach(function(k){row[k]=Number(document.getElementById('q_'+k)?document.getElementById('q_'+k).value:0)||0;});
+  sbups('leave_quota',row,'id').then(function(){return loadAllData();}).then(function(){toast('✅','假期額度已儲存');});
+};
+
+// ── Override submitLeave ──────────────────────────
+window.submitLeave=function(){
+  var type=document.getElementById('lType')?document.getElementById('lType').value:'annual';
+  var start=document.getElementById('lStart')?document.getElementById('lStart').value:'';
+  var end=document.getElementById('lEnd')?document.getElementById('lEnd').value:'';
+  var reason=(document.getElementById('lReason')?document.getElementById('lReason').value:'')||'';
+  reason=reason.trim();
+  var proxy=(document.getElementById('lProxy')?document.getElementById('lProxy').value:'')||'';
+  proxy=proxy.trim();
+  var supId=(document.getElementById('lSup')?document.getElementById('lSup').value:'')||'';
+  var errEl=document.getElementById('leaveFormErr');
+  if(!start||!end){errEl.textContent='⚠️ 請填寫日期';errEl.style.display='block';return;}
+  if(start>end){errEl.textContent='⚠️ 結束日期不能早於開始';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫原因';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  var emp=window.currentUser.empData;
+  var fileInput=document.getElementById('lAttach');
+  var file=fileInput&&fileInput.files&&fileInput.files[0];
+  var days=0,cur=new Date(start),endD=new Date(end);
+  while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
+  var supEmp=getEmpById(supId);
+  function saveLeave(attachData){
+    sbins('leave_apps',{id:'LA'+Date.now(),emp_id:window.currentUser.id,emp_name:emp?emp.name:window.currentUser.id,
+      type:type,start_date:start,end_date:end,days:days,reason:reason,proxy:proxy,sup_id:supId,
+      attach_name:file?file.name:'',attach_data:attachData||'',status:'pending',stage:'sup',applied_at:new Date().toISOString()})
+    .then(function(){return loadAllData();}).then(function(){
+      closeSheet('leaveSheet');
+      if(supEmp&&supEmp.email){
+        var a2=document.createElement('a');
+        a2.href='mailto:'+supEmp.email+'?subject='+encodeURIComponent('[請假通知] '+emp.name)+'&body='+encodeURIComponent(emp.name+' 申請請假。期間：'+start+(start!==end?' ~ '+end:'')+' 原因：'+reason);
+        a2.style.display='none';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+      }
+      toast('✅','假期申請已送出！');
+      if(window.currentUser.role==='employee')empTab('status');
+      updateEmpBadge();
+    });
+  }
+  if(file){var r=new FileReader();r.onload=function(e){saveLeave(e.target.result);};r.onerror=function(){saveLeave('');};r.readAsDataURL(file);}
+  else saveLeave('');
+};
+
+// ── Override doReview ─────────────────────────────
+window.doReview=function(status){
+  if(!window.reviewingId)return;
+  var rid=window.reviewingId;
+  var note=(document.getElementById('reviewNote')?document.getElementById('reviewNote').value:'')||'';
+  var now=new Date().toISOString();
+
+  if(rid.startsWith('MAKEUP:')){
+    var realId=rid.replace('MAKEUP:','');
+    var a=getMakeupApps().find(function(x){return x.id===realId;});
+    if(!a)return;
+    var upd={};
+    if(status==='rejected'){upd={status:'rejected',sup_note:a.supNote||note,hr_note:note,hr_reviewed_at:now};}
+    else if(a.status==='pending'){upd={status:'sup_approved',stage:'hr',sup_note:note,sup_reviewed_at:now};}
+    else if(a.status==='sup_approved'){
+      upd={status:'approved',stage:'done',hr_note:note,hr_reviewed_at:now};
+      var timeISO=a.date+'T'+a.punchTime+':00';
+      var ex=getRecs().find(function(r){return r.date===a.date&&r.empId===a.empId;});
+      if(ex){sbupd('records',a.punchType==='in'?{time_in:timeISO,gps_in:Object.assign({},a.gps,{makeup:true})}:{time_out:timeISO,gps_out:Object.assign({},a.gps,{makeup:true})},{emp_id:a.empId,date:a.date});}
+      else{sbins('records',{emp_id:a.empId,date:a.date,time_in:a.punchType==='in'?timeISO:null,time_out:a.punchType==='out'?timeISO:null,gps_in:a.punchType==='in'?Object.assign({},a.gps,{makeup:true}):null,gps_out:a.punchType==='out'?Object.assign({},a.gps,{makeup:true}):null});}
+    }
+    sbupd('makeup_apps',upd,{id:realId}).then(function(){return loadAllData();}).then(function(){
+      closeSheet('reviewSheet');
+      toast(status==='rejected'?'❌':'✅',status==='rejected'?'已拒絕補打卡':upd.status==='sup_approved'?'第1層核准！':'✅ 補打卡核准並寫入紀錄');
+      renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
+    });
+    return;
+  }
+
+  var b=getApps().find(function(x){return x.id===rid;});
+  if(!b)return;
+  var upd2={};
+  if(status==='rejected'){upd2={status:'rejected',sup_note:b.supNote||note,hr_note:note,sup_reviewed_at:b.supReviewedAt||now,hr_reviewed_at:now};}
+  else if(b.status==='pending'){
+    upd2={status:'sup_approved',stage:'hr',sup_note:note,sup_reviewed_at:now};
+    var hrAcc=(DB.accs||[]).find(function(x){return x.role==='admin';});
+    var hrEmp=hrAcc?getEmpById(hrAcc.id):null;
+    if(hrEmp&&hrEmp.email){
+      var el=document.createElement('a');
+      el.href='mailto:'+hrEmp.email+'?subject='+encodeURIComponent('[請假待HR審核] '+b.empName)+'&body='+encodeURIComponent(b.empName+' 的請假已通過主管審核，請進行最終審核。');
+      el.style.display='none';document.body.appendChild(el);el.click();document.body.removeChild(el);
+    }
+  }else if(b.status==='sup_approved'){upd2={status:'approved',stage:'done',hr_note:note,hr_reviewed_at:now};}
+  sbupd('leave_apps',upd2,{id:rid}).then(function(){return loadAllData();}).then(function(){
+    closeSheet('reviewSheet');
+    var msg=status==='rejected'?'已拒絕 '+b.empName+' 的申請':upd2.status==='sup_approved'?'第1層核准！已通知HR':'✅ 全數核准！';
+    toast(status==='rejected'?'❌':'✅',msg);
+    renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
+  });
+};
+
+// ── Override confirmMakeupGps ─────────────────────
+window.confirmMakeupGps=function(){
+  if(!window.makeupPendingData)return;
+  var d=window.makeupPendingData;
+  var emp=window.currentUser.empData;
+  var supEmp=getEmpById(d.supId);
+  sbins('makeup_apps',{id:'MK'+Date.now(),emp_id:window.currentUser.id,emp_name:emp?emp.name:window.currentUser.id,
+    date:d.date,punch_type:d.type,punch_time:d.time,sup_id:d.supId,reason:d.reason,
+    gps:window.makeupGpsData,status:'pending',stage:'sup',applied_at:new Date().toISOString()})
+  .then(function(){return loadAllData();}).then(function(){
+    closeSheet('makeupGpsSheet');
+    window.makeupPendingData=null;window.makeupGpsData=null;
+    if(supEmp&&supEmp.email){
+      var tl=d.type==='in'?'上班':'下班';
+      var el=document.createElement('a');
+      el.href='mailto:'+supEmp.email+'?subject='+encodeURIComponent('[補打卡審核] '+emp.name)+'&body='+encodeURIComponent(emp.name+' 申請補打卡。日期：'+d.date+' 類型：'+tl+'打卡 '+d.time+' 原因：'+d.reason);
+      el.style.display='none';document.body.appendChild(el);el.click();document.body.removeChild(el);
+    }
+    toast('✅','補打卡申請已送出！等待主管審核');
+    if(window.currentUser.role==='employee')empTab('clock');
+    updateEmpBadge();
+  });
+};
+
+// ── Init: override seedData call ──────────────────
+document.addEventListener('DOMContentLoaded',function(){
+  window.seedData();
+});
+
+})(); // end IIFE
+</script>
