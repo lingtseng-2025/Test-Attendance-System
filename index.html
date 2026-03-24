@@ -460,33 +460,9 @@ const LS={
 
 // ── Seed initial data ──────────────────────────────
 function seedData(){
-  // 清除舊版本 demo 帳號（EMP-0042、ADMIN-001 等），保留真實帳號
-  const OLD_DEMO_IDS=['EMP-0042','EMP-0018','EMP-0031','EMP-0005','ADMIN-001'];
-  let accs=LS.get('accounts')||[];
-  let emps=LS.get('employees')||[];
-  const hadDemo=accs.some(a=>OLD_DEMO_IDS.includes(a.id));
-  if(hadDemo){
-    accs=accs.filter(a=>!OLD_DEMO_IDS.includes(a.id));
-    emps=emps.filter(e=>!OLD_DEMO_IDS.includes(e.id));
-    LS.set('accounts',accs);
-    LS.set('employees',emps);
-  }
-  // 確保 admin 帳號永遠存在
-  if(!accs.find(a=>a.id==='admin')){
-    accs.push({id:'admin',pw:'93609058',role:'admin'});
-    LS.set('accounts',accs);
-  }
-  if(!emps.find(e=>e.id==='admin')){
-    emps.push({id:'admin',name:'系統管理員',dept:'人資部',pos:'HR 主任',workRule:'deduct_lunch',salary:0,email:'',color:'#5046e0'});
-    LS.set('employees',emps);
-  }
-  if(!LS.get('records')) LS.set('records',[]);
-  if(!LS.get('leaveApps')) LS.set('leaveApps',[]);
-  if(!LS.get('makeupApps')) LS.set('makeupApps',[]);
-  if(!LS.get('leaveQuota')) LS.set('leaveQuota',{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0});
-  if(!LS.get('companySettings')) LS.set('companySettings',COMPANY_DEFAULTS);
-  if(!LS.get('workRules')) LS.set('workRules',{default:'deduct_lunch'});
+  // Replaced by Supabase patch - do nothing here
 }
+
 
 // ── Getters ────────────────────────────────────────
 const getAccounts=()=>LS.get('accounts')||[];
@@ -530,28 +506,30 @@ let clockIntervals=[];
 function doLogin(){
   const id=document.getElementById('loginId').value.trim();
   const pw=document.getElementById('loginPw').value;
-  const acc=getAccounts().find(a=>a.id===id&&a.pw===pw);
-  if(!acc){
-    document.getElementById('loginError').classList.add('show');
-    document.getElementById('loginPw').value='';
-    return;
-  }
+  if(!id||!pw){document.getElementById('loginError').classList.add('show');return;}
   document.getElementById('loginError').classList.remove('show');
-  const emp=getEmpById(acc.id);
-  currentUser={id:acc.id, role:acc.role, empData:emp};
-  if(acc.role==='admin'){
-    showScreen('adminScreen');
-    startAdminSession();
-  } else {
-    showScreen('empScreen');
-    startEmpSession();
-  }
-}
-
-function quickLogin(id,pw){
-  document.getElementById('loginId').value=id;
-  document.getElementById('loginPw').value=pw;
-  doLogin();
+  const btn=document.querySelector('.lf-btn');
+  if(btn){btn.textContent='登入中...';btn.disabled=true;}
+  // SHA-256 hash then load from Supabase
+  (window.sha256?window.sha256(pw):Promise.resolve(pw)).then(async function(hash){
+    if(window.loadAllData) await window.loadAllData();
+    const accs=getAccounts();
+    const acc=accs.find(a=>a.id===id&&a.pw===hash);
+    if(!acc){
+      document.getElementById('loginError').classList.add('show');
+      document.getElementById('loginPw').value='';
+      if(btn){btn.textContent='登入';btn.disabled=false;}
+      return;
+    }
+    document.getElementById('loginError').classList.remove('show');
+    const emp=getEmpById(acc.id);
+    currentUser={id:acc.id,role:acc.role,empData:emp};
+    if(acc.role==='admin'){
+      document.body.classList.add('admin-mode');
+      showScreen('adminScreen');startAdminSession();
+    }else{showScreen('empScreen');startEmpSession();}
+    if(btn){btn.textContent='登入';btn.disabled=false;}
+  });
 }
 
 function doLogout(){
