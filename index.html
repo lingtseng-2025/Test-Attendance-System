@@ -1119,9 +1119,10 @@ function changePassword(){
 let adminMode='admin'; // 'admin' | 'punch'
 
 function startAdminSession(){
+  if(!currentUser){console.error('startAdminSession: currentUser is null!');return;}
   const emp=currentUser.empData;
   // Update sidebar user info
-  var uname=emp?emp.name:currentUser.id;
+  var uname=(currentUser&&emp)?emp.name:(currentUser?currentUser.id:'管理員');
   if(document.getElementById('sidebarName')) document.getElementById('sidebarName').textContent=uname;
   if(document.getElementById('sidebarAv')) document.getElementById('sidebarAv').textContent=uname[0]||'A';
   if(document.getElementById('adminNameTop')) document.getElementById('adminNameTop').textContent=uname;
@@ -2778,7 +2779,8 @@ window.doLogin=function(){
         if(btn){btn.textContent='登入';btn.disabled=false;}
         return;
       }
-      var emp=getEmpById(acc.id);
+      var emp=window.getEmpById(acc.id)||getEmpById(acc.id);
+      console.log('[doLogin] id='+acc.id+' emp='+JSON.stringify(emp)+' DB.emps.length='+(DB.emps||[]).length);
       window.currentUser={id:acc.id,role:acc.role,empData:emp};
       if(acc.role==='admin'){
         document.body.classList.add('admin-mode');
