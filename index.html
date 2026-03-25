@@ -2644,7 +2644,9 @@ function sbq(t,o){
   if(o.filter)Object.keys(o.filter).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(o.filter[k]));});
   if(o.order)p.push('order='+encodeURIComponent(o.order));
   if(p.length)u+='?'+p.join('&');
-  return fetch(u,{headers:H}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];});
+  // No-cache headers to ensure fresh data
+  var fetchH=Object.assign({},H,{'Cache-Control':'no-cache','Pragma':'no-cache'});
+  return fetch(u,{headers:fetchH,cache:'no-store'}).then(function(r){return r.ok?r.json():[];}).catch(function(){return[];});
 }
 function sbins(t,d){
   return fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(d)})
@@ -2803,8 +2805,10 @@ window.saveEmp=function(empId){
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
     return sbupd('employees',d,{id:empId}).then(function(){return loadAllData();}).then(function(){
-      closePcModal();closeSheet('empSheet');toast('✅',d.name+' 資料已更新');
-      adminTab('employees');
+      closePcModal();
+      closeSheet('empSheet');
+      toast('\u2705',d.name+' \u8cc7\u6599\u5df2\u66f4\u65b0');
+      setTimeout(function(){ adminTab('employees'); }, 50);
     });
   };
   if(newPw)sha256(newPw).then(doSave);else doSave();
