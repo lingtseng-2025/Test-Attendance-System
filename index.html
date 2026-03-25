@@ -28,7 +28,11 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{font-family:var(--font);background:var(--bg);color:var(--text);display:flex;flex-direction:column;max-width:480px;margin:0 auto;position:relative}
-body.admin-mode{max-width:100%!important;}
+body.admin-mode{max-width:100%!important;overflow:hidden}
+body.admin-mode .sab{display:none}
+body.admin-mode #loginScreen{display:none}
+body.admin-mode #empScreen{display:none}
+#adminScreen.active.admin-pc-screen{display:flex;flex-direction:row;height:100vh;width:100vw;overflow:hidden}
 
 /* ── Safe area ── */
 .sab{height:env(safe-area-inset-top,0);background:var(--sb);flex-shrink:0}
@@ -245,7 +249,7 @@ tr:last-child td{border-bottom:none}
 }
 
 /* ═══════════════ ADMIN PC LAYOUT ═══════════════ */
-.admin-pc-layout{display:flex;height:100%;overflow:hidden}
+.admin-pc-layout{display:flex;width:100%;height:100%;overflow:hidden}
 .admin-sidebar{width:240px;min-width:240px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow:hidden;box-shadow:2px 0 12px rgba(80,70,224,.08)}
 .sidebar-logo{padding:20px 18px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bg)}
 .sidebar-logo-icon{width:38px;height:38px;border-radius:12px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
@@ -264,7 +268,7 @@ tr:last-child td{border-bottom:none}
 .snav-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0}
 .snav-badge{background:var(--pink);color:#fff;font-size:10px;font-weight:900;padding:1px 7px;border-radius:20px;margin-left:auto}
 .sidebar-footer{padding:12px;border-top:1px solid var(--bg)}
-.admin-main{flex:1;overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}
+.admin-main{flex:1;overflow:hidden;display:flex;flex-direction:column;background:var(--bg);min-width:0}
 .admin-main .scroll{padding:20px 24px 32px!important}
 
 /* PC content styles */
@@ -290,6 +294,39 @@ body.admin-mode .card{border-radius:16px}
   .admin-pc-layout{display:none}
   #adminTabbar{display:flex!important}
   .admin-main .scroll{padding:12px 12px 80px!important}
+}
+/* Admin PC full override */
+body.admin-mode{
+  max-width:100vw!important;
+  width:100vw!important;
+  height:100vh!important;
+  overflow:hidden!important;
+  flex-direction:row!important;
+}
+body.admin-mode > .sab{display:none!important}
+body.admin-mode > #loginScreen{display:none!important}
+body.admin-mode > #empScreen{display:none!important}
+body.admin-mode > #adminScreen{
+  flex:1!important;
+  max-width:100%!important;
+  width:100%!important;
+  height:100vh!important;
+  overflow:hidden!important;
+  display:flex!important;
+  flex-direction:row!important;
+}
+.admin-sidebar{
+  height:100vh!important;
+  flex-shrink:0!important;
+}
+.admin-main{
+  height:100vh!important;
+  overflow:hidden!important;
+}
+.admin-main .scroll{
+  height:100%!important;
+  overflow-y:auto!important;
+  padding:24px 28px 40px!important;
 }
 
 </style>
@@ -362,7 +399,7 @@ body.admin-mode .card{border-radius:16px}
 </div>
 
 <!-- ═══════════════ ADMIN SCREEN ═══════════════ -->
-<div class="screen" id="adminScreen">
+<div class="screen admin-pc-screen" id="adminScreen">
   <!-- PC Layout: sidebar + main content -->
   <div class="admin-pc-layout">
     <!-- Sidebar -->
@@ -406,13 +443,8 @@ body.admin-mode .card{border-radius:16px}
         </div>
       </nav>
       <div class="sidebar-footer">
-        <div class="tn-time" id="adminClock" style="font-size:20px;font-weight:900;color:var(--pd);margin-bottom:6px"></div>
-        <!-- Admin punch mode switcher -->
-        <div class="role-switch" style="margin-bottom:10px">
-          <button class="rs-btn active" id="rsAdmin" onclick="switchAdminMode('admin')">⚙️ 管理</button>
-          <button class="rs-btn" id="rsMyPunch" onclick="switchAdminMode('punch')">🕐 打卡</button>
-        </div>
-        <button class="tn-logout" onclick="doLogout()" style="width:100%;padding:9px;border-radius:10px">🚪 登出系統</button>
+        <div class="tn-time" id="adminClock" style="font-size:18px;font-weight:900;color:var(--pd);margin-bottom:10px;text-align:center"></div>
+        <button class="tn-logout" onclick="doLogout()" style="width:100%;padding:10px;border-radius:10px;background:var(--grad);color:#fff;border:none;font-weight:700;cursor:pointer;font-family:var(--font)">🚪 登出系統</button>
       </div>
     </div>
     <!-- Main content -->
@@ -1060,38 +1092,24 @@ let adminMode='admin'; // 'admin' | 'punch'
 
 function startAdminSession(){
   const emp=currentUser.empData;
-  // Update sidebar
-  if(document.getElementById('sidebarName')) document.getElementById('sidebarName').textContent=emp?.name||currentUser.id;
-  if(document.getElementById('sidebarAv')) document.getElementById('sidebarAv').textContent=(emp?.name||currentUser.id)[0];
-  if(document.getElementById('adminNameTop')) document.getElementById('adminNameTop').textContent=emp?.name||currentUser.id;
+  // Update sidebar user info
+  var uname=emp?emp.name:currentUser.id;
+  if(document.getElementById('sidebarName')) document.getElementById('sidebarName').textContent=uname;
+  if(document.getElementById('sidebarAv')) document.getElementById('sidebarAv').textContent=uname[0]||'A';
+  if(document.getElementById('adminNameTop')) document.getElementById('adminNameTop').textContent=uname;
   function tick(){
     const el=document.getElementById('adminClock');
     if(el) el.textContent=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
   }
   tick();
   clockIntervals.push(setInterval(tick,1000));
-  adminMode='admin';
-  document.getElementById('rsAdmin').classList.add('active');
-  document.getElementById('rsMyPunch').classList.remove('active');
   adminTab('dashboard');
   updateAdminBadge();
 }
 
 function switchAdminMode(mode){
-  adminMode=mode;
-  ['rsAdmin','rsMyPunch'].forEach(function(id){
-    var el=document.getElementById(id);
-    if(el) el.classList.toggle('active', id==='rsAdmin'?mode==='admin':mode==='punch');
-  });
-  const s=document.getElementById('adminScroll');
-  if(mode==='punch'){
-    s.innerHTML='';
-    renderAdminPunch(s);
-    // Hide sidebar nav items
-    document.querySelectorAll('.snav-item').forEach(t=>t.classList.remove('active'));
-  } else {
-    adminTab('dashboard');
-  }
+  // Admin no longer has punch mode - always stay in admin mode
+  adminTab('dashboard');
 }
 
 // ── Admin Punch (管理員自己打卡) ────────────────────
@@ -1133,8 +1151,7 @@ let currentAdminTab='dashboard';
 function adminTab(tab){
   currentAdminTab=tab;
   adminMode='admin';
-  if(document.getElementById('rsAdmin')) document.getElementById('rsAdmin').classList.add('active');
-  if(document.getElementById('rsMyPunch')) document.getElementById('rsMyPunch').classList.remove('active');
+
   // Update sidebar nav
   document.querySelectorAll('.snav-item').forEach(t=>t.classList.remove('active'));
   var snavEl=document.getElementById('snav-'+tab);
