@@ -3234,7 +3234,7 @@ window.printSalarySlip = function(empId, y, m) {
 
 
 // ── PC Modal helpers ─────────────────────────────
-function openPcModal(title, bodyHTML, saveCallback){
+window.openPcModal=function(title, bodyHTML, saveCallback){
   var overlay=document.getElementById('pcEmpModal');
   if(!overlay){
     // Fallback to sheet for mobile
@@ -3248,7 +3248,7 @@ function openPcModal(title, bodyHTML, saveCallback){
   // Close on backdrop click
   overlay.onclick=function(e){if(e.target===overlay)closePcModal();};
 }
-function closePcModal(){
+window.closePcModal=function(){
   var overlay=document.getElementById('pcEmpModal');
   if(overlay) overlay.classList.remove('show');
 }
