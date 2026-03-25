@@ -602,9 +602,9 @@ const RULE_LABEL={subtract:'直接相減',deduct_lunch:'扣午休1h',deduct_both
 const LEAVE_LABEL={annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'};
 const COMPANY_DEFAULTS={lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
 
-const LS={
-  get(k){try{return JSON.parse(localStorage.getItem(k))}catch{return null}},
-  set(k,v){localStorage.setItem(k,JSON.stringify(v))},
+var LS={
+  get:function(k){try{return JSON.parse(localStorage.getItem(k));}catch(e){return null;}},
+  set:function(k,v){localStorage.setItem(k,JSON.stringify(v));},
 };
 
 // ── Seed initial data ──────────────────────────────
@@ -649,8 +649,8 @@ function getMonthRecs(y,m,empId){
 // ══════════════════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════════════════
-let currentUser=null; // {id, role, empData}
-let clockIntervals=[];
+var currentUser=null; // {id, role, empData}
+var clockIntervals=[];
 
 function doLogin(){
   const id=document.getElementById('loginId').value.trim();
@@ -2715,21 +2715,45 @@ function showLoad(m){
 }
 function hideLoad(){var el=document.getElementById('_lo');if(el)el.style.display='none';}
 
+// ── Override getter functions ────────────────────
+// These must be overridden because main script uses const (not window.)
+// We patch them by reassigning on window AND making them reference DB directly
+
 // ── Override LS ───────────────────────────────────
-window.LS={
-  get:function(k){
-    if(k==='accounts')return DB.accs;
-    if(k==='employees')return DB.emps;
-    if(k==='records')return DB.recs;
-    if(k==='leaveApps')return DB.leaves;
-    if(k==='makeupApps')return DB.makeups;
-    if(k==='leaveQuota')return DB.quota;
-    if(k==='companySettings')return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
-    if(k==='workRules')return{default:'deduct_lunch'};
-    return null;
-  },
-  set:function(){}
+// Mutate the existing LS object so that const LS in main script picks up the changes
+var _lsGet=function(k){
+  if(k==='accounts')return DB.accs;
+  if(k==='employees')return DB.emps;
+  if(k==='records')return DB.recs;
+  if(k==='leaveApps')return DB.leaves;
+  if(k==='makeupApps')return DB.makeups;
+  if(k==='leaveQuota')return DB.quota;
+  if(k==='companySettings')return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
+  if(k==='workRules')return{default:'deduct_lunch'};
+  return null;
 };
+// Patch the LS object that main script uses (works because objects are mutable)
+if(window.LS){window.LS.get=_lsGet;window.LS.set=function(){};}
+// Also set window.LS for patch code
+window.LS={get:_lsGet,set:function(){}};
+
+// ── Override getter functions to use DB ──────────
+// Since main script uses `const` (not window.), we must override via window
+// In browsers, top-level `const` is NOT on window, but functions ARE
+// So we wrap them: when called from patch context, they use DB
+// The trick: patch overrides LS.get, main script's const getEmps calls LS.get()
+// Since LS is const (not window.LS), we need to ensure window.LS patch works differently
+// ACTUAL FIX: make main script LS use window._LS fallback
+// SIMPLER FIX: override each getter on window so patch code can call them safely
+
+window.getEmps=function(){return DB.emps||[];};
+window.getAccounts=function(){return DB.accs||[];};
+window.getRecs=function(){return DB.recs||[];};
+window.getApps=function(){return DB.leaves||[];};
+window.getMakeupApps=function(){return DB.makeups||[];};
+window.getQuota=function(){return DB.quota||{};};
+window.getCfg=function(){return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};};
+window.getEmpById=function(id){return (DB.emps||[]).find(function(e){return e.id===id;})||null;};
 
 // ── Override seedData ─────────────────────────────
 window.seedData=function(){
