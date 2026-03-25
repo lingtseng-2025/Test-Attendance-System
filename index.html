@@ -295,6 +295,18 @@ body.admin-mode .card{border-radius:16px}
   #adminTabbar{display:flex!important}
   .admin-main .scroll{padding:12px 12px 80px!important}
 }
+/* ── PC Modal ── */
+.pc-modal-overlay{position:fixed;inset:0;background:rgba(40,30,100,.45);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
+.pc-modal-overlay.show{display:flex}
+.pc-modal{background:#fff;border-radius:20px;width:560px;max-width:92vw;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(80,70,224,.25);overflow:hidden}
+.pc-modal-hd{padding:20px 24px 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--bg);flex-shrink:0}
+.pc-modal-title{font-family:Nunito,sans-serif;font-size:18px;font-weight:900;color:var(--text)}
+.pc-modal-close{width:32px;height:32px;border-radius:50%;background:var(--bg);border:none;cursor:pointer;font-size:16px;color:var(--t2);display:flex;align-items:center;justify-content:center}
+.pc-modal-close:hover{background:var(--border)}
+.pc-modal-body{padding:20px 24px;overflow-y:auto;flex:1}
+.pc-modal-footer{padding:14px 24px;border-top:1px solid var(--bg);display:flex;gap:10px;justify-content:flex-end;flex-shrink:0}
+.pc-modal-footer .sbtn{min-width:100px;text-align:center}
+
 /* Admin PC full override */
 body.admin-mode{
   max-width:100vw!important;
@@ -562,6 +574,22 @@ body.admin-mode > #adminScreen{
     </div>
   </div>
 </div>
+
+<!-- ═══════ PC MODAL for employee edit / add ═══════ -->
+<div class="pc-modal-overlay" id="pcEmpModal">
+  <div class="pc-modal">
+    <div class="pc-modal-hd">
+      <div class="pc-modal-title" id="pcModalTitle">✏️ 員工設定</div>
+      <button class="pc-modal-close" onclick="closePcModal()">✕</button>
+    </div>
+    <div class="pc-modal-body" id="pcModalBody"></div>
+    <div class="pc-modal-footer">
+      <button class="sbtn cancel" onclick="closePcModal()">取消</button>
+      <button class="sbtn confirm" id="pcModalSaveBtn">💾 儲存變更</button>
+    </div>
+  </div>
+</div>
+
 
 <div class="toast" id="toast"><span id="tIcon"></span><span id="tMsg"></span></div>
 
@@ -1643,47 +1671,48 @@ function renderEmployees(s){
 function openEditEmp(empId){
   const emp=getEmps().find(e=>e.id===empId);if(!emp)return;
   const acc=getAccounts().find(a=>a.id===empId);
-  // 其他員工作為主管選項（排除自己）
   const otherEmps=getEmps().filter(e=>e.id!==empId);
   const supOptions='<option value="">-- 無 / 未設定 --</option>'
     +otherEmps.map(e=>'<option value="'+e.id+'"'+(emp.supervisorId===e.id?' selected':'')+'>'+e.name+' ('+e.dept+')</option>').join('');
-  document.getElementById('empSheetBody').innerHTML=`
-    <div class="fg"><label>姓名</label><input id="ee_name" value="${emp.name}"></div>
-    <div class="fr2">
-      <div class="fg"><label>部門</label><input id="ee_dept" value="${emp.dept}"></div>
-      <div class="fg"><label>職稱</label><input id="ee_pos" value="${emp.pos}"></div>
-    </div>
-    <div class="fr2">
-      <div class="fg"><label>月薪</label><input type="number" id="ee_sal" value="${emp.salary}"></div>
-      <div class="fg"><label>Email</label><input type="email" id="ee_email" value="${emp.email||''}"></div>
-    </div>
-    <div class="fg"><label>直屬主管</label>
-      <select id="ee_sup">${supOptions}</select>
-    </div>
-    <div class="fg"><label>工時計算規則</label>
-      <select id="ee_rule">
-        <option value="subtract" ${emp.workRule==='subtract'?'selected':''}>直接相減</option>
-        <option value="deduct_lunch" ${emp.workRule==='deduct_lunch'?'selected':''}>扣除午休 1 小時</option>
-        <option value="deduct_both" ${emp.workRule==='deduct_both'?'selected':''}>扣除午休＋晚餐 2 小時</option>
-      </select>
-    </div>
-    <div class="fg"><label>角色權限</label>
-      <select id="ee_role">
-        <option value="employee" ${acc?.role==='employee'?'selected':''}>👤 員工</option>
-        <option value="admin" ${acc?.role==='admin'?'selected':''}>⚙️ 管理員</option>
-      </select>
-    </div>
-    <div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-bottom:13px">
-      <div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:8px">🔑 重設密碼</div>
-      <div style="font-size:11px;color:var(--t3);margin-bottom:8px">輸入新密碼幫員工重設，空白則不更動</div>
-      <div style="position:relative">
-        <input type="password" id="ee_pw" placeholder="輸入新密碼（空白=不更改）" style="padding-right:40px">
-        <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);cursor:pointer;font-size:15px" onclick="togglePwVis('ee_pw')">👁️</span>
-      </div>
-    </div>
-    <button class="save-btn" onclick="saveEmp('${empId}')">💾 儲存變更</button>`;
-  openSheet('empSheet');
+
+  var bodyHTML=''
+    +'<div class="fg"><label>姓名</label><input id="ee_name" value="'+emp.name+'"></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>部門</label><input id="ee_dept" value="'+emp.dept+'"></div>'
+    +'<div class="fg"><label>職稱</label><input id="ee_pos" value="'+emp.pos+'"></div>'
+    +'</div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>月薪</label><input type="number" id="ee_sal" value="'+emp.salary+'"></div>'
+    +'<div class="fg"><label>Email</label><input type="email" id="ee_email" value="'+(emp.email||'')+'"></div>'
+    +'</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="ee_sup">'+supOptions+'</select></div>'
+    +'<div class="fg"><label>工時計算規則</label>'
+    +'<select id="ee_rule">'
+    +'<option value="subtract"'+(emp.workRule==='subtract'?' selected':'')+'>直接相減</option>'
+    +'<option value="deduct_lunch"'+(emp.workRule==='deduct_lunch'?' selected':'')+'>扣除午休 1 小時</option>'
+    +'<option value="deduct_both"'+(emp.workRule==='deduct_both'?' selected':'')+'>扣除午休＋晚餐 2 小時</option>'
+    +'</select></div>'
+    +'<div class="fg"><label>角色權限</label>'
+    +'<select id="ee_role">'
+    +'<option value="employee"'+(acc&&acc.role==='employee'?' selected':'')+'>👤 員工</option>'
+    +'<option value="admin"'+(acc&&acc.role==='admin'?' selected':'')+'>⚙️ 管理員</option>'
+    +'</select></div>'
+    +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-bottom:4px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:6px">🔑 重設密碼</div>'
+    +'<div style="font-size:11px;color:var(--t3);margin-bottom:6px">輸入新密碼幫員工重設，空白則不更動</div>'
+    +'<input type="password" id="ee_pw" placeholder="輸入新密碼（空白=不更改）">'
+    +'</div>';
+
+  // Use PC modal if available (admin PC mode), else fallback to sheet
+  if(document.getElementById('pcEmpModal') && document.body.classList.contains('admin-mode')){
+    openPcModal('✏️ 編輯員工 — '+emp.name, bodyHTML, function(){saveEmp(empId);});
+  } else {
+    document.getElementById('empSheetBody').innerHTML=bodyHTML
+      +'<button class="save-btn" onclick="saveEmp(\''+empId+'\')">💾 儲存變更</button>';
+    openSheet('empSheet');
+  }
 }
+
 
 function saveEmp(empId){
   const emps=getEmps();
@@ -1756,10 +1785,16 @@ function openAddEmp(){
     </div>
     <div id="addEmpError" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:9px 13px;border-radius:10px;margin-bottom:10px"></div>
     <button class="save-btn" onclick="doAddEmp()">✅ 建立員工帳號</button>`;
-  openSheet('empSheet');
-  // 填入主管選項
-  const supSel=document.getElementById('ne_sup');
-  if(supSel) supSel.innerHTML='<option value="">-- 無 / 稍後設定 --</option>'+supOptHtml;
+  var supOptHtml2=existEmpsForSup.map(e=>'<option value="'+e.id+'">'+e.name+' ('+e.dept+')</option>').join('');
+  if(document.getElementById('pcEmpModal') && document.body.classList.contains('admin-mode')){
+    openPcModal('➕ 新增員工', document.getElementById('empSheetBody').innerHTML, function(){doAddEmp();});
+    var supSel2=document.getElementById('ne_sup');
+    if(supSel2) supSel2.innerHTML='<option value="">-- 無 / 稍後設定 --</option>'+supOptHtml2;
+  } else {
+    openSheet('empSheet');
+    var supSel=document.getElementById('ne_sup');
+    if(supSel) supSel.innerHTML='<option value="">-- 無 / 稍後設定 --</option>'+supOptHtml2;
+  }
 }
 
 function doAddEmp(){
@@ -2734,7 +2769,7 @@ window.saveEmp=function(empId){
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
     return sbupd('employees',d,{id:empId}).then(function(){return loadAllData();}).then(function(){
-      closeSheet('empSheet');toast('✅',d.name+' 資料已更新');
+      closePcModal();closeSheet('empSheet');toast('✅',d.name+' 資料已更新');
       renderEmployees(document.getElementById('adminScroll'));
     });
   };
@@ -2762,7 +2797,7 @@ window.doAddEmp=function(){
       role:document.getElementById('ne_role').value,
       color:colors[(DB.emps||[]).length%colors.length],password_hash:hash});
   }).then(function(){return loadAllData();}).then(function(){
-    closeSheet('empSheet');showNewEmpInfo(name,newId,pw);
+    closePcModal();closeSheet('empSheet');showNewEmpInfo(name,newId,pw);
     renderEmployees(document.getElementById('adminScroll'));
   });
 };
@@ -3193,6 +3228,26 @@ window.printSalarySlip = function(empId, y, m) {
   win.print();
 };
 
+
+// ── PC Modal helpers ─────────────────────────────
+function openPcModal(title, bodyHTML, saveCallback){
+  var overlay=document.getElementById('pcEmpModal');
+  if(!overlay){
+    // Fallback to sheet for mobile
+    return;
+  }
+  document.getElementById('pcModalTitle').textContent=title;
+  document.getElementById('pcModalBody').innerHTML=bodyHTML;
+  var saveBtn=document.getElementById('pcModalSaveBtn');
+  saveBtn.onclick=saveCallback;
+  overlay.classList.add('show');
+  // Close on backdrop click
+  overlay.onclick=function(e){if(e.target===overlay)closePcModal();};
+}
+function closePcModal(){
+  var overlay=document.getElementById('pcEmpModal');
+  if(overlay) overlay.classList.remove('show');
+}
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
 window.seedData();
