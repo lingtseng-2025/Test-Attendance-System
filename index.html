@@ -2831,8 +2831,10 @@ window.confirmPunch=function(){
 
 // ── Override saveEmp ──────────────────────────────
 window.saveEmp=function(empId){
+  console.log('[saveEmp] called with empId='+empId);
   var newPw=document.getElementById('ee_pw')?document.getElementById('ee_pw').value:'';
   var newEmpId=document.getElementById('ee_empid')?document.getElementById('ee_empid').value.trim():empId;
+  console.log('[saveEmp] ee_name='+(document.getElementById('ee_name')?document.getElementById('ee_name').value:'NOT FOUND'));
   var d={name:document.getElementById('ee_name').value,dept:document.getElementById('ee_dept').value,
     pos:document.getElementById('ee_pos').value,salary:Number(document.getElementById('ee_sal').value)||0,
     email:document.getElementById('ee_email').value,work_rule:document.getElementById('ee_rule').value,
@@ -2841,7 +2843,11 @@ window.saveEmp=function(empId){
     status:document.getElementById('ee_status')?document.getElementById('ee_status').value:'active'};
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
-    return sbupd('employees',d,{id:empId}).then(function(){return loadAllData();}).then(function(){
+    console.log('[saveEmp] calling sbupd id='+empId+' data='+JSON.stringify(d));
+    return sbupd('employees',d,{id:empId}).then(function(res){
+      console.log('[saveEmp] sbupd result='+JSON.stringify(res));
+      return loadAllData();
+    }).then(function(){
       closePcModal();
       closeSheet('empSheet');
       toast('\u2705',d.name+' \u8cc7\u6599\u5df2\u66f4\u65b0');
