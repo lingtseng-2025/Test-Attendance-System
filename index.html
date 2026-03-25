@@ -1640,11 +1640,11 @@ function renderEmployees(s){
     var acc=accounts.find(function(a){return a.id===emp.id;});
     var isAdmin=acc&&acc.role==='admin';
     var sup=getEmpById(emp.supervisorId||'');
-    var editBtn='<button class="emp-edit-btn" data-id="'+emp.id+'" style="padding:5px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-size:12px;font-weight:700;cursor:pointer">&#x270F; 編輯</button>';
     return '<tr>'
       +'<td><div style="display:flex;align-items:center;gap:10px">'
       +'<div style="width:34px;height:34px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+emp.name[0]+'</div>'
-      +'<div><div style="font-weight:700;font-size:14px">'+emp.name+'</div><div style="font-size:11px;color:var(--t3)">'+(emp.email||'--')+'</div></div>'
+      +'<div><div style="font-weight:700;font-size:14px">'+emp.name+'</div>'
+      +'<div style="font-size:11px;color:var(--t3)">'+(emp.email||'--')+'</div></div>'
       +'</div></td>'
       +'<td><div style="font-size:13px">'+emp.dept+'</div><div style="font-size:11px;color:var(--t3)">'+emp.pos+'</div></td>'
       +'<td style="font-family:monospace;font-size:13px;color:var(--t2)">'+emp.id+'</td>'
@@ -1652,7 +1652,30 @@ function renderEmployees(s){
       +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--green)">'+(emp.salary>0?'$'+emp.salary.toLocaleString():'--')+'</td>'
       +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--pd)">'+(h>0?h.toFixed(1)+'h':'--')+'</td>'
       +'<td>'+(isAdmin?'<span class="bgg bg-pk">管理員</span>':'<span class="bgg bg-gr">員工</span>')+'</td>'
-      +'<td>'+editBtn+'</td>'
+      +'<td><button onclick="_editEmp(this.parentElement.parentElement.dataset.empid)" style="padding:5px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-size:12px;font-weight:700;cursor:pointer">&#x270F; 編輯</button></td>'
+      +'</tr>'
+      .replace('data.empid', emp.id);
+  }).join('');
+  // Build HTML with empid in each row
+  var tableRows = emps.map(function(emp){
+    var rec=getRecs().find(function(r){return r.date===today&&r.empId===emp.id;});
+    var h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
+    var acc=accounts.find(function(a){return a.id===emp.id;});
+    var isAdmin=acc&&acc.role==='admin';
+    var sup=getEmpById(emp.supervisorId||'');
+    return '<tr data-empid="'+emp.id+'">'
+      +'<td><div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:34px;height:34px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+emp.name[0]+'</div>'
+      +'<div><div style="font-weight:700;font-size:14px">'+emp.name+'</div>'
+      +'<div style="font-size:11px;color:var(--t3)">'+(emp.email||'--')+'</div></div>'
+      +'</div></td>'
+      +'<td><div style="font-size:13px">'+emp.dept+'</div><div style="font-size:11px;color:var(--t3)">'+emp.pos+'</div></td>'
+      +'<td style="font-family:monospace;font-size:13px;color:var(--t2)">'+emp.id+'</td>'
+      +'<td style="font-size:13px">'+(sup?sup.name:'--')+'</td>'
+      +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--green)">'+(emp.salary>0?'$'+emp.salary.toLocaleString():'--')+'</td>'
+      +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--pd)">'+(h>0?h.toFixed(1)+'h':'--')+'</td>'
+      +'<td>'+(isAdmin?'<span class="bgg bg-pk">管理員</span>':'<span class="bgg bg-gr">員工</span>')+'</td>'
+      +'<td><button class="emp-edit-btn" style="padding:5px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-size:12px;font-weight:700;cursor:pointer">&#x270F; 編輯</button></td>'
       +'</tr>';
   }).join('');
   s.innerHTML=''
@@ -1663,13 +1686,20 @@ function renderEmployees(s){
     +'<div class="pc-section">'
     +'<table class="pc-table" style="width:100%">'
     +'<thead><tr><th>員工</th><th>部門／職稱</th><th>工號</th><th>直屬主管</th><th>月薪</th><th>今日工時</th><th>角色</th><th>操作</th></tr></thead>'
-    +'<tbody>'+rows+'</tbody>'
+    +'<tbody>'+tableRows+'</tbody>'
     +'</table>'
     +'</div>';
-  // Attach click handlers after DOM is built
-  s.querySelectorAll('.emp-edit-btn').forEach(function(btn){
-    btn.addEventListener('click', function(){openEditEmp(this.dataset.id);});
-  });
+  // Attach click via event delegation on tbody
+  var tbody=s.querySelector('tbody');
+  if(tbody){
+    tbody.addEventListener('click',function(e){
+      var btn=e.target.closest('.emp-edit-btn');
+      if(btn){
+        var tr=btn.closest('tr');
+        if(tr&&tr.dataset.empid) openEditEmp(tr.dataset.empid);
+      }
+    });
+  }
 }
 
 function openEditEmp(empId){
@@ -3252,6 +3282,11 @@ window.closePcModal=function(){
   var overlay=document.getElementById('pcEmpModal');
   if(overlay) overlay.classList.remove('show');
 }
+
+// ── Global edit helper ───────────────────────────
+// Called from dynamically generated buttons
+window._editEmp = function(id){ window.openEditEmp(id); };
+window._addEmp  = function(){ openAddEmp(); };
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
 window.seedData();
