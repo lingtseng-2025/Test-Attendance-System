@@ -243,6 +243,55 @@ tr:last-child td{border-bottom:none}
   .scroll{padding:0}
   .card{box-shadow:none;border:1px solid #ddd}
 }
+
+/* ═══════════════ ADMIN PC LAYOUT ═══════════════ */
+.admin-pc-layout{display:flex;height:100%;overflow:hidden}
+.admin-sidebar{width:240px;min-width:240px;background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;height:100%;overflow:hidden;box-shadow:2px 0 12px rgba(80,70,224,.08)}
+.sidebar-logo{padding:20px 18px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--bg)}
+.sidebar-logo-icon{width:38px;height:38px;border-radius:12px;background:var(--grad);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.sidebar-brand{font-family:Nunito,sans-serif;font-size:16px;font-weight:900;color:var(--pd);line-height:1}
+.sidebar-brand-sub{font-size:10px;color:var(--t3);font-weight:600;margin-top:2px}
+.sidebar-user{padding:12px 16px;display:flex;align-items:center;gap:10px;background:var(--bg);margin:0 12px 8px;border-radius:12px}
+.sidebar-av{width:32px;height:32px;border-radius:50%;background:var(--grad);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;flex-shrink:0}
+.sidebar-uname{font-size:13px;font-weight:700;color:var(--text)}
+.sidebar-urole{font-size:10px;color:var(--t3)}
+.sidebar-nav{flex:1;overflow-y:auto;padding:4px 10px}
+.sidebar-nav::-webkit-scrollbar{display:none}
+.snav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;cursor:pointer;font-size:13px;font-weight:600;color:var(--t2);transition:all .15s;margin-bottom:2px;position:relative}
+.snav-item:hover{background:var(--bg);color:var(--pd)}
+.snav-item.active{background:var(--pl);color:var(--pd);font-weight:700}
+.snav-item.active .snav-icon{transform:scale(1.1)}
+.snav-icon{font-size:18px;width:24px;text-align:center;flex-shrink:0}
+.snav-badge{background:var(--pink);color:#fff;font-size:10px;font-weight:900;padding:1px 7px;border-radius:20px;margin-left:auto}
+.sidebar-footer{padding:12px;border-top:1px solid var(--bg)}
+.admin-main{flex:1;overflow:hidden;display:flex;flex-direction:column;background:var(--bg)}
+.admin-main .scroll{padding:20px 24px 32px!important}
+
+/* PC content styles */
+body.admin-mode .card{border-radius:16px}
+.pc-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.pc-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.pc-grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.pc-page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.pc-page-title{font-family:Nunito,sans-serif;font-size:22px;font-weight:900;color:var(--text)}
+.pc-page-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.pc-stat-card{background:#fff;border-radius:16px;padding:18px 20px;box-shadow:var(--sh);display:flex;align-items:center;gap:14px}
+.pc-stat-ico{width:48px;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0}
+.pc-stat-label{font-size:11px;color:var(--t3);margin-bottom:3px}
+.pc-stat-val{font-family:Nunito,sans-serif;font-size:26px;font-weight:900;line-height:1}
+.pc-table th{font-size:11px;padding:10px 14px;background:var(--bg);color:var(--t3)}
+.pc-table td{padding:11px 14px;font-size:13px}
+.pc-table tr:hover td{background:#fafafe}
+.pc-section{background:#fff;border-radius:16px;padding:20px;box-shadow:var(--sh)}
+.pc-section-title{font-size:15px;font-weight:800;color:var(--text);margin-bottom:16px;display:flex;align-items:center;justify-content:space-between}
+
+/* Responsive: mobile fallback */
+@media(max-width:768px){
+  .admin-pc-layout{display:none}
+  #adminTabbar{display:flex!important}
+  .admin-main .scroll{padding:12px 12px 80px!important}
+}
+
 </style>
 </head>
 <body>
@@ -314,35 +363,72 @@ tr:last-child td{border-bottom:none}
 
 <!-- ═══════════════ ADMIN SCREEN ═══════════════ -->
 <div class="screen" id="adminScreen">
-  <div class="topnav">
-    <div class="tn-left">
-      <div class="tn-av" style="background:var(--grad);color:#fff">👑</div>
-      <div>
-        <div class="tn-name" id="adminNameTop">管理員</div>
-        <div class="tn-role"><span>⚙️</span><span>人資管理員</span></div>
+  <!-- PC Layout: sidebar + main content -->
+  <div class="admin-pc-layout">
+    <!-- Sidebar -->
+    <div class="admin-sidebar">
+      <div class="sidebar-logo">
+        <div class="sidebar-logo-icon">👑</div>
+        <div>
+          <div class="sidebar-brand">iROBOT</div>
+          <div class="sidebar-brand-sub">HR System</div>
+        </div>
+      </div>
+      <div class="sidebar-user" id="sidebarUser">
+        <div class="sidebar-av" id="sidebarAv">A</div>
+        <div>
+          <div class="sidebar-uname" id="sidebarName">管理員</div>
+          <div class="sidebar-urole">人資管理員</div>
+        </div>
+      </div>
+      <nav class="sidebar-nav">
+        <div class="snav-item active" id="snav-dashboard" onclick="adminTab('dashboard')">
+          <span class="snav-icon">🏠</span><span>總覽儀表板</span>
+        </div>
+        <div class="snav-item" id="snav-employees" onclick="adminTab('employees')">
+          <span class="snav-icon">👥</span><span>員工管理</span>
+        </div>
+        <div class="snav-item" id="snav-approve" onclick="adminTab('approve')">
+          <span class="snav-icon">📋</span><span>審核申請</span>
+          <span class="snav-badge" id="adminApproveBadge" style="display:none">0</span>
+        </div>
+        <div class="snav-item" id="snav-reports" onclick="adminTab('reports')">
+          <span class="snav-icon">📊</span><span>出勤報表</span>
+        </div>
+        <div class="snav-item" id="snav-salary" onclick="adminTab('salary')">
+          <span class="snav-icon">💰</span><span>薪資管理</span>
+        </div>
+        <div class="snav-item" id="snav-gps" onclick="adminTab('gps')">
+          <span class="snav-icon">🗺️</span><span>GPS 地圖</span>
+        </div>
+        <div class="snav-item" id="snav-settings" onclick="adminTab('settings')">
+          <span class="snav-icon">⚙️</span><span>系統設定</span>
+        </div>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="tn-time" id="adminClock" style="font-size:20px;font-weight:900;color:var(--pd);margin-bottom:6px"></div>
+        <!-- Admin punch mode switcher -->
+        <div class="role-switch" style="margin-bottom:10px">
+          <button class="rs-btn active" id="rsAdmin" onclick="switchAdminMode('admin')">⚙️ 管理</button>
+          <button class="rs-btn" id="rsMyPunch" onclick="switchAdminMode('punch')">🕐 打卡</button>
+        </div>
+        <button class="tn-logout" onclick="doLogout()" style="width:100%;padding:9px;border-radius:10px">🚪 登出系統</button>
       </div>
     </div>
-    <div class="tn-right">
-      <div class="tn-time" id="adminClock"></div>
-      <button class="tn-logout" onclick="doLogout()">登出</button>
+    <!-- Main content -->
+    <div class="admin-main">
+      <div class="scroll" id="adminScroll" style="padding-bottom:24px"></div>
     </div>
   </div>
-  <!-- Admin mode switcher -->
-  <div style="padding:10px 12px 0;flex-shrink:0">
-    <div class="role-switch">
-      <button class="rs-btn active" id="rsAdmin" onclick="switchAdminMode('admin')">⚙️ 管理模式</button>
-      <button class="rs-btn" id="rsMyPunch" onclick="switchAdminMode('punch')">🕐 我的打卡</button>
-    </div>
-  </div>
-  <div class="scroll" id="adminScroll"></div>
-  <div class="tabbar" id="adminTabbar">
+  <!-- Mobile tabbar (hidden on PC) -->
+  <div class="tabbar admin-mobile-tabbar" id="adminTabbar" style="display:none">
     <div class="tb-item active" id="atab-dashboard" onclick="adminTab('dashboard')"><div class="tbi">🏠</div><span>總覽</span></div>
-    <div class="tb-item" id="atab-gps" onclick="adminTab('gps')"><div class="tbi">🗺️</div><span>GPS地圖</span></div>
-    <div class="tb-item" id="atab-approve" onclick="adminTab('approve')"><div class="tbi">📋</div><span>審核</span><span class="tb-badge" id="adminApproveBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="atab-gps" onclick="adminTab('gps')"><div class="tbi">🗺️</div><span>GPS</span></div>
+    <div class="tb-item" id="atab-approve" onclick="adminTab('approve')"><div class="tbi">📋</div><span>審核</span><span class="tb-badge" id="adminApproveBadgeMobile" style="display:none">0</span></div>
     <div class="tb-item" id="atab-employees" onclick="adminTab('employees')"><div class="tbi">👥</div><span>員工</span></div>
     <div class="tb-item" id="atab-reports" onclick="adminTab('reports')"><div class="tbi">📊</div><span>報表</span></div>
-    <div class="tb-item" id="atab-settings" onclick="adminTab('settings')"><div class="tbi">⚙️</div><span>設定</span></div>
     <div class="tb-item" id="atab-salary" onclick="adminTab('salary')"><div class="tbi">💰</div><span>薪資</span></div>
+    <div class="tb-item" id="atab-settings" onclick="adminTab('settings')"><div class="tbi">⚙️</div><span>設定</span></div>
   </div>
 </div>
 
@@ -974,7 +1060,10 @@ let adminMode='admin'; // 'admin' | 'punch'
 
 function startAdminSession(){
   const emp=currentUser.empData;
-  document.getElementById('adminNameTop').textContent=emp?.name||currentUser.id;
+  // Update sidebar
+  if(document.getElementById('sidebarName')) document.getElementById('sidebarName').textContent=emp?.name||currentUser.id;
+  if(document.getElementById('sidebarAv')) document.getElementById('sidebarAv').textContent=(emp?.name||currentUser.id)[0];
+  if(document.getElementById('adminNameTop')) document.getElementById('adminNameTop').textContent=emp?.name||currentUser.id;
   function tick(){
     const el=document.getElementById('adminClock');
     if(el) el.textContent=new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false});
@@ -990,18 +1079,17 @@ function startAdminSession(){
 
 function switchAdminMode(mode){
   adminMode=mode;
-  document.getElementById('rsAdmin').classList.toggle('active',mode==='admin');
-  document.getElementById('rsMyPunch').classList.toggle('active',mode==='punch');
-  const tb=document.getElementById('adminTabbar');
+  ['rsAdmin','rsMyPunch'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.classList.toggle('active', id==='rsAdmin'?mode==='admin':mode==='punch');
+  });
   const s=document.getElementById('adminScroll');
   if(mode==='punch'){
-    tb.style.display='none';
-    s.style.paddingBottom='calc(24px + env(safe-area-inset-bottom,0))';
     s.innerHTML='';
     renderAdminPunch(s);
+    // Hide sidebar nav items
+    document.querySelectorAll('.snav-item').forEach(t=>t.classList.remove('active'));
   } else {
-    tb.style.display='flex';
-    s.style.paddingBottom='';
     adminTab('dashboard');
   }
 }
@@ -1045,11 +1133,19 @@ let currentAdminTab='dashboard';
 function adminTab(tab){
   currentAdminTab=tab;
   adminMode='admin';
-  document.getElementById('rsAdmin').classList.add('active');
-  document.getElementById('rsMyPunch').classList.remove('active');
-  document.getElementById('adminTabbar').style.display='flex';
-  document.querySelectorAll('#adminTabbar .tb-item').forEach(t=>t.classList.remove('active'));
-  document.getElementById('atab-'+tab).classList.add('active');
+  if(document.getElementById('rsAdmin')) document.getElementById('rsAdmin').classList.add('active');
+  if(document.getElementById('rsMyPunch')) document.getElementById('rsMyPunch').classList.remove('active');
+  // Update sidebar nav
+  document.querySelectorAll('.snav-item').forEach(t=>t.classList.remove('active'));
+  var snavEl=document.getElementById('snav-'+tab);
+  if(snavEl) snavEl.classList.add('active');
+  // Update mobile tabbar if visible
+  var tabbar=document.getElementById('adminTabbar');
+  if(tabbar&&tabbar.style.display!=='none'){
+    document.querySelectorAll('#adminTabbar .tb-item').forEach(t=>t.classList.remove('active'));
+    var mEl=document.getElementById('atab-'+tab);
+    if(mEl) mEl.classList.add('active');
+  }
   const s=document.getElementById('adminScroll');
   s.innerHTML='';
   if(tab==='dashboard') renderAdminDashboard(s);
@@ -1066,8 +1162,10 @@ function updateAdminBadge(){
   const lp=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
   const mp=getMakeupApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
   const p=lp+mp;
-  const b=document.getElementById('adminApproveBadge');
-  if(b){b.style.display=p?'inline':'none';b.textContent=p;}
+  ['adminApproveBadge','adminApproveBadgeMobile'].forEach(function(id){
+    const b=document.getElementById(id);
+    if(b){b.style.display=p?'inline':'none';b.textContent=p;}
+  });
 }
 
 // ── Admin Dashboard ────────────────────────────────
@@ -1077,28 +1175,63 @@ function renderAdminDashboard(s){
   const emps=getEmps();
   const pending=getApps().filter(a=>a.status==='pending');
   const cfg=getCfg();
+  const allPending=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length
+    +getMakeupApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
+  const now=new Date();
+
   s.innerHTML=`
-  <div class="stat-row fu">
-    <div class="sc"><div class="sc-ico pk">👥</div><div><div class="sc-label">員工總數</div><div class="sc-val" style="color:var(--pd)">${emps.length}</div></div></div>
-    <div class="sc"><div class="sc-ico gn">✅</div><div><div class="sc-label">今日出勤</div><div class="sc-val" style="color:var(--green)">${recs.length}</div></div></div>
-    <div class="sc"><div class="sc-ico yl">⏳</div><div><div class="sc-label">待審假期</div><div class="sc-val" style="color:var(--yellow)">${pending.length}</div></div></div>
-    <div class="sc"><div class="sc-ico bl">📍</div><div><div class="sc-label">打卡範圍</div><div class="sc-val" style="color:var(--blue);font-size:16px">${cfg.rangeM}m</div></div></div>
+  <div class="pc-page-header">
+    <div>
+      <div class="pc-page-title">🏠 總覽儀表板</div>
+      <div class="pc-page-sub">${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日（週${WDAY[now.getDay()]}）</div>
+    </div>
+    <div style="font-family:Nunito,sans-serif;font-size:13px;color:var(--t3)">iROBOT MEDICINE 智能人醫</div>
   </div>
-  <div class="sec-title fu fu1"><span>📍 今日出勤</span><span class="sec-link" onclick="adminTab('gps')">GPS地圖</span></div>
-  <div class="card fu fu1">
-    ${emps.map(emp=>{
-      const rec=getRecs().find(r=>r.date===today&&r.empId===emp.id);
-      const h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
-      const dist=rec?.gpsIn?haversine(rec.gpsIn.lat,rec.gpsIn.lng,cfg.lat,cfg.lng):null;
-      const isAdmin=getAccounts().find(a=>a.id===emp.id&&a.role==='admin');
-      const badge=rec?.in&&rec?.out?'<span class="bgg bg-g">已下班</span>':rec?.in?'<span class="bgg bg-b">上班中</span>':'<span class="bgg bg-gr">未打卡</span>';
-      return `<div class="list-row"><div class="lr-av" style="background:${emp.color}22;color:${emp.color}">${emp.name[0]}</div><div class="lr-info"><div class="lr-name">${emp.name}${isAdmin?'<span class="bgg bg-pk" style="margin-left:5px;font-size:9px">管理員</span>':''}</div><div class="lr-sub">${fmtTime(rec?.in)} → ${fmtTime(rec?.out)}${dist!==null?' · 📍'+dist+'m':''}</div></div>${badge}</div>`;
-    }).join('')}
+  <div class="pc-grid-4" style="margin-bottom:20px">
+    <div class="pc-stat-card"><div class="pc-stat-ico" style="background:var(--pl)">👥</div><div><div class="pc-stat-label">員工總數</div><div class="pc-stat-val" style="color:var(--pd)">${emps.length}</div></div></div>
+    <div class="pc-stat-card"><div class="pc-stat-ico" style="background:var(--gl)">✅</div><div><div class="pc-stat-label">今日出勤</div><div class="pc-stat-val" style="color:var(--green)">${recs.length}</div></div></div>
+    <div class="pc-stat-card"><div class="pc-stat-ico" style="background:var(--yl)">⏳</div><div><div class="pc-stat-label">待審申請</div><div class="pc-stat-val" style="color:var(--yellow)">${allPending}</div></div></div>
+    <div class="pc-stat-card"><div class="pc-stat-ico" style="background:var(--bl)">📍</div><div><div class="pc-stat-label">打卡範圍</div><div class="pc-stat-val" style="color:var(--blue);font-size:20px">${cfg.rangeM}m</div></div></div>
   </div>
-  <div class="sec-title fu fu2"><span>⏳ 待審假期</span><span class="sec-link" onclick="adminTab('approve')">全部</span></div>
-  <div class="card fu fu2">
-    ${pending.length===0?'<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">🎉 目前無待審申請</div>':
-    pending.slice(0,3).map(a=>`<div class="list-row"><div class="lr-av" style="background:var(--pl);color:var(--pd)">${a.empName[0]}</div><div class="lr-info"><div class="lr-name">${a.empName} — ${LEAVE_LABEL[a.type]||a.type}</div><div class="lr-sub">${a.startDate}${a.startDate!==a.endDate?' ~ '+a.endDate:''} · ${a.reason}</div></div><button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer" onclick="openReview('${a.id}')">審核</button></div>`).join('')}
+  <div class="pc-grid-2" style="margin-bottom:20px">
+    <div class="pc-section">
+      <div class="pc-section-title"><span>📍 今日出勤狀況</span><span class="sec-link" onclick="adminTab('gps')">GPS地圖 →</span></div>
+      <table class="pc-table" style="width:100%">
+        <thead><tr><th>員工</th><th>部門</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
+        <tbody>
+          ${(function(){return emps.map(function(emp){
+            var rec=getRecs().find(function(r){return r.date===today&&r.empId===emp.id;});
+            var h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
+            var dist=rec&&rec.gpsIn?haversine(rec.gpsIn.lat,rec.gpsIn.lng,cfg.lat,cfg.lng):null;
+            var isAdmin=getAccounts().find(function(a){return a.id===emp.id&&a.role==='admin';});
+            var badge=rec&&rec.in&&rec.out?'<span class="bgg bg-g">已下班</span>':rec&&rec.in?'<span class="bgg bg-b">上班中</span>':'<span class="bgg bg-gr">未打卡</span>';
+            return '<tr>'
+              +'<td><div style="display:flex;align-items:center;gap:8px">'
+              +'<div style="width:28px;height:28px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+emp.name[0]+'</div>'
+              +'<div><div style="font-weight:700">'+emp.name+(isAdmin?'<span class="bgg bg-pk" style="margin-left:4px;font-size:9px">管理員</span>':'')+'</div>'
+              +'<div style="font-size:10px;color:var(--t3)">'+emp.id+'</div></div></div></td>'
+              +'<td style="color:var(--t3)">'+emp.dept+'</td>'
+              +'<td style="font-family:Nunito,sans-serif">'+fmtTime(rec&&rec.in)+'</td>'
+              +'<td style="font-family:Nunito,sans-serif">'+fmtTime(rec&&rec.out)+'</td>'
+              +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--pd)">'+(h>0?h.toFixed(1)+'h':'--')+'</td>'
+              +'<td>'+badge+(dist!==null?' <span style="font-size:10px;color:var(--t3)">📍'+dist+'m</span>':'')+'</td>'
+              +'</tr>';
+          }).join('');})()}
+        </tbody>
+      </table>
+    </div>
+    <div class="pc-section">
+      <div class="pc-section-title"><span>⏳ 待審假期申請</span><span class="sec-link" onclick="adminTab('approve')">全部審核 →</span></div>
+      ${pending.length===0?'<div style="text-align:center;padding:40px;color:var(--t3)">🎉 目前無待審申請</div>':
+      pending.map(a=>`<div class="list-row">
+        <div class="lr-av" style="background:var(--pl);color:var(--pd)">${a.empName[0]}</div>
+        <div class="lr-info">
+          <div class="lr-name">${a.empName} — ${LEAVE_LABEL[a.type]||a.type}${a.days?' · '+a.days+'天':''}</div>
+          <div class="lr-sub">${a.startDate}${a.startDate!==a.endDate?' ~ '+a.endDate:''} · ${a.reason}</div>
+        </div>
+        <button style="padding:5px 14px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview('${a.id}')">審核</button>
+      </div>`).join('')}
+    </div>
   </div>`;
 }
 
@@ -1120,10 +1253,13 @@ function renderGPSMap(s){
     const icon=m.type==='company'?'🏢':m.type==='in'?'🟢':'🔵';
     return `L.marker([${m.lat},${m.lng}]).addTo(map).bindPopup('<b>${icon} ${m.label}</b><br>${m.lat}, ${m.lng}');`;
   }).join('\n');
-  const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}</style></head><body><div id="map"></div><script>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
+  const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}</style></head><body><div id="map"></div>\u003Cscript>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
   const blob=new Blob([mapHTML],{type:'text/html'});
   const blobURL=URL.createObjectURL(blob);
   s.innerHTML=`
+  <div class="pc-page-header" style="margin-bottom:20px">
+    <div><div class="pc-page-title">🗺️ GPS 打卡地圖</div><div class="pc-page-sub">今日員工打卡位置即時追蹤</div></div>
+  </div>
   <div class="sec-title fu"><span>🗺️ 今日打卡 GPS 地圖</span></div>
   <div class="card fu fu1" style="padding:0;overflow:hidden">
     <iframe src="${blobURL}" style="width:100%;height:310px;border:none;display:block"></iframe>
@@ -1161,8 +1297,9 @@ function renderApprove(s){
   const done=apps.filter(a=>a.status==='approved'||a.status==='rejected');
   const waiting=apps.filter(a=>a.status==='pending'&&a.supId!==myId);
 
-  var html='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPending.length+'）</span></div>'
-    +'<div class="card fu fu1">';
+  var html='<div class="pc-page-header" style="margin-bottom:20px"><div><div class="pc-page-title">📋 審核申請</div><div class="pc-page-sub">假期申請與補打卡審核管理</div></div></div>'
+    +'<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPending.length+'）</span></div>'
+    +'<div class="pc-section" style="margin-bottom:16px">';
   if(!myPending.length){
     html+='<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審申請</div>';
   } else {
@@ -1449,29 +1586,41 @@ function doReview(status){
 
 // ── Employees ──────────────────────────────────────
 function renderEmployees(s){
-  const emps=getEmps();
-  const today=todayKey();
-  const accounts=getAccounts();
-  s.innerHTML=`
-  <div class="sec-title fu"><span>👥 員工名冊（${emps.length}）</span><span class="sec-link" onclick="openAddEmp()">＋ 新增</span></div>
-  ${emps.map((emp,i)=>{
-    const rec=getRecs().find(r=>r.date===today&&r.empId===emp.id);
-    const h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
-    const acc=accounts.find(a=>a.id===emp.id);
-    const isAdmin=acc?.role==='admin';
-    return `<div class="emp-card fu" style="animation-delay:${i*.05}s" onclick="openEditEmp('${emp.id}')">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-        <div style="width:38px;height:38px;border-radius:50%;background:${emp.color}22;color:${emp.color};display:flex;align-items:center;justify-content:center;font-size:17px;font-weight:700;flex-shrink:0">${emp.name[0]}</div>
-        <div style="flex:1"><div style="font-size:14px;font-weight:700">${emp.name}${isAdmin?'<span class="bgg bg-pk" style="margin-left:5px;font-size:9px">管理員</span>':''}</div><div style="font-size:11px;color:var(--t3)">${emp.dept} · ${emp.pos}</div></div>
-        <span style="font-size:12px;color:var(--t3)">✏️</span>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;font-size:11px">
-        <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">工號</div><div style="font-weight:700;font-size:10px">${emp.id}</div></div>
-        <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">直屬主管</div><div style="font-weight:700;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${emp.supervisorId?getEmpById(emp.supervisorId)?.name||'--':'--'}</div></div>
-        <div style="background:var(--bg);border-radius:8px;padding:7px;text-align:center"><div style="color:var(--t3);margin-bottom:2px;font-size:9px">今日工時</div><div style="font-weight:700;color:var(--pd)">${h>0?h.toFixed(1)+'h':'--'}</div></div>
-      </div>
-    </div>`;
-  }).join('')}`;
+  var emps=getEmps();
+  var today=todayKey();
+  var accounts=getAccounts();
+  var rows=emps.map(function(emp){
+    var rec=getRecs().find(function(r){return r.date===today&&r.empId===emp.id;});
+    var h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
+    var acc=accounts.find(function(a){return a.id===emp.id;});
+    var isAdmin=acc&&acc.role==='admin';
+    var sup=getEmpById(emp.supervisorId||'');
+    var editBtn='<button onclick="openEditEmp(\''+emp.id+'\')" style="padding:5px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-size:12px;font-weight:700;cursor:pointer">&#x270F; 編輯</button>';
+    return '<tr>'
+      +'<td><div style="display:flex;align-items:center;gap:10px">'
+      +'<div style="width:34px;height:34px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+emp.name[0]+'</div>'
+      +'<div><div style="font-weight:700;font-size:14px">'+emp.name+'</div><div style="font-size:11px;color:var(--t3)">'+(emp.email||'--')+'</div></div>'
+      +'</div></td>'
+      +'<td><div style="font-size:13px">'+emp.dept+'</div><div style="font-size:11px;color:var(--t3)">'+emp.pos+'</div></td>'
+      +'<td style="font-family:monospace;font-size:13px;color:var(--t2)">'+emp.id+'</td>'
+      +'<td style="font-size:13px">'+(sup?sup.name:'--')+'</td>'
+      +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--green)">'+(emp.salary>0?'$'+emp.salary.toLocaleString():'--')+'</td>'
+      +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--pd)">'+(h>0?h.toFixed(1)+'h':'--')+'</td>'
+      +'<td>'+(isAdmin?'<span class="bgg bg-pk">管理員</span>':'<span class="bgg bg-gr">員工</span>')+'</td>'
+      +'<td>'+editBtn+'</td>'
+      +'</tr>';
+  }).join('');
+  s.innerHTML=''
+    +'<div class="pc-page-header">'
+    +'<div><div class="pc-page-title">&#x1F465; 員工管理</div><div class="pc-page-sub">共 '+emps.length+' 位員工</div></div>'
+    +'<button onclick="openAddEmp()" style="padding:10px 20px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:13px;font-weight:800;cursor:pointer">&#xFF0B; 新增員工</button>'
+    +'</div>'
+    +'<div class="pc-section">'
+    +'<table class="pc-table" style="width:100%">'
+    +'<thead><tr><th>員工</th><th>部門／職稱</th><th>工號</th><th>直屬主管</th><th>月薪</th><th>今日工時</th><th>角色</th><th>操作</th></tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table>'
+    +'</div>';
 }
 
 function openEditEmp(empId){
@@ -1677,16 +1826,25 @@ function showNewEmpInfo(name,id,pw){
 
 // ── Reports ────────────────────────────────────────
 function renderReports(s){
-  const emps=getEmps();
-  const now=new Date();
-  s.innerHTML=`
-  <div class="sec-title fu"><span>📊 月份報表</span></div>
-  <div class="card fu fu1">
-    <div class="fg"><label>查詢月份</label><input type="month" id="selMonth" value="${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}"></div>
-    <div class="fg"><label>員工</label><select id="selEmp"><option value="all">全部員工</option>${emps.map(e=>`<option value="${e.id}">${e.name}</option>`).join('')}</select></div>
-    <button class="save-btn" onclick="loadReport()">🔍 查詢</button>
-  </div>
-  <div id="reportResult"></div>`;
+  var emps=getEmps();
+  var now=new Date();
+  var yy=now.getFullYear(), mm=String(now.getMonth()+1).padStart(2,'0');
+  var empOpts='<option value="all">全部員工</option>'
+    +emps.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('');
+  s.innerHTML=''
+    +'<div class="pc-page-header">'
+    +'<div><div class="pc-page-title">&#x1F4CA; 出勤報表</div><div class="pc-page-sub">查詢員工月度出勤紀錄</div></div>'
+    +'</div>'
+    +'<div class="pc-section" style="margin-bottom:20px">'
+    +'<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">查詢月份</label>'
+    +'<input type="month" id="selMonth" value="'+yy+'-'+mm+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none"></div>'
+    +'<div style="flex:2;min-width:200px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">員工</label>'
+    +'<select id="selEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none">'+empOpts+'</select></div>'
+    +'<button onclick="loadReport()" style="padding:10px 28px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">&#x1F50D; 查詢</button>'
+    +'</div>'
+    +'</div>'
+    +'<div id="reportResult"></div>';
 }
 
 function loadReport(){
@@ -1740,6 +1898,10 @@ function renderSettings(s){
   const q=getQuota();
   const qTypes=[{k:'annual',l:'🌴 特休假'},{k:'sick',l:'🤒 病假'},{k:'personal',l:'🎉 事假'},{k:'marriage',l:'💐 婚假'},{k:'funeral',l:'😢 喪假'},{k:'official',l:'🏛️ 公假'}];
   s.innerHTML=`
+  <div class="pc-page-header" style="margin-bottom:20px">
+    <div><div class="pc-page-title">⚙️ 系統設定</div><div class="pc-page-sub">公司 GPS、工時規則、假期額度設定</div></div>
+  </div>
+  <div class="pc-grid-2" style="align-items:start;margin-bottom:20px"><div>
   <div class="sec-title fu"><span>🏢 公司 GPS 設定</span></div>
   <div class="card fu fu1">
     <div class="fg"><label>公司名稱</label><input id="cfg_name" value="${cfg.name}"></div>
@@ -1773,11 +1935,12 @@ function renderSettings(s){
     </div>
     <button class="save-btn" onclick="LS.set('workRules',{default:document.getElementById('cfg_rule').value});toast('✅','已儲存')">💾 儲存</button>
   </div>
+  </div><div>
   <div class="sec-title fu fu3"><span>🎯 假期額度設定</span></div>
   <div class="card fu fu3">
     ${qTypes.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #fef0f0"><div style="font-size:13px;font-weight:600">${t.l}</div><div style="display:flex;align-items:center;gap:5px"><input type="number" id="q_${t.k}" value="${q[t.k]||0}" min="0" style="width:60px;text-align:center;padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:14px"><span style="font-size:12px;color:var(--t3)">天</span></div></div>`).join('')}
     <button class="save-btn" style="margin-top:12px" onclick="saveQuota()">💾 儲存假期額度</button>
-  </div>`;
+  </div></div></div>`;
 }
 
 function saveSettings(){
@@ -2769,7 +2932,8 @@ window.renderSalary = function(s) {
   var now = new Date();
   var defaultMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 
-  s.innerHTML = '<div style="display:flex;flex-direction:column;gap:16px;padding:0">'
+  s.innerHTML = '<div class="pc-page-header" style="margin-bottom:20px"><div><div class="pc-page-title">💰 薪資管理</div><div class="pc-page-sub">月薪計算、加班費、勞健保、薪資單列印</div></div></div>'
+    + '<div style="display:flex;flex-direction:column;gap:16px;padding:0">'
     // Header
     + '<div style="background:var(--grad);border-radius:16px;padding:20px 24px;color:#fff">'
     + '<div style="font-size:11px;opacity:.8;margin-bottom:4px">薪資管理系統</div>'
