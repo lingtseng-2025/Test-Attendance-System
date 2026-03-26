@@ -1723,14 +1723,15 @@ function openEditEmp(empId){
     +'<input type="password" id="ee_pw" placeholder="輸入新密碼（空白=不更改）">'
     +'</div>';
 
+  var deleteBtn='<button onclick="deleteEmp(\''+empId+'\')" style="width:100%;margin-top:8px;padding:12px;border-radius:12px;border:none;background:#ffe4e4;color:#c0392b;font-family:\'Nunito\',\'Noto Sans TC\',sans-serif;font-size:14px;font-weight:800;cursor:pointer;">🗑️ 刪除此員工</button>';
+
   // Use PC modal if available (admin PC mode), else fallback to sheet
   if(document.getElementById('pcEmpModal') && document.body.classList.contains('admin-mode')){
-    // Clear sheet body to avoid duplicate element IDs
-    document.getElementById('empSheetBody').innerHTML='';
-    openPcModal('✏️ 編輯員工 — '+emp.name, bodyHTML, function(){saveEmp(empId);});
+    openPcModal('✏️ 編輯員工 — '+emp.name, bodyHTML+deleteBtn, function(){saveEmp(empId);});
   } else {
     document.getElementById('empSheetBody').innerHTML=bodyHTML
-      +'<button class="save-btn" onclick="saveEmp(\''+empId+'\')">💾 儲存變更</button>';
+      +'<button class="save-btn" onclick="saveEmp(\''+empId+'\')">💾 儲存變更</button>'
+      +deleteBtn;
     openSheet('empSheet');
   }
 }
@@ -1770,8 +1771,8 @@ function openAddEmp(){
   document.getElementById('empSheetBody').innerHTML=`
     <div class="fg">
       <label>員工工號（即登入帳號）</label>
-      <input id="ne_id" placeholder="例：EMP-0001" autocapitalize="none" style="font-family:monospace;font-size:15px;letter-spacing:1px">
-      <div style="font-size:10px;color:var(--t3);margin-top:4px">工號將作為登入帳號，請確認唯一且不重複</div>
+      <input id="ne_id" placeholder="例：IRM-001" autocapitalize="characters" style="font-family:monospace;font-size:15px;letter-spacing:1px">
+      <div style="font-size:10px;color:var(--t3);margin-top:4px">工號必須以 <b>IRM-</b> 開頭，將作為登入帳號，請確認唯一且不重複</div>
     </div>
     <div class="fg"><label>姓名</label><input id="ne_name" placeholder="員工姓名"></div>
     <div class="fr2">
@@ -1811,9 +1812,7 @@ function openAddEmp(){
     <button class="save-btn" onclick="doAddEmp()">✅ 建立員工帳號</button>`;
   var supOptHtml2=existEmpsForSup.map(e=>'<option value="'+e.id+'">'+e.name+' ('+e.dept+')</option>').join('');
   if(document.getElementById('pcEmpModal') && document.body.classList.contains('admin-mode')){
-    var modalHTML=document.getElementById('empSheetBody').innerHTML;
-    document.getElementById('empSheetBody').innerHTML='';
-    openPcModal('➕ 新增員工', modalHTML, function(){doAddEmp();});
+    openPcModal('➕ 新增員工', document.getElementById('empSheetBody').innerHTML, function(){doAddEmp();});
     var supSel2=document.getElementById('ne_sup');
     if(supSel2) supSel2.innerHTML='<option value="">-- 無 / 稍後設定 --</option>'+supOptHtml2;
   } else {
@@ -2618,8 +2617,6 @@ document.querySelectorAll('.overlay').forEach(ov=>{
 //  INIT (handled by Supabase patch below)
 // ══════════════════════════════════════════════════
 </script>
-</body>
-</html>
 <script>
 // ══════════════════════════════════════════════════
 //  SUPABASE PATCH - 完全覆蓋 localStorage 資料層
@@ -2660,12 +2657,21 @@ function sbupd(t,d,f){
   return fetch(u,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(d)})
     .then(function(r){if(!r.ok){console.error('[sbupd] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbupd] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbupd] fetch error:',e);return null;});
 }
+function sbdel(t,f){
+  var u=SB_URL+'/rest/v1/'+t,p=[];
+  Object.keys(f).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(f[k]));});
+  if(p.length)u+='?'+p.join('&');
+  return fetch(u,{method:'DELETE',headers:H})
+    .then(function(r){if(!r.ok){console.error('[sbdel] HTTP '+r.status+' on '+t);return false;}return true;})
+    .catch(function(e){console.error('[sbdel] fetch error:',e);return false;});
+}
 
 // ── SHA-256 ───────────────────────────────────────
 function sha256(s){
   return crypto.subtle.digest('SHA-256',new TextEncoder().encode(s))
     .then(function(b){return Array.from(new Uint8Array(b)).map(function(x){return x.toString(16).padStart(2,'0');}).join('');});
 }
+window.sha256=sha256;
 
 // ── In-memory cache ───────────────────────────────
 var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
@@ -2765,17 +2771,24 @@ window.doLogin=function(){
   document.getElementById('loginError').classList.remove('show');
   var btn=document.querySelector('.lf-btn');
   if(btn){btn.textContent='登入中...';btn.disabled=true;}
+  var errEl=document.getElementById('loginError');
   sha256(pw).then(function(hash){
     return loadAllData().then(function(){
+      if((DB.accs||[]).length===0&&(DB.emps||[]).length===0){
+        errEl.textContent='無法連線至伺服器，請確認網路後重試';
+        errEl.classList.add('show');
+        if(btn){btn.textContent='登入';btn.disabled=false;}
+        return;
+      }
       var acc=(DB.accs||[]).find(function(a){return a.id===id&&a.pw===hash;});
       if(!acc){
-        document.getElementById('loginError').classList.add('show');
+        errEl.textContent='帳號或密碼錯誤，請重新輸入';
+        errEl.classList.add('show');
         document.getElementById('loginPw').value='';
         if(btn){btn.textContent='登入';btn.disabled=false;}
         return;
       }
       var emp=window.getEmpById(acc.id)||getEmpById(acc.id);
-      console.log('[doLogin] id='+acc.id+' emp='+JSON.stringify(emp)+' DB.emps.length='+(DB.emps||[]).length);
       window.currentUser={id:acc.id,role:acc.role,empData:emp};
       if(acc.role==='admin'){
         document.body.classList.add('admin-mode');
@@ -2783,6 +2796,11 @@ window.doLogin=function(){
       }else{showScreen('empScreen');startEmpSession();}
       if(btn){btn.textContent='登入';btn.disabled=false;}
     });
+  }).catch(function(err){
+    console.error('[doLogin] error:',err);
+    errEl.textContent='登入時發生錯誤，請重試';
+    errEl.classList.add('show');
+    if(btn){btn.textContent='登入';btn.disabled=false;}
   });
 };
 
@@ -2820,10 +2838,6 @@ window.confirmPunch=function(){
 // ── Override saveEmp ──────────────────────────────
 window.saveEmp=function(empId){
   console.log('[saveEmp] called with empId='+empId);
-  var nameEl=document.getElementById('ee_name');
-  var deptEl=document.getElementById('ee_dept');
-  console.log('[saveEmp] ee_name element parent='+( nameEl? nameEl.closest('[id]').id:'NOT FOUND'));
-  console.log('[saveEmp] ee_name='+( nameEl? nameEl.value:'NOT FOUND')+' ee_dept='+(deptEl? deptEl.value:'NOT FOUND'));
   var newPw=document.getElementById('ee_pw')?document.getElementById('ee_pw').value:'';
   console.log('[saveEmp] ee_name='+(document.getElementById('ee_name')?document.getElementById('ee_name').value:'NOT FOUND'));
   var d={name:document.getElementById('ee_name').value,dept:document.getElementById('ee_dept').value,
@@ -2859,6 +2873,8 @@ window.doAddEmp=function(){
   var pw=document.getElementById('ne_pw').value.trim()||'1234';
   var errEl=document.getElementById('addEmpError');
   if(!newId){errEl.textContent='⚠️ 請填寫員工工號';errEl.style.display='block';return;}
+  if(!/^IRM-/i.test(newId)){errEl.textContent='⚠️ 工號必須以 IRM- 開頭（例如：IRM-001）';errEl.style.display='block';return;}
+  newId=newId.toUpperCase();
   if(!name){errEl.textContent='⚠️ 請填寫員工姓名';errEl.style.display='block';return;}
   if(pw.length<4){errEl.textContent='⚠️ 密碼至少4碼';errEl.style.display='block';return;}
   if((DB.accs||[]).find(function(a){return a.id===newId;})){errEl.textContent='⚠️ 此工號已存在';errEl.style.display='block';return;}
@@ -3325,9 +3341,6 @@ window.openPcModal=function(title, bodyHTML, saveCallback){
     // Fallback to sheet for mobile
     return;
   }
-  // Clear sheet body to prevent duplicate element IDs in the DOM
-  var sheetBody=document.getElementById('empSheetBody');
-  if(sheetBody) sheetBody.innerHTML='';
   document.getElementById('pcModalTitle').textContent=title;
   document.getElementById('pcModalBody').innerHTML=bodyHTML;
   var saveBtn=document.getElementById('pcModalSaveBtn');
@@ -3359,6 +3372,30 @@ window.closePcModal=function(){
   if(overlay) overlay.classList.remove('show');
 }
 
+// ── Delete employee ───────────────────────────────
+window.deleteEmp=function(empId){
+  var emp=(DB.emps||[]).find(function(e){return e.id===empId;});
+  var name=emp?emp.name:empId;
+  if(!confirm('確定要刪除員工「'+name+'」（'+empId+'）？\n\n⚠️ 此操作無法復原，該員工所有資料將一併刪除。')){return;}
+  Promise.all([
+    sbdel('employees',{id:empId}),
+    sbdel('records',{emp_id:empId}),
+    sbdel('leave_apps',{emp_id:empId}),
+    sbdel('makeup_apps',{emp_id:empId})
+  ]).then(function(results){
+    if(!results[0]){toast('❌','刪除失敗，請重試');return;}
+    return loadAllData();
+  }).then(function(){
+    closePcModal();
+    closeSheet('empSheet');
+    toast('🗑️','員工「'+name+'」已刪除');
+    setTimeout(function(){adminTab('employees');},50);
+  }).catch(function(err){
+    console.error('[deleteEmp] error:',err);
+    toast('❌','刪除失敗：'+err.message);
+  });
+};
+
 // ── Global edit helper ───────────────────────────
 // Called from dynamically generated buttons
 window._editEmp = function(id){ window.openEditEmp(id); };
@@ -3369,3 +3406,5 @@ window.seedData();
 
 })(); // end IIFE
 </script>
+</body>
+</html>
