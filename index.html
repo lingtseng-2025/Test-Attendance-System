@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" content="#dcdaf6">
 <title>iROBOT MEDICINE 智能人醫</title>
@@ -1635,30 +1635,6 @@ function renderEmployees(s){
   var emps=getEmps();
   var today=todayKey();
   var accounts=getAccounts();
-  var rows=emps.map(function(emp){
-    var rec=getRecs().find(function(r){return r.date===today&&r.empId===emp.id;});
-    var h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
-    var acc=accounts.find(function(a){return a.id===emp.id;});
-    var isAdmin=acc&&acc.role==='admin';
-    var sup=getEmpById(emp.supervisorId||'');
-    return '<tr>'
-      +'<td><div style="display:flex;align-items:center;gap:10px">'
-      +'<div style="width:34px;height:34px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+emp.name[0]+'</div>'
-      +'<div><div style="font-weight:700;font-size:14px">'+emp.name+'</div>'
-      +'<div style="font-size:11px;color:var(--t3)">'+(emp.email||'--')+'</div></div>'
-      +'</div></td>'
-      +'<td><div style="font-size:13px">'+emp.dept+'</div><div style="font-size:11px;color:var(--t3)">'+emp.pos+'</div></td>'
-      +'<td style="font-family:monospace;font-size:13px;color:var(--t2)">'+emp.id+'</td>'
-      +'<td style="font-size:13px">'+(sup?sup.name:'--')+'</td>'
-      +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--green)">'+(emp.salary>0?'$'+emp.salary.toLocaleString():'--')+'</td>'
-      +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--pd)">'+(h>0?h.toFixed(1)+'h':'--')+'</td>'
-      +'<td>'+(emp.status==='inactive'?'<span class="bgg bg-r">❌ 離職</span>':'<span class="bgg bg-g">✅ 在職</span>')+'</td>'
-      +'<td>'+(isAdmin?'<span class="bgg bg-pk">管理員</span>':'<span class="bgg bg-gr">員工</span>')+'</td>'
-      +'<td><button onclick="_editEmp(this.parentElement.parentElement.dataset.empid)" style="padding:5px 14px;border-radius:8px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-size:12px;font-weight:700;cursor:pointer">&#x270F; 編輯</button></td>'
-      +'</tr>'
-      .replace('data.empid', emp.id);
-  }).join('');
-  // Build HTML with empid in each row
   var tableRows = emps.map(function(emp){
     var rec=getRecs().find(function(r){return r.date===today&&r.empId===emp.id;});
     var h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
@@ -1768,6 +1744,7 @@ function saveEmp(empId){
   emps[idx].email=document.getElementById('ee_email').value;
   emps[idx].workRule=document.getElementById('ee_rule').value;
   emps[idx].supervisorId=document.getElementById('ee_sup')?document.getElementById('ee_sup').value||'':'';
+  if(document.getElementById('ee_status')) emps[idx].status=document.getElementById('ee_status').value;
   LS.set('employees',emps);
   // update account role & password
   const accs=getAccounts();
@@ -1778,6 +1755,7 @@ function saveEmp(empId){
     if(newPw) accs[ai].pw=newPw;
     LS.set('accounts',accs);
   }
+  closePcModal();
   closeSheet('empSheet');
   toast('✅',`${emps[idx].name} 資料已更新`);
   renderEmployees(document.getElementById('adminScroll'));
@@ -2029,7 +2007,7 @@ function renderSettings(s){
         <option value="deduct_both" ${(LS.get('workRules')||{}).default==='deduct_both'?'selected':''}>扣除午休＋晚餐 2 小時</option>
       </select>
     </div>
-    <button class="save-btn" onclick="LS.set('workRules',{default:document.getElementById('cfg_rule').value});toast('✅','已儲存')">💾 儲存</button>
+    <button class="save-btn" onclick="saveDefaultWorkRule()">💾 儲存</button>
   </div>
   </div><div>
   <div class="sec-title fu fu3"><span>🎯 假期額度設定</span></div>
@@ -2055,6 +2033,11 @@ function saveQuota(){
   const keys=['annual','sick','personal','marriage','funeral','official'];
   const q={};keys.forEach(k=>{q[k]=Number(document.getElementById('q_'+k)?.value)||0});
   LS.set('leaveQuota',q);toast('✅','假期額度已儲存');
+}
+function saveDefaultWorkRule(){
+  var val=document.getElementById('cfg_rule').value;
+  DB._defaultWorkRule=val;
+  toast('✅','預設工時規則已儲存');
 }
 
 // ══════════════════════════════════════════════════
@@ -2628,9 +2611,8 @@ document.querySelectorAll('.overlay').forEach(ov=>{
 });
 
 // ══════════════════════════════════════════════════
-//  INIT
+//  INIT (handled by Supabase patch below)
 // ══════════════════════════════════════════════════
-seedData();
 </script>
 </body>
 </html>
@@ -2660,19 +2642,19 @@ function sbq(t,o){
 }
 function sbins(t,d){
   return fetch(SB_URL+'/rest/v1/'+t,{method:'POST',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(d)})
-    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+    .then(function(r){if(!r.ok){console.error('[sbins] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbins] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbins] fetch error:',e);return null;});
 }
 function sbups(t,d,oc){
   var u=SB_URL+'/rest/v1/'+t+(oc?'?on_conflict='+oc:'');
   return fetch(u,{method:'POST',headers:Object.assign({},H,{Prefer:'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(d)})
-    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+    .then(function(r){if(!r.ok){console.error('[sbups] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbups] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbups] fetch error:',e);return null;});
 }
 function sbupd(t,d,f){
   var u=SB_URL+'/rest/v1/'+t,p=[];
   Object.keys(f).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(f[k]));});
   if(p.length)u+='?'+p.join('&');
   return fetch(u,{method:'PATCH',headers:Object.assign({},H,{Prefer:'return=representation'}),body:JSON.stringify(d)})
-    .then(function(r){return r.ok?r.json():null;}).catch(function(){return null;});
+    .then(function(r){if(!r.ok){console.error('[sbupd] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbupd] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbupd] fetch error:',e);return null;});
 }
 
 // ── SHA-256 ───────────────────────────────────────
@@ -2739,7 +2721,7 @@ var _lsGet=function(k){
   if(k==='makeupApps')return DB.makeups;
   if(k==='leaveQuota')return DB.quota;
   if(k==='companySettings')return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
-  if(k==='workRules')return{default:'deduct_lunch'};
+  if(k==='workRules')return{default:DB._defaultWorkRule||'deduct_lunch'};
   return null;
 };
 // Patch the LS object that main script uses (works because objects are mutable)
@@ -2818,14 +2800,16 @@ window.confirmPunch=function(){
   var dateStr=todayKey(),existing=getTodayRec(empId);
   if(action==='in'){
     sbups('records',{emp_id:empId,date:dateStr,time_in:now.toISOString(),gps_in:window.currentGPS},'emp_id,date')
-      .then(function(){return loadAllData();})
-      .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓');empTab('clock');});
+      .then(function(res){if(!res){toast('❌','打卡失敗，請重試');return;}return loadAllData();})
+      .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓');empTab('clock');})
+      .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗');});
   }else{
     if(!existing||!existing.in){toast('⚠️','請先上班打卡');return;}
     var h=calcHours(existing.in,now.toISOString(),emp.workRule);
     sbupd('records',{time_out:now.toISOString(),gps_out:window.currentGPS},{emp_id:empId,date:dateStr})
-      .then(function(){return loadAllData();})
-      .then(function(){toast('🎉','下班打卡！工時 '+h.toFixed(1)+'h');empTab('clock');});
+      .then(function(res){if(!res){toast('❌','打卡失敗，請重試');return;}return loadAllData();})
+      .then(function(){toast('🎉','下班打卡！工時 '+h.toFixed(1)+'h');empTab('clock');})
+      .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗');});
   }
 };
 
@@ -2833,7 +2817,6 @@ window.confirmPunch=function(){
 window.saveEmp=function(empId){
   console.log('[saveEmp] called with empId='+empId);
   var newPw=document.getElementById('ee_pw')?document.getElementById('ee_pw').value:'';
-  var newEmpId=document.getElementById('ee_empid')?document.getElementById('ee_empid').value.trim():empId;
   console.log('[saveEmp] ee_name='+(document.getElementById('ee_name')?document.getElementById('ee_name').value:'NOT FOUND'));
   var d={name:document.getElementById('ee_name').value,dept:document.getElementById('ee_dept').value,
     pos:document.getElementById('ee_pos').value,salary:Number(document.getElementById('ee_sal').value)||0,
@@ -2846,12 +2829,16 @@ window.saveEmp=function(empId){
     console.log('[saveEmp] calling sbupd id='+empId+' data='+JSON.stringify(d));
     return sbupd('employees',d,{id:empId}).then(function(res){
       console.log('[saveEmp] sbupd result='+JSON.stringify(res));
+      if(!res){toast('❌','儲存失敗，請檢查網路連線');return;}
       return loadAllData();
     }).then(function(){
       closePcModal();
       closeSheet('empSheet');
       toast('\u2705',d.name+' \u8cc7\u6599\u5df2\u66f4\u65b0');
       setTimeout(function(){ adminTab('employees'); }, 50);
+    }).catch(function(err){
+      console.error('[saveEmp] error:',err);
+      toast('❌','儲存失敗：'+err.message);
     });
   };
   if(newPw)sha256(newPw).then(doSave);else doSave();
@@ -2878,10 +2865,15 @@ window.doAddEmp=function(){
       role:document.getElementById('ne_role').value,
       status:'active',
       color:colors[(DB.emps||[]).length%colors.length],password_hash:hash});
-  }).then(function(){return loadAllData();}).then(function(){
+  }).then(function(res){
+    if(!res){errEl.textContent='⚠️ 新增失敗，請檢查網路連線或工號是否重複';errEl.style.display='block';return Promise.reject(new Error('insert failed'));}
+    return loadAllData();
+  }).then(function(){
     closePcModal();closeSheet('empSheet');
     adminTab('employees');
     showNewEmpInfo(name,newId,pw);
+  }).catch(function(err){
+    console.error('[doAddEmp] error:',err);
   });
 };
 
@@ -2897,10 +2889,16 @@ window.changePassword=function(){
     var acc=(DB.accs||[]).find(function(a){return a.id===window.currentUser.id;});
     if(!acc||acc.pw!==curHash){errEl.textContent='目前密碼錯誤';errEl.style.display='block';return;}
     sha256(newPw).then(function(newHash){
-      sbupd('employees',{password_hash:newHash},{id:window.currentUser.id}).then(function(){return loadAllData();}).then(function(){
+      sbupd('employees',{password_hash:newHash},{id:window.currentUser.id}).then(function(res){
+        if(!res){errEl.textContent='密碼更新失敗，請重試';errEl.style.display='block';return;}
+        return loadAllData();
+      }).then(function(){
         errEl.style.display='none';
         ['curPw','newPw','confirmPw'].forEach(function(id){document.getElementById(id).value='';});
         toast('🔒','密碼修改成功！');
+      }).catch(function(err){
+        console.error('[changePassword] error:',err);
+        errEl.textContent='密碼更新失敗';errEl.style.display='block';
       });
     });
   });
@@ -3322,7 +3320,25 @@ window.openPcModal=function(title, bodyHTML, saveCallback){
   document.getElementById('pcModalTitle').textContent=title;
   document.getElementById('pcModalBody').innerHTML=bodyHTML;
   var saveBtn=document.getElementById('pcModalSaveBtn');
-  saveBtn.onclick=saveCallback;
+  // Store callback globally to avoid closure issues
+  window._pcModalSaveCallback = saveCallback;
+  saveBtn.onclick=null;
+  saveBtn.setAttribute('onclick','');
+  saveBtn.removeAttribute('onclick');
+  // Use addEventListener for reliability
+  var newBtn = saveBtn.cloneNode(true);
+  saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+  newBtn.addEventListener('click', function(e){
+    e.preventDefault();
+    e.stopPropagation();
+    console.log('[pcModal] save button clicked');
+    try{
+      if(window._pcModalSaveCallback) window._pcModalSaveCallback();
+    }catch(err){
+      console.error('[Modal save error]',err);
+      toast('❌','儲存失敗：'+err.message);
+    }
+  });
   overlay.classList.add('show');
   // Close on backdrop click
   overlay.onclick=function(e){if(e.target===overlay)closePcModal();};
