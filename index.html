@@ -2868,10 +2868,16 @@ window.saveEmp=function(empId){
 
 // ── Override doAddEmp ─────────────────────────────
 window.doAddEmp=function(){
-  var newId=document.getElementById('ne_id').value.trim();
-  var name=document.getElementById('ne_name').value.trim();
-  var pw=document.getElementById('ne_pw').value.trim()||'1234';
-  var errEl=document.getElementById('addEmpError');
+  // 在 PC Modal 模式下，從 pcModalBody 讀取欄位，避免 empSheetBody 重複 ID 問題
+  var ctx=(document.body.classList.contains('admin-mode')&&document.getElementById('pcModalBody'))
+    ?document.getElementById('pcModalBody')
+    :document;
+  function gv(id){var el=ctx.querySelector('#'+id);return el?el.value:'';}
+  var newId=gv('ne_id').trim();
+  var name=gv('ne_name').trim();
+  var pw=gv('ne_pw').trim()||'1234';
+  var errEl=ctx.querySelector('#addEmpError');
+  if(!errEl)errEl=document.getElementById('addEmpError');
   if(!newId){errEl.textContent='⚠️ 請填寫員工工號';errEl.style.display='block';return;}
   if(!/^IRM-/i.test(newId)){errEl.textContent='⚠️ 工號必須以 IRM- 開頭（例如：IRM-001）';errEl.style.display='block';return;}
   newId=newId.toUpperCase();
@@ -2882,11 +2888,11 @@ window.doAddEmp=function(){
   var colors=['#5046e0','#2f5fd4','#7340c8','#2eaa6e','#e07c08','#16a085'];
   sha256(pw).then(function(hash){
     return sbins('employees',{id:newId,name:name,
-      dept:document.getElementById('ne_dept').value,pos:document.getElementById('ne_pos').value,
-      salary:Number(document.getElementById('ne_sal').value)||0,
-      email:document.getElementById('ne_email').value,work_rule:document.getElementById('ne_rule').value,
-      supervisor_id:(document.getElementById('ne_sup')?document.getElementById('ne_sup').value:'')||'',
-      role:document.getElementById('ne_role').value,
+      dept:gv('ne_dept'),pos:gv('ne_pos'),
+      salary:Number(gv('ne_sal'))||0,
+      email:gv('ne_email'),work_rule:gv('ne_rule'),
+      supervisor_id:gv('ne_sup')||'',
+      role:gv('ne_role'),
       status:'active',
       color:colors[(DB.emps||[]).length%colors.length],password_hash:hash});
   }).then(function(res){
