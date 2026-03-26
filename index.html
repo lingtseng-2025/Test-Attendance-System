@@ -1725,6 +1725,8 @@ function openEditEmp(empId){
 
   // Use PC modal if available (admin PC mode), else fallback to sheet
   if(document.getElementById('pcEmpModal') && document.body.classList.contains('admin-mode')){
+    // Clear sheet body to avoid duplicate element IDs
+    document.getElementById('empSheetBody').innerHTML='';
     openPcModal('✏️ 編輯員工 — '+emp.name, bodyHTML, function(){saveEmp(empId);});
   } else {
     document.getElementById('empSheetBody').innerHTML=bodyHTML
@@ -1809,7 +1811,9 @@ function openAddEmp(){
     <button class="save-btn" onclick="doAddEmp()">✅ 建立員工帳號</button>`;
   var supOptHtml2=existEmpsForSup.map(e=>'<option value="'+e.id+'">'+e.name+' ('+e.dept+')</option>').join('');
   if(document.getElementById('pcEmpModal') && document.body.classList.contains('admin-mode')){
-    openPcModal('➕ 新增員工', document.getElementById('empSheetBody').innerHTML, function(){doAddEmp();});
+    var modalHTML=document.getElementById('empSheetBody').innerHTML;
+    document.getElementById('empSheetBody').innerHTML='';
+    openPcModal('➕ 新增員工', modalHTML, function(){doAddEmp();});
     var supSel2=document.getElementById('ne_sup');
     if(supSel2) supSel2.innerHTML='<option value="">-- 無 / 稍後設定 --</option>'+supOptHtml2;
   } else {
@@ -2816,6 +2820,10 @@ window.confirmPunch=function(){
 // ── Override saveEmp ──────────────────────────────
 window.saveEmp=function(empId){
   console.log('[saveEmp] called with empId='+empId);
+  var nameEl=document.getElementById('ee_name');
+  var deptEl=document.getElementById('ee_dept');
+  console.log('[saveEmp] ee_name element parent='+( nameEl? nameEl.closest('[id]').id:'NOT FOUND'));
+  console.log('[saveEmp] ee_name='+( nameEl? nameEl.value:'NOT FOUND')+' ee_dept='+(deptEl? deptEl.value:'NOT FOUND'));
   var newPw=document.getElementById('ee_pw')?document.getElementById('ee_pw').value:'';
   console.log('[saveEmp] ee_name='+(document.getElementById('ee_name')?document.getElementById('ee_name').value:'NOT FOUND'));
   var d={name:document.getElementById('ee_name').value,dept:document.getElementById('ee_dept').value,
@@ -3317,6 +3325,9 @@ window.openPcModal=function(title, bodyHTML, saveCallback){
     // Fallback to sheet for mobile
     return;
   }
+  // Clear sheet body to prevent duplicate element IDs in the DOM
+  var sheetBody=document.getElementById('empSheetBody');
+  if(sheetBody) sheetBody.innerHTML='';
   document.getElementById('pcModalTitle').textContent=title;
   document.getElementById('pcModalBody').innerHTML=bodyHTML;
   var saveBtn=document.getElementById('pcModalSaveBtn');
