@@ -1360,7 +1360,7 @@ function renderApprove(s){
         +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stage+'</div>'
         +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+a.attachName+'</div>':'')
         +'</div>'
-        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\x27"+a.id+"\x27)">審核</button>'
+        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\''+a.id+'\')">審核</button>'
         +'</div>';
     });
   }
@@ -1431,7 +1431,7 @@ function renderApprove(s){
           +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
           +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
           +'</div>'
-          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\x27'+a.id+'\x27)">審核</button>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\''+a.id+'\')">審核</button>'
           +'</div>';
       });
     }
