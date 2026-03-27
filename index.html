@@ -2815,15 +2815,88 @@ window.doLogout=function(){
   showScreen('loginScreen');
 };
 
+// ══════════════════════════════════════════════════
+//  多辦公室支援
+// ══════════════════════════════════════════════════
+var OFFICES=[
+  {id:'taipei', name:'台北辦公室', address:'台北市大同區市民大道一段209號12樓', lat:25.0473, lng:121.5124},
+  {id:'taoyuan',name:'桃園辦公室', address:'桃園市中壢區高鐵站前西路一段268號18樓', lat:24.9793, lng:121.2280}
+];
+window.OFFICES=OFFICES;
+window.pendingOffice=OFFICES[0];
+
+// 切換辦公室：重新計算距離
+window.selectOffice=function(idx){
+  window.pendingOffice=OFFICES[parseInt(idx)]||OFFICES[0];
+  var gps=window.currentGPS;
+  if(gps&&gps.lat){
+    var cfg=getCfg();
+    var o=window.pendingOffice;
+    var dist=haversine(gps.lat,gps.lng,o.lat,o.lng);
+    var isOK=dist<=cfg.rangeM, isWarn=dist<=cfg.rangeM*2;
+    var db=document.getElementById('distBadge');
+    if(db) db.innerHTML='<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">📏 距'+o.name+' '+dist+'m '+(isOK?'✅ 範圍內':isWarn?'⚠️ 稍遠':'❌ 範圍外')+'</span>';
+    var cb=document.getElementById('punchConfirmBtn');
+    if(cb){cb.disabled=false;cb.textContent=isOK?'✅ 確認打卡':'⚠️ 仍要打卡';}
+  }
+};
+
+// Override openPunch：加上辦公室選擇器
+window.openPunch=function(action){
+  window.pendingAction=action;
+  window.currentGPS=null;
+  window.pendingOffice=OFFICES[0];
+  var emp=window.currentUser.empData;
+  document.getElementById('punchTitle').textContent=action==='in'?'🌅 上班打卡確認':'🌇 下班打卡確認';
+  document.getElementById('gpsDot').className='gps-dot loading';
+  document.getElementById('gpsText').textContent='正在取得 GPS 位置...';
+  document.getElementById('gpsCoord').textContent='';
+  document.getElementById('distBadge').innerHTML='';
+  document.getElementById('punchConfirmBtn').disabled=true;
+  document.getElementById('punchConfirmBtn').textContent='確認打卡';
+  var now=new Date();
+  var offOpts=OFFICES.map(function(o,i){return '<option value="'+i+'">'+o.name+' — '+o.address+'</option>';}).join('');
+  document.getElementById('punchBody').innerHTML=
+    '<div style="margin-bottom:12px">'
+    +'<div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:5px">📍 今日上班地點</div>'
+    +'<select id="officeSelect" onchange="selectOffice(this.value)" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;font-family:var(--font);background:#fff;outline:none;-webkit-appearance:none;color:var(--text)">'
+    +offOpts+'</select>'
+    +'</div>'
+    +'<div style="font-size:13px;color:var(--t2);line-height:1.9">'
+    +'<div>⏰ 時間：<strong>'+now.toLocaleTimeString('zh-TW',{hour12:false})+'</strong></div>'
+    +'<div>👤 '+(emp?emp.name:window.currentUser.id)+'</div>'
+    +'</div>';
+  openSheet('punchSheet');
+  getGPS();
+};
+
+// Override getGPS：使用選擇的辦公室座標進行距離比對
+window.getGPS=function(){
+  var baseCfg=getCfg();
+  var o=window.pendingOffice||OFFICES[0];
+  // 以選擇的辦公室座標覆蓋 lat/lng，保留其餘設定
+  var cfg=Object.assign({},baseCfg,{lat:o.lat,lng:o.lng});
+  if(!navigator.geolocation){showGPSError('此裝置不支援定位功能');return;}
+  try{
+    navigator.geolocation.getCurrentPosition(
+      function(pos){try{onGPSSuccess(pos,cfg);}catch(e){console.warn('GPS success handler error:',e);}},
+      function(err){try{onGPSError(err,cfg);}catch(e){console.warn('GPS error handler error:',e);}},
+      {enableHighAccuracy:false,timeout:8000,maximumAge:30000}
+    );
+  }catch(e){console.warn('geolocation error:',e);showGPSError('定位功能發生錯誤，請重試');}
+};
+
 // ── Override confirmPunch ─────────────────────────
 window.confirmPunch=function(){
   var now=new Date(),empId=window.currentUser.id,emp=window.currentUser.empData,action=window.pendingAction;
   closeSheet('punchSheet');
   var dateStr=todayKey(),existing=getTodayRec(empId);
+  var officeName=(window.pendingOffice||OFFICES[0]).name;
+  var gpsData=window.currentGPS?Object.assign({},window.currentGPS,{office:officeName}):null;
   if(action==='in'){
-    sbups('records',{emp_id:empId,date:dateStr,time_in:now.toISOString(),gps_in:window.currentGPS},'emp_id,date')
+    sbups('records',{emp_id:empId,date:dateStr,time_in:now.toISOString(),gps_in:gpsData},'emp_id,date')
       .then(function(res){if(!res){toast('❌','打卡失敗，請重試');return;}return loadAllData();})
-      .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓');empTab('clock');})
+      .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓ '+officeName);empTab('clock');})
       .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗');});
   }else{
     if(!existing||!existing.in){toast('⚠️','請先上班打卡');return;}
@@ -2992,6 +3065,65 @@ window.submitLeave=function(){
   }
   if(file){var r=new FileReader();r.onload=function(e){saveLeave(e.target.result);};r.onerror=function(){saveLeave('');};r.readAsDataURL(file);}
   else saveLeave('');
+};
+
+// ── Override openReview & openMakeupReview ────────
+// 修正：主程式用 let reviewingId（區域），patch 用 window.reviewingId（全域）
+// 同時設定兩者，確保 doReview 能正確讀取
+window.openReview=function(id){
+  var a=getApps().find(function(x){return x.id===id;});
+  if(!a)return;
+  window.reviewingId=id;  // ← 關鍵：讓 patch doReview 能讀到
+  // 呼叫原始 openReview 繪製 UI
+  openReview._orig?openReview._orig(id):null;
+  // 重新呼叫原始邏輯（直接繪製）
+  var supEmp=getEmpById(a.supId||'');
+  var isSup=a.status==='pending';
+  var stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
+  var stageColor=isSup?'var(--blue)':'var(--orange)';
+  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
+    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
+    +'<div>&#x1F4CC; '+a.type+(a.days?' · '+a.days+'天':'')+'</div>'
+    +'<div>&#x1F4C5; '+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+'</div>'
+    +'<div>&#x1F4DD; '+a.reason+'</div>'
+    +'<div>&#x1F91D; 代理：'+(a.proxy||'--')+'</div>'
+    +'<div>&#x1F464; 直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
+    +(a.attachName?'<div>&#x1F4CE; 附件：'+a.attachName+'</div>':'')
+    +'</div>'
+    +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
+  if(a.attachData){
+    if(a.attachData.startsWith('data:image'))
+      body+='<div style="margin-bottom:12px"><img src="'+a.attachData+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
+    else
+      body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
+  }
+  if(!isSup&&a.supNote)
+    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+a.supNote+'</div>';
+  body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
+  document.getElementById('reviewBody').innerHTML=body;
+  openSheet('reviewSheet');
+};
+
+window.openMakeupReview=function(id){
+  var a=getMakeupApps().find(function(x){return x.id===id;});
+  if(!a)return;
+  window.reviewingId='MAKEUP:'+id;  // ← 關鍵
+  var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+  var isSup=a.status==='pending';
+  var stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
+  var stageColor=isSup?'var(--blue)':'var(--orange)';
+  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
+    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
+    +'<div>&#x1F527; 補'+typeLabel+'</div>'
+    +'<div>&#x1F4C5; '+a.date+' '+a.punchTime+'</div>'
+    +'<div>&#x1F4DD; '+a.reason+'</div>'
+    +'</div>'
+    +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
+  if(!isSup&&a.supNote)
+    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 主管備註：'+a.supNote+'</div>';
+  body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
+  document.getElementById('reviewBody').innerHTML=body;
+  openSheet('reviewSheet');
 };
 
 // ── Override doReview ─────────────────────────────
