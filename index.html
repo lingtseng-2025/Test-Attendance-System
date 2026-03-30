@@ -459,6 +459,11 @@ body.admin-mode > #adminScreen{
     </div>
     <!-- Main content -->
     <div class="admin-main">
+      <div id="holidayReminderBar" style="display:none;align-items:center;gap:12px;background:#fff3cd;border-bottom:2px solid #f0a500;padding:10px 20px;font-size:13px;font-weight:600;color:#7a5200;flex-shrink:0">
+        <span id="holidayReminderText"></span>
+        <button onclick="adminTab('settings');dismissHolidayReminder();" style="background:#f0a500;color:#fff;border:none;border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">立即設定</button>
+        <button onclick="dismissHolidayReminder()" style="background:none;border:none;font-size:16px;cursor:pointer;color:#7a5200;margin-left:auto">✕</button>
+      </div>
       <div class="scroll" id="adminScroll" style="padding-bottom:24px"></div>
     </div>
   </div>
@@ -1132,6 +1137,45 @@ function startAdminSession(){
   clockIntervals.push(setInterval(tick,1000));
   adminTab('dashboard');
   updateAdminBadge();
+  checkHolidayReminder();
+}
+
+// ── 行事曆提醒 (每年12/1) ─────────────────────────
+function checkHolidayReminder(){
+  var now=new Date();
+  var month=now.getMonth(); // 0-indexed; 11 = December
+  if(month<11)return; // 只在 12 月提醒
+  var nextYear=now.getFullYear()+1;
+  var hasNext=Object.keys(DB.holidays||{}).some(function(d){return d.startsWith(nextYear+'-');});
+  if(!hasNext){
+    var el=document.getElementById('holidayReminderBar');
+    if(el){
+      el.querySelector('#holidayReminderText').textContent=
+        '📅 提醒：尚未設定 '+nextYear+' 年度國定假日行事曆，請至「系統設定 → 國定假日管理」更新！';
+      el.style.display='flex';
+    }
+  }
+}
+function dismissHolidayReminder(){
+  var el=document.getElementById('holidayReminderBar');
+  if(el) el.style.display='none';
+}
+// ── 假日 CRUD ────────────────────────────────────
+function saveHoliday(){
+  var d=document.getElementById('hol_date').value;
+  var n=document.getElementById('hol_name').value.trim();
+  if(!d||!n){toast('⚠️','請填寫日期與假日名稱');return;}
+  var yr=parseInt(d.split('-')[0]);
+  sbins('holidays',{date:d,name:n,year:yr}).then(function(){
+    toast('✅','假日已新增');
+    return loadAllData();
+  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','新增失敗：'+e.message);});
+}
+function deleteHoliday(id){
+  if(!confirm('確定刪除此假日？'))return;
+  sbdel('holidays',{id:id}).then(function(){
+    toast('✅','已刪除');return loadAllData();
+  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','刪除失敗：'+e.message);});
 }
 
 function switchAdminMode(mode){
@@ -2015,9 +2059,51 @@ function renderSettings(s){
   <div class="card fu fu3">
     ${qTypes.map(t=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid #fef0f0"><div style="font-size:13px;font-weight:600">${t.l}</div><div style="display:flex;align-items:center;gap:5px"><input type="number" id="q_${t.k}" value="${q[t.k]||0}" min="0" style="width:60px;text-align:center;padding:6px;border:1.5px solid var(--border);border-radius:8px;font-size:14px"><span style="font-size:12px;color:var(--t3)">天</span></div></div>`).join('')}
     <button class="save-btn" style="margin-top:12px" onclick="saveQuota()">💾 儲存假期額度</button>
-  </div></div></div>`;
+  </div></div></div>
+  ${renderHolidaySettings()}`;
 }
 
+function renderHolidaySettings(){
+  var hols=DB.holidays||{};
+  var years=[...new Set(Object.values(hols).map(function(h){return h.year;}))].sort();
+  var curYear=new Date().getFullYear();
+  var nextYear=curYear+1;
+  if(!years.includes(curYear)) years.push(curYear);
+  if(!years.includes(nextYear)) years.push(nextYear);
+  years.sort();
+  var rows='';
+  years.forEach(function(yr){
+    var yrHols=Object.entries(hols).filter(function(e){return e[1].year===yr;}).sort(function(a,b){return a[0]<b[0]?-1:1;});
+    var hasYr=yrHols.length>0;
+    rows+='<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:var(--pd);margin-bottom:8px">'+yr+'年'+(yr===nextYear&&!hasYr?'　<span style="color:#e07c08;font-size:11px">⚠️ 尚未設定</span>':' ('+yrHols.length+'天)')+'</div>';
+    if(yrHols.length>0){
+      rows+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
+      yrHols.forEach(function(e){
+        rows+='<div style="display:flex;align-items:center;gap:4px;background:var(--pl);border-radius:8px;padding:4px 10px;font-size:12px">'
+          +'<span style="color:var(--pd);font-weight:600">'+e[0].slice(5)+'</span>'
+          +'<span>'+e[1].name+'</span>'
+          +'<button onclick="deleteHoliday('+e[1].id+')" style="background:none;border:none;color:#e07c08;cursor:pointer;font-size:13px;padding:0 2px;line-height:1" title="刪除">✕</button>'
+          +'</div>';
+      });
+      rows+='</div>';
+    } else {
+      rows+='<div style="font-size:12px;color:var(--t3);padding:6px 0">尚無假日資料，請新增</div>';
+    }
+    rows+='</div>';
+  });
+  return '<div class="sec-title fu" style="margin-top:20px"><span>📅 國定假日管理</span></div>'
+    +'<div class="card fu">'
+    +'<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">'
+    +'<div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--t2)">新增假日</div>'
+    +'<div class="fr2" style="margin-bottom:8px">'
+    +'<div class="fg"><label>日期</label><input type="date" id="hol_date"></div>'
+    +'<div class="fg"><label>假日名稱</label><input type="text" id="hol_name" placeholder="例：元旦"></div>'
+    +'</div>'
+    +'<button class="save-btn" onclick="saveHoliday()">➕ 新增假日</button>'
+    +'</div>'
+    +rows
+    +'</div>';
+}
 function saveSettings(){
   var requireGPS=document.getElementById('cfg_requireGPS')?document.getElementById('cfg_requireGPS').checked:true;
   LS.set('companySettings',{
@@ -2686,7 +2772,7 @@ function escapeHtml(s){
 window.escapeHtml=escapeHtml;
 
 // ── In-memory cache ───────────────────────────────
-var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
+var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],holidays:{},quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
 
 function toEmp(e){return{id:e.id,name:e.name,dept:e.dept||'',pos:e.pos||'',workRule:e.work_rule||'deduct_lunch',salary:e.salary||0,email:e.email||'',color:e.color||'#5046e0',supervisorId:e.supervisor_id||'',role:e.role||'employee',status:e.status||'active'};}
 function toRec(r){return{date:r.date,empId:r.emp_id,in:r.time_in||null,out:r.time_out||null,gpsIn:r.gps_in||null,gpsOut:r.gps_out||null};}
@@ -2704,9 +2790,10 @@ function loadAllData(){
     sbq('leave_apps',{select:'id,emp_id,emp_name,type,start_date,end_date,days,reason,proxy,sup_id,attach_name,status,stage,sup_note,sup_reviewed_at,hr_note,hr_reviewed_at,applied_at',order:'applied_at.desc'}),
     sbq('makeup_apps',{select:'*',order:'applied_at.desc'}),
     sbq('leave_quota',{select:'*'}),
-    sbq('company_settings',{select:'*'})
+    sbq('company_settings',{select:'*'}),
+    sbq('holidays',{select:'*',order:'date.asc'})
   ]).then(function(res){
-    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[];
+    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[];
     DB.emps=emps.map(toEmp);
     DB.accs=emps.map(function(e){return{id:e.id,pw:e.password_hash,role:e.role||'employee'};});
     DB.recs=recs.map(toRec);
@@ -2716,6 +2803,8 @@ function loadAllData(){
     DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0};
     var cfg=cfgRows[0]||{};
     DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false};
+    DB.holidays={};
+    holRows.forEach(function(h){DB.holidays[h.date]={name:h.name,year:h.year,id:h.id};});
   });
 }
 
@@ -2772,6 +2861,9 @@ window.getMakeupApps=function(){return DB.makeups||[];};
 window.getQuota=function(){return DB.quota||{};};
 window.getCfg=function(){return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};};
 window.getEmpById=function(id){return (DB.emps||[]).find(function(e){return e.id===id;})||null;};
+window.getHolidays=function(){return DB.holidays||{};};
+window.isHoliday=function(dateStr){return !!(DB.holidays&&DB.holidays[dateStr]);};
+window.getHolidayName=function(dateStr){return (DB.holidays&&DB.holidays[dateStr]&&DB.holidays[dateStr].name)||'';};
 
 // ── Override seedData ─────────────────────────────
 window.seedData=function(){
