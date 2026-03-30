@@ -2791,7 +2791,7 @@ function loadAllData(){
     sbq('makeup_apps',{select:'*',order:'applied_at.desc'}),
     sbq('leave_quota',{select:'*'}),
     sbq('company_settings',{select:'*'}),
-    sbq('holidays',{select:'*',order:'date.asc'})
+    sbq('holidays',{select:'*',order:'date.asc'}).catch(function(){return [];})
   ]).then(function(res){
     var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[];
     DB.emps=emps.map(toEmp);
