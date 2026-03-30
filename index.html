@@ -379,8 +379,6 @@ body.admin-mode > #adminScreen{
     </div>
     <button class="lf-btn" onclick="doLogin()">登入</button>
     <div style="margin-top:14px;text-align:center;font-size:11px;color:var(--t3)">如忘記密碼，請聯繫人資管理員重設</div>
-<button onclick="debugLogin()" style="margin-top:10px;width:100%;padding:10px;border-radius:10px;border:1.5px dashed #aaa;background:#f8f8ff;color:#666;font-size:12px;cursor:pointer">🔍 除錯診斷（點我）</button>
-<div id="debugOut" style="margin-top:8px;font-size:11px;color:#333;background:#f0f0f0;border-radius:8px;padding:10px;display:none;word-break:break-all;text-align:left;line-height:1.8"></div>
   </div>
 </div>
 
@@ -2635,6 +2633,10 @@ function sbq(t,o){
   o=o||{};
   if(o.select)p.push('select='+encodeURIComponent(o.select));
   if(o.filter)Object.keys(o.filter).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(o.filter[k]));});
+  if(o.range)Object.keys(o.range).forEach(function(k){
+    if(o.range[k].gte!==undefined)p.push(k+'=gte.'+encodeURIComponent(o.range[k].gte));
+    if(o.range[k].lte!==undefined)p.push(k+'=lte.'+encodeURIComponent(o.range[k].lte));
+  });
   if(o.order)p.push('order='+encodeURIComponent(o.order));
   if(p.length)u+='?'+p.join('&');
   // No-cache headers to ensure fresh data
@@ -2651,6 +2653,7 @@ function sbups(t,d,oc){
     .then(function(r){if(!r.ok){console.error('[sbups] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbups] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbups] fetch error:',e);return null;});
 }
 function sbupd(t,d,f){
+  if(!f||Object.keys(f).length===0){console.error('[sbupd] 拒絕空 filter，防止全表更新 on '+t);return Promise.resolve(null);}
   var u=SB_URL+'/rest/v1/'+t,p=[];
   Object.keys(f).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(f[k]));});
   if(p.length)u+='?'+p.join('&');
@@ -2658,6 +2661,7 @@ function sbupd(t,d,f){
     .then(function(r){if(!r.ok){console.error('[sbupd] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbupd] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbupd] fetch error:',e);return null;});
 }
 function sbdel(t,f){
+  if(!f||Object.keys(f).length===0){console.error('[sbdel] 拒絕空 filter，防止全表刪除 on '+t);return Promise.resolve(false);}
   var u=SB_URL+'/rest/v1/'+t,p=[];
   Object.keys(f).forEach(function(k){p.push(k+'=eq.'+encodeURIComponent(f[k]));});
   if(p.length)u+='?'+p.join('&');
@@ -2673,6 +2677,14 @@ function sha256(s){
 }
 window.sha256=sha256;
 
+// ── XSS 防護：escapeHtml ──────────────────────────
+// 所有使用者輸入插入 innerHTML 前必須先 escape
+function escapeHtml(s){
+  if(s===null||s===undefined)return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
+}
+window.escapeHtml=escapeHtml;
+
 // ── In-memory cache ───────────────────────────────
 var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
 
@@ -2682,10 +2694,14 @@ function toLea(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',type:a.ty
 function toMkp(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',date:a.date||'',punchType:a.punch_type||'',punchTime:a.punch_time||'',supId:a.sup_id||'',reason:a.reason||'',gps:a.gps||null,status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||''};}
 
 function loadAllData(){
+  // 只抓最近 3 個月打卡記錄，防止資料量無限成長
+  var d3m=new Date(); d3m.setMonth(d3m.getMonth()-3);
+  var recFrom=d3m.toISOString().slice(0,10);
   return Promise.all([
     sbq('employees',{select:'*'}),
-    sbq('records',{select:'*'}),
-    sbq('leave_apps',{select:'*',order:'applied_at.desc'}),
+    sbq('records',{select:'*',range:{date:{gte:recFrom}}}),
+    // attach_data 欄位不在此處抓取（可達 1MB+），審核時才 lazy load
+    sbq('leave_apps',{select:'id,emp_id,emp_name,type,start_date,end_date,days,reason,proxy,sup_id,attach_name,status,stage,sup_note,sup_reviewed_at,hr_note,hr_reviewed_at,applied_at',order:'applied_at.desc'}),
     sbq('makeup_apps',{select:'*',order:'applied_at.desc'}),
     sbq('leave_quota',{select:'*'}),
     sbq('company_settings',{select:'*'})
@@ -3070,25 +3086,31 @@ window.submitLeave=function(){
 // ── Override openReview & openMakeupReview ────────
 // 修正：主程式用 let reviewingId（區域），patch 用 window.reviewingId（全域）
 // 同時設定兩者，確保 doReview 能正確讀取
-window.openReview=function(id){
+window.openReview=async function(id){
   var a=getApps().find(function(x){return x.id===id;});
   if(!a)return;
-  window.reviewingId=id;  // ← 關鍵：讓 patch doReview 能讀到
-  // 呼叫原始 openReview 繪製 UI
-  openReview._orig?openReview._orig(id):null;
-  // 重新呼叫原始邏輯（直接繪製）
+  window.reviewingId=id;
+  // Lazy load attach_data（不在 loadAllData 抓，避免每次下載大檔案）
+  if(a.attachName&&!a.attachData){
+    try{
+      var rows=await sbq('leave_apps',{select:'attach_data',filter:{id:a.id}});
+      if(rows&&rows[0])a.attachData=rows[0].attach_data||'';
+    }catch(e){console.warn('[openReview] 附件載入失敗',e);}
+  }
   var supEmp=getEmpById(a.supId||'');
   var isSup=a.status==='pending';
   var stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
   var stageColor=isSup?'var(--blue)':'var(--orange)';
+  // escapeHtml 保護：防止員工姓名/原因等使用者輸入造成 XSS
+  var eh=window.escapeHtml||function(s){return String(s||'');};
   var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
-    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
-    +'<div>&#x1F4CC; '+a.type+(a.days?' · '+a.days+'天':'')+'</div>'
-    +'<div>&#x1F4C5; '+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+'</div>'
-    +'<div>&#x1F4DD; '+a.reason+'</div>'
-    +'<div>&#x1F91D; 代理：'+(a.proxy||'--')+'</div>'
-    +'<div>&#x1F464; 直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
-    +(a.attachName?'<div>&#x1F4CE; 附件：'+a.attachName+'</div>':'')
+    +'<div>&#x1F464; <strong>'+eh(a.empName)+'</strong></div>'
+    +'<div>&#x1F4CC; '+eh(a.type)+(a.days?' · '+a.days+'天':'')+'</div>'
+    +'<div>&#x1F4C5; '+eh(a.startDate)+(a.startDate!==a.endDate?' ～ '+eh(a.endDate):'')+'</div>'
+    +'<div>&#x1F4DD; '+eh(a.reason)+'</div>'
+    +'<div>&#x1F91D; 代理：'+eh(a.proxy||'--')+'</div>'
+    +'<div>&#x1F464; 直屬主管：'+eh(supEmp?supEmp.name:'--')+'</div>'
+    +(a.attachName?'<div>&#x1F4CE; 附件：'+eh(a.attachName)+'</div>':'')
     +'</div>'
     +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
   if(a.attachData){
@@ -3098,7 +3120,7 @@ window.openReview=function(id){
       body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
   }
   if(!isSup&&a.supNote)
-    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+a.supNote+'</div>';
+    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+eh(a.supNote)+'</div>';
   body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
   document.getElementById('reviewBody').innerHTML=body;
   openSheet('reviewSheet');
@@ -3112,15 +3134,16 @@ window.openMakeupReview=function(id){
   var isSup=a.status==='pending';
   var stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
   var stageColor=isSup?'var(--blue)':'var(--orange)';
+  var eh=window.escapeHtml||function(s){return String(s||'');};
   var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
-    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
+    +'<div>&#x1F464; <strong>'+eh(a.empName)+'</strong></div>'
     +'<div>&#x1F527; 補'+typeLabel+'</div>'
-    +'<div>&#x1F4C5; '+a.date+' '+a.punchTime+'</div>'
-    +'<div>&#x1F4DD; '+a.reason+'</div>'
+    +'<div>&#x1F4C5; '+eh(a.date)+' '+eh(a.punchTime)+'</div>'
+    +'<div>&#x1F4DD; '+eh(a.reason)+'</div>'
     +'</div>'
     +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
   if(!isSup&&a.supNote)
-    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 主管備註：'+a.supNote+'</div>';
+    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 主管備註：'+eh(a.supNote)+'</div>';
   body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
   document.getElementById('reviewBody').innerHTML=body;
   openSheet('reviewSheet');
@@ -3201,24 +3224,7 @@ window.confirmMakeupGps=function(){
   });
 };
 
-// ── Debug function ───────────────────────────────
-window.debugLogin=function(){
-  var out=document.getElementById('debugOut');
-  out.style.display='block';
-  var r='DB.accs:'+(DB.accs?DB.accs.length:'undef');
-  r+=' | DB.emps:'+(DB.emps?DB.emps.length:'undef');
-  if(DB.accs&&DB.accs.length){
-    r+=' | first acc:'+DB.accs[0].id+'/'+DB.accs[0].role+'/'+(DB.accs[0].pw?DB.accs[0].pw.slice(0,8):'null');
-  }
-  out.textContent=r;
-  sha256('93609058').then(function(h){
-    out.textContent+=(' | hash:'+h.slice(0,8));
-    sbq('employees',{select:'id,role,password_hash'}).then(function(rows){
-      out.textContent+=' | SB rows:'+rows.length;
-      if(rows[0]) out.textContent+=' | '+rows[0].id+':'+( rows[0].password_hash?rows[0].password_hash.slice(0,8):'null');
-    });
-  });
-};
+// debugLogin 已移除（生產環境不應暴露 DB 狀態）
 
 // ── Salary Management ────────────────────────────
 // ── Salary Management ─────────────────────────────
