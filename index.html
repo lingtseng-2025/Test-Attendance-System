@@ -540,7 +540,11 @@ body.admin-mode > #adminScreen{
     <div class="sh-body">
       <div class="fg"><label>收件人 Email</label><input id="emailTo" type="email" placeholder="請輸入 Email"></div>
       <div class="fg"><label>主旨</label><input id="emailSubj"></div>
-      <div class="fg"><label>備註</label><textarea id="emailNote" placeholder="選填..."></textarea></div>
+      <div id="emailPreviewWrap" style="display:none;margin-top:4px">
+        <div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:6px">📋 薪資單預覽</div>
+        <div id="emailPreview" style="background:var(--bg);border-radius:10px;padding:12px;font-size:12px;color:var(--text);line-height:1.8;white-space:pre-wrap;max-height:220px;overflow-y:auto;border:1px solid var(--border)"></div>
+      </div>
+      <div class="fg" id="emailNoteWrap"><label>備註</label><textarea id="emailNote" placeholder="選填..."></textarea></div>
     </div>
     <div class="sh-btns two">
       <button class="sbtn cancel" onclick="closeSheet('emailSheet')">取消</button>
@@ -2688,13 +2692,149 @@ function openEmailSheet(y,m){
   document.getElementById('emailSubj').value=`${emp?.name||''} ${y}年${m}月工作時間明細`;
   document.getElementById('emailTo').value='';
   document.getElementById('emailNote').value='';
+  document.getElementById('emailPreviewWrap').style.display='none';
+  document.getElementById('emailNoteWrap').style.display='';
+  window._salaryEmailData=null;
   openSheet('emailSheet');
 }
+
+window.emailSalarySlip=function(empId,y,m){
+  var emp=getEmpById(empId); if(!emp) return;
+  var recs=getMonthRecs(y,m-1,emp.id);
+  var leaveApps=getApps().filter(function(a){return a.empId===emp.id&&a.status==='approved';});
+  var daysInMonth=new Date(y,m,0).getDate();
+
+  var scheduledDays=0;
+  for(var dd=1;dd<=daysInMonth;dd++){
+    var dds=y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    var ddow=new Date(dds).getDay();
+    if(ddow===0||ddow===6) continue;
+    if(window.isHoliday&&window.isHoliday(dds)) continue;
+    scheduledDays++;
+  }
+  if(scheduledDays===0) scheduledDays=22;
+
+  var baseSalary=emp.salary||0;
+  var dailyRate=baseSalary/scheduledDays, hourlyRate=dailyRate/8;
+  var workDays=0,totalHours=0,otPay=0,otHoursNormal=0,otHoursHoliday=0,leaveDays=0,absentDays=0;
+
+  for(var d=1;d<=daysInMonth;d++){
+    var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    var dow=new Date(ds).getDay();
+    var isDayOff=(dow===0||dow===6)||(window.isHoliday&&window.isHoliday(ds));
+    var rec=recs.find(function(r){return r.date===ds;});
+    var leave=leaveApps.find(function(a){return ds>=a.startDate&&ds<=a.endDate;});
+    if(!isDayOff){
+      if(leave){leaveDays++;workDays++;}
+      else if(rec&&rec.in){
+        workDays++;
+        var h=calcHours(rec.in,rec.out,emp.workRule);
+        totalHours+=h;
+        var dayOT=Math.max(0,h-8);
+        otPay+=Math.min(dayOT,2)*hourlyRate*1.34+Math.max(0,dayOT-2)*hourlyRate*1.67;
+        otHoursNormal+=dayOT;
+      } else {absentDays++;}
+    } else {
+      if(rec&&rec.in){
+        var hh=calcHours(rec.in,rec.out,emp.workRule);
+        otPay+=hh*hourlyRate*2.0; otHoursHoliday+=hh;
+      }
+    }
+  }
+
+  var absentDeduct=absentDays*dailyRate;
+  var sickDays=leaveApps.filter(function(a){return a.type==='sick';}).reduce(function(sum,a){
+    var cnt=0,cur=new Date(a.startDate),end=new Date(a.endDate);
+    while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)cnt++;cur.setDate(cur.getDate()+1);}
+    return sum+cnt;
+  },0);
+  var sickDeduct=sickDays>30?(sickDays-30)*dailyRate*0.5:0;
+  var laborIns=Math.round(baseSalary*0.12*0.2);
+  var healthIns=Math.round(baseSalary*0.0517*0.3);
+  var incomeTax=baseSalary>88501?Math.round((baseSalary-88501)*0.05):0;
+  var grossPay=baseSalary+otPay-absentDeduct-sickDeduct;
+  var netPay=Math.max(0,grossPay-laborIns-healthIns-incomeTax);
+  var totalOTh=(otHoursNormal+otHoursHoliday).toFixed(1);
+
+  var lines=[
+    'iROBOT MEDICINE 智能人醫',
+    '═══════════════════════════',
+    '薪　資　單',
+    '───────────────────────────',
+    '員工：'+emp.name+'（'+emp.id+'）',
+    '部門：'+emp.dept+'　職位：'+emp.pos,
+    '月份：'+y+' 年 '+m+' 月',
+    '應出勤：'+scheduledDays+' 天',
+    '───────────────────────────',
+    '【收入項目】',
+    '  本月底薪          $'+baseSalary.toLocaleString(),
+    '  日薪基數（÷'+scheduledDays+'天）   $'+Math.round(dailyRate).toLocaleString()
+  ];
+  if(otHoursNormal>0) lines.push('  平日加班費（'+otHoursNormal.toFixed(1)+'h）   $'+Math.round(otPay-(otHoursHoliday*hourlyRate*2)).toLocaleString());
+  if(otHoursHoliday>0) lines.push('  假日出勤費（'+otHoursHoliday.toFixed(1)+'h×2.0）$'+Math.round(otHoursHoliday*hourlyRate*2).toLocaleString());
+  if(absentDays>0) lines.push('  曠職扣薪（'+absentDays+'天）     −$'+Math.round(absentDeduct).toLocaleString());
+  if(sickDeduct>0) lines.push('  病假扣薪（超30天）       −$'+Math.round(sickDeduct).toLocaleString());
+  lines=lines.concat([
+    '  ──────────────────────',
+    '  應發合計            $'+Math.round(grossPay).toLocaleString(),
+    '',
+    '【扣除項目】',
+    '  勞保費（12%×20%）    −$'+laborIns.toLocaleString(),
+    '  健保費（5.17%×30%）  −$'+healthIns.toLocaleString()
+  ]);
+  if(incomeTax>0) lines.push('  所得稅預扣          −$'+incomeTax.toLocaleString());
+  lines=lines.concat([
+    '───────────────────────────',
+    '💰 本月實領薪資        $'+Math.round(netPay).toLocaleString(),
+    '═══════════════════════════',
+    '',
+    '【出勤統計】',
+    '  實際出勤：'+workDays+' 天　請假：'+leaveDays+' 天　曠職：'+absentDays+' 天',
+    '  總工時：'+totalHours.toFixed(1)+' h　加班：'+totalOTh+' h',
+    '',
+    '此薪資單由 iROBOT MEDICINE 智能人醫系統自動產生',
+    new Date().toLocaleString()
+  ]);
+
+  var bodyText=lines.join('\n');
+  window._salaryEmailData={
+    to:emp.email||'',
+    subj:'【薪資單】'+emp.name+' '+y+'年'+m+'月',
+    body:bodyText
+  };
+
+  document.getElementById('emailTo').value=emp.email||'';
+  document.getElementById('emailSubj').value='【薪資單】'+emp.name+' '+y+'年'+m+'月';
+  document.getElementById('emailPreview').textContent=bodyText;
+  document.getElementById('emailPreviewWrap').style.display='block';
+  document.getElementById('emailNoteWrap').style.display='none';
+  openSheet('emailSheet');
+};
+
 function doSendEmail(){
-  const to=document.getElementById('emailTo').value.trim();
-  if(!to){toast('⚠️','請填寫 Email');return}
-  closeSheet('emailSheet');
-  toast('📧',`已傳送至 ${to}（模擬）`);
+  var to=document.getElementById('emailTo').value.trim();
+  if(!to){toast('⚠️','請填寫收件人 Email');return;}
+  var subj=document.getElementById('emailSubj').value.trim();
+
+  if(window._salaryEmailData){
+    // 薪資單：用 mailto: 開啟郵件程式並帶入完整內容
+    var body=window._salaryEmailData.body;
+    var note=(document.getElementById('emailNote').value||'').trim();
+    if(note) body=note+'\n\n'+body;
+    var link='mailto:'+encodeURIComponent(to)
+      +'?subject='+encodeURIComponent(subj)
+      +'&body='+encodeURIComponent(body);
+    var a=document.createElement('a');
+    a.href=link; a.style.display='none';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    window._salaryEmailData=null;
+    closeSheet('emailSheet');
+    toast('📧','已開啟郵件程式，請確認後寄出');
+  } else {
+    // 工作時間明細（原有邏輯）
+    closeSheet('emailSheet');
+    toast('📧','已傳送至 '+to+'（模擬）');
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -3391,121 +3531,160 @@ window.calcSalary = function() {
   var container = document.getElementById('salaryResult');
   if(!container) return;
 
-  var html = '<div style="display:flex;flex-direction:column;gap:14px">';
+  // ── 當月實際應出勤日（週一~五 扣除國定假日）────────
+  var daysInMonth = new Date(y, m, 0).getDate();
+  var scheduledDays = 0;
+  for(var dd=1; dd<=daysInMonth; dd++){
+    var dds = y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    var ddow = new Date(dds).getDay();
+    if(ddow===0||ddow===6) continue;
+    if(window.isHoliday && window.isHoliday(dds)) continue;
+    scheduledDays++;
+  }
+  if(scheduledDays===0) scheduledDays=22;
 
-  // Summary stats
-  var totalSalary = 0, totalOT = 0, totalDays = 0;
+  var html = '<div style="display:flex;flex-direction:column;gap:14px">';
+  var totalSalary=0, totalOT=0, totalDays=0;
 
   var rows = emps.map(function(emp) {
     var recs = getMonthRecs(y, m-1, emp.id);
     var leaveApps = getApps().filter(function(a){return a.empId===emp.id&&a.status==='approved';});
-    var daysInMonth = new Date(y, m, 0).getDate();
-    var workDays = 0, totalHours = 0, otHours = 0, leaveDays = 0;
+    var workDays=0, totalHours=0, otPay=0, otHoursNormal=0, otHoursHoliday=0, leaveDays=0, absentDays=0;
 
-    for(var d=1; d<=daysInMonth; d++) {
+    var baseSalary = emp.salary||0;
+    var dailyRate  = baseSalary / scheduledDays;
+    var hourlyRate = dailyRate / 8;
+
+    for(var d=1; d<=daysInMonth; d++){
       var ds = y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
       var dow = new Date(ds).getDay();
-      if(dow===0||dow===6) continue; // skip weekends
-      var rec = recs.find(function(r){return r.date===ds;});
-      var leave = leaveApps.find(function(a){return ds>=a.startDate&&ds<=a.endDate;});
-      if(leave) { leaveDays++; workDays++; continue; }
-      if(rec && rec.in) {
-        workDays++;
-        var h = calcHours(rec.in, rec.out, emp.workRule);
-        totalHours += h;
-        otHours += Math.max(0, h-8);
+      var isWeekend = dow===0||dow===6;
+      var isHol = window.isHoliday ? window.isHoliday(ds) : false;
+      var isDayOff = isWeekend||isHol;
+      var rec  = recs.find(function(r){return r.date===ds;});
+      var leave= leaveApps.find(function(a){return ds>=a.startDate&&ds<=a.endDate;});
+
+      if(!isDayOff){
+        if(leave){ leaveDays++; workDays++; }
+        else if(rec&&rec.in){
+          workDays++;
+          var h = calcHours(rec.in, rec.out, emp.workRule);
+          totalHours += h;
+          var dayOT = Math.max(0, h-8);
+          // 勞基法：平日前2h×1.34，第3h起×1.67
+          var t1 = Math.min(dayOT, 2);
+          var t2 = Math.max(0, dayOT-2);
+          otPay += t1*hourlyRate*1.34 + t2*hourlyRate*1.67;
+          otHoursNormal += dayOT;
+        } else {
+          absentDays++; // 曠職
+        }
+      } else {
+        // 假日/例假出勤：全部以2倍計算
+        if(rec&&rec.in){
+          var hh = calcHours(rec.in, rec.out, emp.workRule);
+          otPay += hh * hourlyRate * 2.0;
+          otHoursHoliday += hh;
+        }
       }
     }
 
-    // Salary calculation
-    var baseSalary = emp.salary || 0;
-    var dailyRate = baseSalary / 22; // 每月約22個工作天
-    var hourlyRate = dailyRate / 8;
-    var otPay = otHours * hourlyRate * 1.34; // 加班費 1.34倍
-    var sickLeaveDays = leaveApps.filter(function(a){
+    // 曠職扣薪
+    var absentDeduct = absentDays * dailyRate;
+
+    // 病假扣薪：前30天全薪，31~90天半薪（勞基法第43條）
+    var sickDays = leaveApps.filter(function(a){
       return a.empId===emp.id&&a.status==='approved'&&a.type==='sick';
     }).reduce(function(sum,a){
-      var d2=0,cur=new Date(a.startDate),end=new Date(a.endDate);
-      while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)d2++;cur.setDate(cur.getDate()+1);}
-      return sum+d2;
-    }, 0);
-    // 病假前3天全薪，之後半薪
-    var sickDeduct = sickLeaveDays > 3 ? (sickLeaveDays-3)*dailyRate*0.5 : 0;
-    // 勞保費（固定估算）
-    var laborInsurance = Math.round(baseSalary * 0.0882 * 0.2); // 員工負擔20%
-    // 健保費
-    var healthInsurance = Math.round(baseSalary * 0.0517 * 0.3); // 員工負擔30%
-    // 所得稅預扣（薪資40001以上）
-    var incomeTax = baseSalary > 40000 ? Math.round((baseSalary - 40000) * 0.05) : 0;
+      var cnt=0,cur=new Date(a.startDate),end=new Date(a.endDate);
+      while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)cnt++;cur.setDate(cur.getDate()+1);}
+      return sum+cnt;
+    },0);
+    var sickDeduct = sickDays>30 ? (sickDays-30)*dailyRate*0.5 : 0;
 
-    var grossPay = baseSalary + otPay - sickDeduct;
-    var deductions = laborInsurance + healthInsurance + incomeTax;
-    var netPay = grossPay - deductions;
+    // 勞保：費率12%，員工負擔20%（2026年預估）
+    var laborIns = Math.round(baseSalary * 0.12 * 0.2);
+    // 健保：費率5.17%，員工負擔30%
+    var healthIns = Math.round(baseSalary * 0.0517 * 0.3);
+    // 所得稅預扣（依財政部扣繳稅額表簡化：月薪>88,501才扣）
+    var incomeTax = baseSalary>88501 ? Math.round((baseSalary-88501)*0.05) : 0;
+
+    var grossPay = baseSalary + otPay - absentDeduct - sickDeduct;
+    var deductions = laborIns + healthIns + incomeTax;
+    var netPay = Math.max(0, grossPay - deductions);
 
     totalSalary += netPay;
-    totalOT += otHours;
+    totalOT += otHoursNormal + otHoursHoliday;
     totalDays += workDays;
 
-    return {emp:emp, workDays:workDays, totalHours:totalHours, otHours:otHours,
-      baseSalary:baseSalary, otPay:otPay, sickDeduct:sickDeduct,
-      laborInsurance:laborInsurance, healthInsurance:healthInsurance, incomeTax:incomeTax,
-      grossPay:grossPay, deductions:deductions, netPay:netPay, leaveDays:leaveDays};
+    return {emp, workDays, totalHours, otHoursNormal, otHoursHoliday, otPay,
+      leaveDays, absentDays, absentDeduct, sickDeduct, baseSalary, dailyRate,
+      laborIns, healthIns, incomeTax, grossPay, deductions, netPay, scheduledDays};
   });
 
-  // Summary cards
+  // ── 摘要統計 ─────────────────────────────────────
   html += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
     + '<div class="sc"><div class="sc-ico pk">👥</div><div><div class="sc-label">計算人數</div><div class="sc-val" style="color:var(--pd)">'+emps.length+'</div></div></div>'
-    + '<div class="sc"><div class="sc-ico gn">💰</div><div><div class="sc-label">總應發薪資</div><div class="sc-val" style="color:var(--green);font-size:16px">$'+Math.round(totalSalary).toLocaleString()+'</div></div></div>'
-    + '<div class="sc"><div class="sc-ico or">🔥</div><div><div class="sc-label">總加班時數</div><div class="sc-val" style="color:var(--orange)">'+totalOT.toFixed(1)+'h</div></div></div>'
+    + '<div class="sc"><div class="sc-ico gn">💰</div><div><div class="sc-label">總實領薪資</div><div class="sc-val" style="color:var(--green);font-size:16px">$'+Math.round(totalSalary).toLocaleString()+'</div></div></div>'
+    + '<div class="sc"><div class="sc-ico or">🔥</div><div><div class="sc-label">本月應出勤</div><div class="sc-val" style="color:var(--orange)">'+scheduledDays+'天</div></div></div>'
     + '</div>';
 
-  // Individual salary cards
-  rows.forEach(function(row) {
-    var emp = row.emp;
+  // ── 個人薪資卡 ────────────────────────────────────
+  rows.forEach(function(row){
+    var emp=row.emp;
+    var totalOTh=(row.otHoursNormal+row.otHoursHoliday).toFixed(1);
     html += '<div class="card" style="border-left:4px solid '+emp.color+'">'
-      // Employee header
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bg)">'
       + '<div style="width:42px;height:42px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0">'+emp.name[0]+'</div>'
       + '<div style="flex:1"><div style="font-size:15px;font-weight:700">'+emp.name+'</div><div style="font-size:11px;color:var(--t3)">'+emp.dept+' · '+emp.pos+'</div></div>'
       + '<div style="text-align:right"><div style="font-size:11px;color:var(--t3)">實領薪資</div><div style="font-family:Nunito,sans-serif;font-size:22px;font-weight:900;color:var(--green)">$'+Math.round(row.netPay).toLocaleString()+'</div></div>'
       + '</div>'
-      // Attendance summary
-      + '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">'
-      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">出勤天數</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--pd)">'+row.workDays+'</div></div>'
-      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">總工時</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--blue)">'+row.totalHours.toFixed(1)+'h</div></div>'
-      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">加班時數</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--orange)">'+row.otHours.toFixed(1)+'h</div></div>'
-      + '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center"><div style="font-size:9px;color:var(--t3);margin-bottom:3px">請假天數</div><div style="font-family:Nunito,sans-serif;font-size:17px;font-weight:900;color:var(--yellow)">'+row.leaveDays+'</div></div>'
+      // 出勤統計（5格）
+      + '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px">'
+      + statBox('出勤天數', row.workDays+'天', 'var(--pd)')
+      + statBox('應出勤', row.scheduledDays+'天', 'var(--blue)')
+      + statBox('總工時', row.totalHours.toFixed(1)+'h', 'var(--blue)')
+      + statBox('加班時數', totalOTh+'h', 'var(--orange)')
+      + statBox('請假天數', row.leaveDays+'天', 'var(--yellow)')
       + '</div>'
-      // Salary breakdown
+      // 薪資明細
       + '<div style="background:var(--bg);border-radius:12px;padding:14px">'
-      + '<div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">薪資明細</div>'
+      + '<div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">📋 薪資明細</div>'
       + salRow('本月底薪', row.baseSalary, 'var(--text)')
-      + salRow('加班費（'+row.otHours.toFixed(1)+'h × 1.34）', row.otPay, 'var(--orange)')
-      + (row.sickDeduct>0 ? salRowMinus('病假扣薪', row.sickDeduct) : '')
+      + salRow('日薪基數（÷'+row.scheduledDays+'天）', row.dailyRate, 'var(--t3)')
+      + (row.otHoursNormal>0?salRow('平日加班費（前2h×1.34，後×1.67）', row.otPay-(row.otHoursHoliday*(row.dailyRate/8)*2), 'var(--orange)'):'')
+      + (row.otHoursHoliday>0?salRow('假日出勤費（'+row.otHoursHoliday.toFixed(1)+'h×2.0）', row.otHoursHoliday*(row.dailyRate/8)*2, 'var(--orange)'):'')
+      + (row.absentDays>0?salRowMinus('曠職扣薪（'+row.absentDays+'天）', row.absentDeduct):'')
+      + (row.sickDeduct>0?salRowMinus('病假扣薪（超30天半薪）', row.sickDeduct):'')
       + '<div style="border-top:1.5px solid var(--border);margin:8px 0"></div>'
       + salRow('應發合計', row.grossPay, 'var(--green)', true)
       + '<div style="border-top:1px dashed var(--border);margin:8px 0"></div>'
       + '<div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:6px">扣除項目</div>'
-      + salRowMinus('勞保費（員工負擔）', row.laborInsurance)
-      + salRowMinus('健保費（員工負擔）', row.healthInsurance)
-      + (row.incomeTax>0 ? salRowMinus('所得稅預扣', row.incomeTax) : '')
+      + salRowMinus('勞保費（員工負擔12%×20%）', row.laborIns)
+      + salRowMinus('健保費（員工負擔5.17%×30%）', row.healthIns)
+      + (row.incomeTax>0?salRowMinus('所得稅預扣', row.incomeTax):'')
       + '<div style="border-top:2px solid var(--border);margin:10px 0"></div>'
       + '<div style="display:flex;justify-content:space-between;align-items:center">'
       + '<div style="font-size:14px;font-weight:800;color:var(--text)">💰 實領金額</div>'
       + '<div style="font-family:Nunito,sans-serif;font-size:22px;font-weight:900;color:var(--green)">$'+Math.round(row.netPay).toLocaleString()+'</div>'
-      + '</div>'
-      + '</div>'
-      // Action buttons
-      + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px">'
+      + '</div></div>'
+      + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:9px;margin-top:12px">'
       + '<button onclick="exportSalaryExcel(\''+emp.id+'\','+y+','+m+')" style="padding:10px;border-radius:10px;border:1.5px solid var(--pink);background:#fff;color:var(--pd);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">📥 Excel</button>'
-      + '<button onclick="printSalarySlip(\''+emp.id+'\','+y+','+m+')" style="padding:10px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🖨️ 列印薪資單</button>'
-      + '</div>'
-      + '</div>';
+      + '<button onclick="emailSalarySlip(\''+emp.id+'\','+y+','+m+')" style="padding:10px;border-radius:10px;border:1.5px solid #2196f3;background:#fff;color:#1565c0;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">📧 Email</button>'
+      + '<button onclick="printSalarySlip(\''+emp.id+'\','+y+','+m+')" style="padding:10px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--font)">🖨️ 列印</button>'
+      + '</div></div>';
   });
 
   html += '</div>';
   container.innerHTML = html;
 };
+
+function statBox(label, val, color){
+  return '<div style="background:var(--bg);border-radius:10px;padding:9px;text-align:center">'
+    +'<div style="font-size:9px;color:var(--t3);margin-bottom:3px">'+label+'</div>'
+    +'<div style="font-family:Nunito,sans-serif;font-size:15px;font-weight:900;color:'+color+'">'+val+'</div>'
+    +'</div>';
+}
 
 function salRow(label, val, color, bold) {
   return '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0">'
@@ -3523,39 +3702,88 @@ function salRowMinus(label, val) {
 window.exportSalaryExcel = function(empId, y, m) {
   var emp = getEmpById(empId); if(!emp) return;
   var recs = getMonthRecs(y, m-1, emp.id);
+  var leaveApps = getApps().filter(function(a){return a.empId===emp.id&&a.status==='approved';});
   var daysInMonth = new Date(y, m, 0).getDate();
-  var workDays=0, totalHours=0, otHours=0;
+
+  // 當月實際應出勤日（週一~五 扣除國定假日）
+  var scheduledDays=0;
+  for(var dd=1;dd<=daysInMonth;dd++){
+    var dds=y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    var ddow=new Date(dds).getDay();
+    if(ddow===0||ddow===6) continue;
+    if(window.isHoliday&&window.isHoliday(dds)) continue;
+    scheduledDays++;
+  }
+  if(scheduledDays===0) scheduledDays=22;
+
+  var baseSalary=emp.salary||0;
+  var dailyRate=baseSalary/scheduledDays, hourlyRate=dailyRate/8;
+  var workDays=0, totalHours=0, otPay=0, otHoursNormal=0, otHoursHoliday=0, leaveDays=0, absentDays=0;
+
   for(var d=1;d<=daysInMonth;d++){
     var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var dow=new Date(ds).getDay(); if(dow===0||dow===6) continue;
+    var dow=new Date(ds).getDay();
+    var isWeekend=dow===0||dow===6;
+    var isHol=window.isHoliday?window.isHoliday(ds):false;
+    var isDayOff=isWeekend||isHol;
     var rec=recs.find(function(r){return r.date===ds;});
-    if(rec&&rec.in){workDays++;var h=calcHours(rec.in,rec.out,emp.workRule);totalHours+=h;otHours+=Math.max(0,h-8);}
+    var leave=leaveApps.find(function(a){return ds>=a.startDate&&ds<=a.endDate;});
+    if(!isDayOff){
+      if(leave){ leaveDays++; workDays++; }
+      else if(rec&&rec.in){
+        workDays++;
+        var h=calcHours(rec.in,rec.out,emp.workRule);
+        totalHours+=h;
+        var dayOT=Math.max(0,h-8);
+        otPay+=Math.min(dayOT,2)*hourlyRate*1.34+Math.max(0,dayOT-2)*hourlyRate*1.67;
+        otHoursNormal+=dayOT;
+      } else { absentDays++; }
+    } else {
+      if(rec&&rec.in){
+        var hh=calcHours(rec.in,rec.out,emp.workRule);
+        otPay+=hh*hourlyRate*2.0; otHoursHoliday+=hh;
+      }
+    }
   }
-  var dailyRate=emp.salary/22, hourlyRate=dailyRate/8;
-  var otPay=otHours*hourlyRate*1.34;
-  var laborIns=Math.round(emp.salary*0.0882*0.2);
-  var healthIns=Math.round(emp.salary*0.0517*0.3);
-  var incomeTax=emp.salary>40000?Math.round((emp.salary-40000)*0.05):0;
-  var gross=emp.salary+otPay;
-  var deduct=laborIns+healthIns+incomeTax;
-  var net=gross-deduct;
+
+  var absentDeduct=absentDays*dailyRate;
+  var sickDays=leaveApps.filter(function(a){return a.type==='sick';}).reduce(function(sum,a){
+    var cnt=0,cur=new Date(a.startDate),end=new Date(a.endDate);
+    while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)cnt++;cur.setDate(cur.getDate()+1);}
+    return sum+cnt;
+  },0);
+  var sickDeduct=sickDays>30?(sickDays-30)*dailyRate*0.5:0;
+  var laborIns=Math.round(baseSalary*0.12*0.2);
+  var healthIns=Math.round(baseSalary*0.0517*0.3);
+  var incomeTax=baseSalary>88501?Math.round((baseSalary-88501)*0.05):0;
+  var grossPay=baseSalary+otPay-absentDeduct-sickDeduct;
+  var deductions=laborIns+healthIns+incomeTax;
+  var netPay=Math.max(0,grossPay-deductions);
+  var totalOTh=(otHoursNormal+otHoursHoliday).toFixed(1);
 
   var data=[
     ['iROBOT MEDICINE 智能人醫 — 薪資單'],
     ['員工：'+emp.name,'工號：'+emp.id,'部門：'+emp.dept],
-    ['月份：'+y+'年'+m+'月'],[''],
+    ['月份：'+y+'年'+m+'月','應出勤天數：'+scheduledDays+'天'],
+    [''],
     ['項目','金額（元）'],
-    ['本月底薪',emp.salary],
-    ['加班費（'+otHours.toFixed(1)+'h）',Math.round(otPay)],
-    ['應發合計',Math.round(gross)],[''],
-    ['－勞保費（員工負擔）',-laborIns],
-    ['－健保費（員工負擔）',-healthIns],
-    ['－所得稅預扣',-incomeTax],
-    [''],['實領金額',Math.round(net)],[''],
-    ['出勤天數',workDays],['總工時',totalHours.toFixed(1)+'h'],['加班時數',otHours.toFixed(1)+'h']
+    ['本月底薪',baseSalary],
+    ['日薪基數（÷'+scheduledDays+'天）',Math.round(dailyRate)]
   ];
+  if(otHoursNormal>0) data.push(['平日加班費（前2h×1.34，後×1.67）',Math.round(otPay-(otHoursHoliday*hourlyRate*2))]);
+  if(otHoursHoliday>0) data.push(['假日出勤費（'+otHoursHoliday.toFixed(1)+'h×2.0）',Math.round(otHoursHoliday*hourlyRate*2)]);
+  if(absentDays>0) data.push(['曠職扣薪（'+absentDays+'天）',-Math.round(absentDeduct)]);
+  if(sickDeduct>0) data.push(['病假扣薪（超30天半薪）',-Math.round(sickDeduct)]);
+  data.push(['應發合計',Math.round(grossPay)],['']);
+  data.push(['－勞保費（員工負擔12%×20%）',-laborIns]);
+  data.push(['－健保費（員工負擔5.17%×30%）',-healthIns]);
+  if(incomeTax>0) data.push(['－所得稅預扣',-incomeTax]);
+  data.push([''],['實領金額',Math.round(netPay)],['']);
+  data.push(['出勤天數',workDays],['請假天數',leaveDays],['曠職天數',absentDays],
+    ['總工時',totalHours.toFixed(1)+'h'],['加班時數',totalOTh+'h']);
+
   var ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:20},{wch:15}];
+  ws['!cols']=[{wch:28},{wch:15}];
   var wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb,ws,emp.name+'_薪資單');
   XLSX.writeFile(wb,'薪資單_'+emp.name+'_'+y+String(m).padStart(2,'0')+'.xlsx');
@@ -3565,38 +3793,85 @@ window.exportSalaryExcel = function(empId, y, m) {
 window.printSalarySlip = function(empId, y, m) {
   var emp = getEmpById(empId); if(!emp) return;
   var recs = getMonthRecs(y, m-1, emp.id);
+  var leaveApps = getApps().filter(function(a){return a.empId===emp.id&&a.status==='approved';});
   var daysInMonth = new Date(y, m, 0).getDate();
-  var workDays=0, totalHours=0, otHours=0;
+
+  // 當月實際應出勤日
+  var scheduledDays=0;
+  for(var dd=1;dd<=daysInMonth;dd++){
+    var dds=y+'-'+String(m).padStart(2,'0')+'-'+String(dd).padStart(2,'0');
+    var ddow=new Date(dds).getDay();
+    if(ddow===0||ddow===6) continue;
+    if(window.isHoliday&&window.isHoliday(dds)) continue;
+    scheduledDays++;
+  }
+  if(scheduledDays===0) scheduledDays=22;
+
+  var baseSalary=emp.salary||0;
+  var dailyRate=baseSalary/scheduledDays, hourlyRate=dailyRate/8;
+  var workDays=0, totalHours=0, otPay=0, otHoursNormal=0, otHoursHoliday=0, leaveDays=0, absentDays=0;
+
   for(var d=1;d<=daysInMonth;d++){
     var ds=y+'-'+String(m).padStart(2,'0')+'-'+String(d).padStart(2,'0');
-    var dow=new Date(ds).getDay(); if(dow===0||dow===6) continue;
+    var dow=new Date(ds).getDay();
+    var isDayOff=(dow===0||dow===6)||(window.isHoliday&&window.isHoliday(ds));
     var rec=recs.find(function(r){return r.date===ds;});
-    if(rec&&rec.in){workDays++;var h=calcHours(rec.in,rec.out,emp.workRule);totalHours+=h;otHours+=Math.max(0,h-8);}
+    var leave=leaveApps.find(function(a){return ds>=a.startDate&&ds<=a.endDate;});
+    if(!isDayOff){
+      if(leave){ leaveDays++; workDays++; }
+      else if(rec&&rec.in){
+        workDays++;
+        var h=calcHours(rec.in,rec.out,emp.workRule);
+        totalHours+=h;
+        var dayOT=Math.max(0,h-8);
+        otPay+=Math.min(dayOT,2)*hourlyRate*1.34+Math.max(0,dayOT-2)*hourlyRate*1.67;
+        otHoursNormal+=dayOT;
+      } else { absentDays++; }
+    } else {
+      if(rec&&rec.in){
+        var hh=calcHours(rec.in,rec.out,emp.workRule);
+        otPay+=hh*hourlyRate*2.0; otHoursHoliday+=hh;
+      }
+    }
   }
-  var dailyRate=emp.salary/22, hourlyRate=dailyRate/8;
-  var otPay=otHours*hourlyRate*1.34;
-  var laborIns=Math.round(emp.salary*0.0882*0.2);
-  var healthIns=Math.round(emp.salary*0.0517*0.3);
-  var incomeTax=emp.salary>40000?Math.round((emp.salary-40000)*0.05):0;
-  var gross=emp.salary+otPay;
-  var net=gross-laborIns-healthIns-incomeTax;
+
+  var absentDeduct=absentDays*dailyRate;
+  var sickDays=leaveApps.filter(function(a){return a.type==='sick';}).reduce(function(sum,a){
+    var cnt=0,cur=new Date(a.startDate),end=new Date(a.endDate);
+    while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)cnt++;cur.setDate(cur.getDate()+1);}
+    return sum+cnt;
+  },0);
+  var sickDeduct=sickDays>30?(sickDays-30)*dailyRate*0.5:0;
+  var laborIns=Math.round(baseSalary*0.12*0.2);
+  var healthIns=Math.round(baseSalary*0.0517*0.3);
+  var incomeTax=baseSalary>88501?Math.round((baseSalary-88501)*0.05):0;
+  var grossPay=baseSalary+otPay-absentDeduct-sickDeduct;
+  var netPay=Math.max(0,grossPay-laborIns-healthIns-incomeTax);
+  var totalOTh=(otHoursNormal+otHoursHoliday).toFixed(1);
+  var holOTPay=Math.round(otHoursHoliday*hourlyRate*2);
+  var normalOTPay=Math.round(otPay-otHoursHoliday*hourlyRate*2);
 
   var win=window.open('','_blank');
-  win.document.write('<html><head><title>薪資單</title><style>body{font-family:"Noto Sans TC",sans-serif;max-width:600px;margin:30px auto;color:#333}h2{color:#5046e0;border-bottom:2px solid #5046e0;padding-bottom:8px}.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f0f0}.total{font-size:18px;font-weight:800;color:#2eaa6e}.deduct{color:#e00}.section{background:#f8f8ff;border-radius:8px;padding:12px;margin:12px 0}</style></head><body>');
+  win.document.write('<html><head><title>薪資單</title><style>body{font-family:"Noto Sans TC",sans-serif;max-width:620px;margin:30px auto;color:#333}h2{color:#5046e0;border-bottom:2px solid #5046e0;padding-bottom:8px}.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px}.total{font-size:18px;font-weight:800;color:#2eaa6e;padding:12px 0}.deduct{color:#e00}.section{background:#f8f8ff;border-radius:8px;padding:12px;margin:12px 0}.label{color:#666;font-size:12px}</style></head><body>');
   win.document.write('<h2>💰 薪資單</h2>');
   win.document.write('<p><strong>iROBOT MEDICINE 智能人醫</strong></p>');
   win.document.write('<p>員工：<strong>'+emp.name+'</strong>（'+emp.id+'） | 部門：'+emp.dept+' | 月份：'+y+'年'+m+'月</p>');
+  win.document.write('<p class="label">應出勤：'+scheduledDays+'天 | 實際出勤：'+workDays+'天 | 請假：'+leaveDays+'天 | 曠職：'+absentDays+'天</p>');
   win.document.write('<div class="section">');
-  win.document.write('<div class="row"><span>本月底薪</span><span>$'+emp.salary.toLocaleString()+'</span></div>');
-  win.document.write('<div class="row"><span>加班費（'+otHours.toFixed(1)+'h × 1.34）</span><span>$'+Math.round(otPay).toLocaleString()+'</span></div>');
-  win.document.write('<div class="row" style="font-weight:700"><span>應發合計</span><span>$'+Math.round(gross).toLocaleString()+'</span></div>');
+  win.document.write('<div class="row"><span>本月底薪</span><span>$'+baseSalary.toLocaleString()+'</span></div>');
+  win.document.write('<div class="row label"><span>日薪基數（÷'+scheduledDays+'天）</span><span>$'+Math.round(dailyRate).toLocaleString()+'</span></div>');
+  if(otHoursNormal>0) win.document.write('<div class="row"><span>平日加班費（前2h×1.34，後×1.67）</span><span>$'+normalOTPay.toLocaleString()+'</span></div>');
+  if(otHoursHoliday>0) win.document.write('<div class="row"><span>假日出勤費（'+otHoursHoliday.toFixed(1)+'h×2.0）</span><span>$'+holOTPay.toLocaleString()+'</span></div>');
+  if(absentDays>0) win.document.write('<div class="row deduct"><span>曠職扣薪（'+absentDays+'天）</span><span>−$'+Math.round(absentDeduct).toLocaleString()+'</span></div>');
+  if(sickDeduct>0) win.document.write('<div class="row deduct"><span>病假扣薪（超30天半薪）</span><span>−$'+Math.round(sickDeduct).toLocaleString()+'</span></div>');
+  win.document.write('<div class="row" style="font-weight:700"><span>應發合計</span><span>$'+Math.round(grossPay).toLocaleString()+'</span></div>');
   win.document.write('</div><div class="section">');
-  win.document.write('<div class="row deduct"><span>− 勞保費（員工負擔）</span><span>−$'+laborIns.toLocaleString()+'</span></div>');
-  win.document.write('<div class="row deduct"><span>− 健保費（員工負擔）</span><span>−$'+healthIns.toLocaleString()+'</span></div>');
+  win.document.write('<div class="row deduct"><span>− 勞保費（員工負擔 12%×20%）</span><span>−$'+laborIns.toLocaleString()+'</span></div>');
+  win.document.write('<div class="row deduct"><span>− 健保費（員工負擔 5.17%×30%）</span><span>−$'+healthIns.toLocaleString()+'</span></div>');
   if(incomeTax>0) win.document.write('<div class="row deduct"><span>− 所得稅預扣</span><span>−$'+incomeTax.toLocaleString()+'</span></div>');
   win.document.write('</div>');
-  win.document.write('<div class="row total"><span>💰 實領金額</span><span>$'+Math.round(net).toLocaleString()+'</span></div>');
-  win.document.write('<p style="margin-top:20px;font-size:12px;color:#999">出勤'+workDays+'天 | 工時'+totalHours.toFixed(1)+'h | 加班'+otHours.toFixed(1)+'h | 列印：'+new Date().toLocaleDateString()+'</p>');
+  win.document.write('<div class="row total"><span>💰 實領金額</span><span>$'+Math.round(netPay).toLocaleString()+'</span></div>');
+  win.document.write('<p style="margin-top:20px;font-size:12px;color:#999">總工時：'+totalHours.toFixed(1)+'h | 加班：'+totalOTh+'h | 列印：'+new Date().toLocaleDateString()+'</p>');
   win.document.write('</body></html>');
   win.document.close();
   win.print();
