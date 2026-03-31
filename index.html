@@ -891,14 +891,23 @@ function renderEmpMonthly(s){
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dow=new Date(ds).getDay();
-    if((dow===0||dow===6)&&!recs.find(r=>r.date===ds)) continue;
+    const isWeekend=dow===0||dow===6;
+    const isHol=window.isHoliday?window.isHoliday(ds):false;
+    const holName=window.getHolidayName?window.getHolidayName(ds):'';
+    const isDayOff=isWeekend||isHol;
     const rec=recs.find(r=>r.date===ds);
     const leave=leaveApps.find(a=>ds>=a.startDate&&ds<=a.endDate);
     const h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
     const OT=Math.max(0,h-8);
-    if(h>0){tH+=h;wDays++;tOT+=OT;}
-    const badge=leave?`<span class="bgg bg-b">${LEAVE_LABEL[leave.type]||leave.type}</span>`:rec?.in&&rec?.out?(OT>0?`<span class="bgg bg-o">+${OT.toFixed(1)}h</span>`:`<span class="bgg bg-g">正常</span>`):rec?.in?`<span class="bgg bg-y">未下班</span>`:`<span class="bgg bg-gr">缺勤</span>`;
-    rows.push({ds,dow,d,rec,h,OT,badge});
+    if(h>0){tH+=h;tOT+=OT;if(!isDayOff)wDays++;}
+    let badge;
+    if(leave){badge=`<span class="bgg bg-b">${LEAVE_LABEL[leave.type]||leave.type}</span>`;}
+    else if(rec?.in&&rec?.out){badge=OT>0?`<span class="bgg bg-o">+${OT.toFixed(1)}h</span>`:`<span class="bgg bg-g">正常</span>`;}
+    else if(rec?.in){badge=`<span class="bgg bg-y">未下班</span>`;}
+    else if(isHol){badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000;font-weight:600">${holName||'國定假日'}</span>`;}
+    else if(isWeekend){badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000">休假</span>`;}
+    else{badge=`<span class="bgg bg-gr">缺勤</span>`;}
+    rows.push({ds,dow,d,rec,h,OT,badge,isDayOff,holName});
   }
   s.innerHTML=`
   <div class="ms fu"><div class="ms-item"><div class="ms-label">出勤天數</div><div class="ms-val" style="color:var(--pd)">${wDays}</div></div><div class="ms-item"><div class="ms-label">總工時</div><div class="ms-val" style="color:var(--green)">${tH.toFixed(1)}</div></div><div class="ms-item"><div class="ms-label">加班時數</div><div class="ms-val" style="color:var(--orange)">${tOT.toFixed(1)}</div></div></div>
@@ -911,7 +920,7 @@ function renderEmpMonthly(s){
     <table>
       <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
       <tbody>
-        ${rows.map(r=>`<tr><td>${r.d}日(${WDAY[r.dow]})</td><td>${r.rec?.in?fmtTime(r.rec.in):'--'}</td><td>${r.rec?.out?fmtTime(r.rec.out):'--'}</td><td>${r.h>0?r.h.toFixed(1)+'h':'--'}</td><td>${r.badge}</td></tr>`).join('')}
+        ${rows.map(r=>{const red=r.isDayOff?'color:#cc0000;':'';const bg=r.isDayOff?'background:#fff8f8;':'';const dateLabel=r.d+'日('+WDAY[r.dow]+')'+(r.holName?'<span style="font-size:10px;margin-left:3px;color:#cc0000">'+r.holName+'</span>':'');return`<tr style="${bg}"><td style="${red}font-weight:${r.isDayOff?'600':'400'}">${dateLabel}</td><td style="${red}">${r.rec?.in?fmtTime(r.rec.in):'--'}</td><td style="${red}">${r.rec?.out?fmtTime(r.rec.out):'--'}</td><td style="${red}">${r.h>0?r.h.toFixed(1)+'h':'--'}</td><td>${r.badge}</td></tr>`;}).join('')}
         <tr style="font-weight:700"><td colspan="3" style="color:var(--t2)">月合計</td><td style="color:var(--pd)">${tH.toFixed(1)}h</td><td></td></tr>
       </tbody>
     </table>
@@ -1963,16 +1972,43 @@ function loadReport(){
     let rows=[],tH=0,tOT=0,wDays=0;
     for(let d=1;d<=daysInMonth;d++){
       const ds=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-      const dow=new Date(ds).getDay();
-      if((dow===0||dow===6)&&!recs.find(r=>r.date===ds)) continue;
+      const dow=new Date(ds).getDay(); // 0=日,6=六
+      const isWeekend=dow===0||dow===6;
+      const isHol=window.isHoliday?window.isHoliday(ds):false;
+      const holName=window.getHolidayName?window.getHolidayName(ds):'';
+      const isDayOff=isWeekend||isHol;
       const rec=recs.find(r=>r.date===ds);
       const leave=leaveApps.find(a=>ds>=a.startDate&&ds<=a.endDate);
       const h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
       const OT=Math.max(0,h-8);
-      if(h>0){tH+=h;tOT+=OT;wDays++;}
-      const badge=leave?`<span class="bgg bg-b">${LEAVE_LABEL[leave.type]||leave.type}</span>`:rec?.in&&rec?.out?(OT>0?`<span class="bgg bg-o">+${OT.toFixed(1)}h</span>`:`<span class="bgg bg-g">正常</span>`):rec?.in?`<span class="bgg bg-y">未下班</span>`:`<span class="bgg bg-gr">缺勤</span>`;
-      rows.push({ds,dow,d,rec,h,OT,badge});
+      if(h>0){tH+=h;tOT+=OT;if(!isDayOff)wDays++;}
+      let badge;
+      if(leave){
+        badge=`<span class="bgg bg-b">${LEAVE_LABEL[leave.type]||leave.type}</span>`;
+      }else if(rec?.in&&rec?.out){
+        badge=OT>0?`<span class="bgg bg-o">+${OT.toFixed(1)}h</span>`:`<span class="bgg bg-g">正常</span>`;
+      }else if(rec?.in){
+        badge=`<span class="bgg bg-y">未下班</span>`;
+      }else if(isHol){
+        badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000;font-weight:600">${holName||'國定假日'}</span>`;
+      }else if(isWeekend){
+        badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000">休假</span>`;
+      }else{
+        badge=`<span class="bgg bg-gr">缺勤</span>`;
+      }
+      rows.push({ds,dow,d,rec,h,OT,badge,isDayOff,holName});
     }
+    const rowHtml=rows.map(r=>{
+      const red=r.isDayOff?'color:#cc0000;':'';
+      const bg=r.isDayOff?'background:#fff8f8;':'';
+      const dateLabel=r.d+'('+WDAY[r.dow]+')'+(r.holName?'<span style="font-size:10px;margin-left:3px;color:#cc0000">'+r.holName+'</span>':'');
+      return `<tr style="${bg}">
+        <td style="${red}font-weight:${r.isDayOff?'600':'400'}">${dateLabel}</td>
+        <td style="${red}">${r.rec?.in?fmtTime(r.rec.in):'--'}</td>
+        <td style="${red}">${r.rec?.out?fmtTime(r.rec.out):'--'}</td>
+        <td style="${red}">${r.h>0?r.h.toFixed(1)+'h':'--'}</td>
+        <td>${r.badge}</td></tr>`;
+    }).join('');
     container.insertAdjacentHTML('beforeend',`
       <div style="margin-top:10px">
         <div class="sec-title"><span>${emp.name} — ${y}/${m}</span></div>
@@ -1984,8 +2020,7 @@ function loadReport(){
           <div style="font-size:11px;color:var(--t2);margin-bottom:8px">出勤 <strong>${wDays}</strong>天 ｜ 工時 <strong style="color:var(--pd)">${tH.toFixed(1)}h</strong> ｜ 加班 <strong style="color:var(--orange)">${tOT.toFixed(1)}h</strong></div>
           <table>
             <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
-            <tbody>
-              ${rows.map(r=>`<tr><td>${r.d}(${WDAY[r.dow]})</td><td>${r.rec?.in?fmtTime(r.rec.in):'--'}</td><td>${r.rec?.out?fmtTime(r.rec.out):'--'}</td><td>${r.h>0?r.h.toFixed(1)+'h':'--'}</td><td>${r.badge}</td></tr>`).join('')}
+            <tbody>${rowHtml}
               <tr style="font-weight:700"><td colspan="3" style="color:var(--t2)">合計</td><td style="color:var(--pd)">${tH.toFixed(1)}h</td><td></td></tr>
             </tbody>
           </table>
@@ -2626,14 +2661,17 @@ function exportExcel(empId,y,m){
   for(let d=1;d<=daysInMonth;d++){
     const ds=`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
     const dow=new Date(ds).getDay();
-    if((dow===0||dow===6)&&!recs.find(r=>r.date===ds)) continue;
+    const isWeekend=dow===0||dow===6;
+    const isHol=window.isHoliday?window.isHoliday(ds):false;
+    const holName=window.getHolidayName?window.getHolidayName(ds):'';
+    const isDayOff=isWeekend||isHol;
     const rec=recs.find(r=>r.date===ds);
     const leave=leaveApps.find(a=>ds>=a.startDate&&ds<=a.endDate);
     const h=rec?calcHours(rec.in,rec.out,emp.workRule):0,OT=Math.max(0,h-8);
-    tH+=h;tOT+=OT;
+    if(h>0){tH+=h;tOT+=OT;}
     const gpsIn=rec?.gpsIn?`${rec.gpsIn.lat},${rec.gpsIn.lng}`:'';
     const distIn=rec?.gpsIn?haversine(rec.gpsIn.lat,rec.gpsIn.lng,cfg.lat,cfg.lng):'';
-    const status=leave?LEAVE_LABEL[leave.type]||leave.type:rec?.in&&rec?.out?'正常':rec?.in?'未下班':'缺勤';
+    const status=leave?LEAVE_LABEL[leave.type]||leave.type:rec?.in&&rec?.out?'正常':rec?.in?'未下班':isHol?(holName||'國定假日'):isWeekend?'休假':'缺勤';
     data.push([ds,`週${WDAY[dow]}`,rec?.in?fmtTime(rec.in):'',rec?.out?fmtTime(rec.out):'',h>0?+h.toFixed(2):0,OT>0?+OT.toFixed(2):0,status,gpsIn,distIn]);
   }
   data.push([]);data.push(['','','','月合計',+tH.toFixed(2),+tOT.toFixed(2),'','','']);
