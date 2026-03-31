@@ -1143,10 +1143,10 @@ function startAdminSession(){
 // ── 行事曆提醒 (每年12/1) ─────────────────────────
 function checkHolidayReminder(){
   var now=new Date();
-  var month=now.getMonth(); // 0-indexed; 11 = December
-  if(month<11)return; // 只在 12 月提醒
+  if(now.getMonth()<11)return; // 只在 12 月提醒
   var nextYear=now.getFullYear()+1;
-  var hasNext=Object.keys(DB.holidays||{}).some(function(d){return d.startsWith(nextYear+'-');});
+  var hols=window.getHolidays?window.getHolidays():{};
+  var hasNext=Object.keys(hols).some(function(d){return d.startsWith(nextYear+'-');});
   if(!hasNext){
     var el=document.getElementById('holidayReminderBar');
     if(el){
@@ -1159,23 +1159,6 @@ function checkHolidayReminder(){
 function dismissHolidayReminder(){
   var el=document.getElementById('holidayReminderBar');
   if(el) el.style.display='none';
-}
-// ── 假日 CRUD ────────────────────────────────────
-function saveHoliday(){
-  var d=document.getElementById('hol_date').value;
-  var n=document.getElementById('hol_name').value.trim();
-  if(!d||!n){toast('⚠️','請填寫日期與假日名稱');return;}
-  var yr=parseInt(d.split('-')[0]);
-  sbins('holidays',{date:d,name:n,year:yr}).then(function(){
-    toast('✅','假日已新增');
-    return loadAllData();
-  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','新增失敗：'+e.message);});
-}
-function deleteHoliday(id){
-  if(!confirm('確定刪除此假日？'))return;
-  sbdel('holidays',{id:id}).then(function(){
-    toast('✅','已刪除');return loadAllData();
-  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','刪除失敗：'+e.message);});
 }
 
 function switchAdminMode(mode){
@@ -2064,34 +2047,46 @@ function renderSettings(s){
 }
 
 function renderHolidaySettings(){
-  var hols=DB.holidays||{};
-  var years=[...new Set(Object.values(hols).map(function(h){return h.year;}))].sort();
+  var hols=window.getHolidays?window.getHolidays():{};
   var curYear=new Date().getFullYear();
   var nextYear=curYear+1;
-  if(!years.includes(curYear)) years.push(curYear);
-  if(!years.includes(nextYear)) years.push(nextYear);
+  var years=[curYear,nextYear];
+  Object.values(hols).forEach(function(h){if(!years.includes(h.year))years.push(h.year);});
   years.sort();
+  var monthNames=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
   var rows='';
   years.forEach(function(yr){
     var yrHols=Object.entries(hols).filter(function(e){return e[1].year===yr;}).sort(function(a,b){return a[0]<b[0]?-1:1;});
     var hasYr=yrHols.length>0;
-    rows+='<div style="margin-bottom:16px"><div style="font-size:13px;font-weight:700;color:var(--pd);margin-bottom:8px">'+yr+'年'+(yr===nextYear&&!hasYr?'　<span style="color:#e07c08;font-size:11px">⚠️ 尚未設定</span>':' ('+yrHols.length+'天)')+'</div>';
-    if(yrHols.length>0){
-      rows+='<div style="display:flex;flex-wrap:wrap;gap:6px">';
-      yrHols.forEach(function(e){
-        rows+='<div style="display:flex;align-items:center;gap:4px;background:var(--pl);border-radius:8px;padding:4px 10px;font-size:12px">'
-          +'<span style="color:var(--pd);font-weight:600">'+e[0].slice(5)+'</span>'
-          +'<span>'+e[1].name+'</span>'
-          +'<button onclick="deleteHoliday('+e[1].id+')" style="background:none;border:none;color:#e07c08;cursor:pointer;font-size:13px;padding:0 2px;line-height:1" title="刪除">✕</button>'
-          +'</div>';
-      });
+    rows+='<div style="margin-bottom:20px">'
+      +'<div style="font-size:13px;font-weight:700;color:var(--pd);margin-bottom:10px;display:flex;align-items:center;gap:8px">'
+      +yr+'年（民國'+(yr-1911)+'年）'
+      +(hasYr?'<span style="font-size:11px;color:var(--t3);font-weight:400">共 '+yrHols.length+' 天假日</span>'
+             :'<span style="color:#e07c08;font-size:11px">⚠️ 尚未設定</span>')
+      +'</div>';
+    rows+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">';
+    for(var m=1;m<=12;m++){
+      var mStr=yr+'-'+(m<10?'0':'')+m;
+      var mHols=yrHols.filter(function(e){return e[0].startsWith(mStr);});
+      var hasMHols=mHols.length>0;
+      rows+='<div style="background:'+(hasMHols?'var(--pl)':'var(--bg)')+';border-radius:10px;padding:8px 10px;border:1px solid '+(hasMHols?'var(--border)':'#e0ddf0')+'">';
+      rows+='<div style="font-size:11px;font-weight:700;color:'+(hasMHols?'var(--pd)':'var(--t3)')+';margin-bottom:4px">'+monthNames[m-1]+'</div>';
+      if(hasMHols){
+        mHols.forEach(function(e){
+          rows+='<div style="display:flex;align-items:center;justify-content:space-between;font-size:11px;gap:4px;margin-bottom:2px">'
+            +'<span><span style="font-weight:600;color:var(--pd)">'+e[0].slice(8)+'日</span> '+e[1].name+'</span>'
+            +'<button onclick="window.deleteHoliday('+e[1].id+')" style="background:none;border:none;color:#e07c08;cursor:pointer;font-size:12px;padding:0;line-height:1;flex-shrink:0" title="刪除">✕</button>'
+            +'</div>';
+        });
+      } else {
+        rows+='<div style="font-size:10px;color:var(--t3)">無假日</div>';
+      }
       rows+='</div>';
-    } else {
-      rows+='<div style="font-size:12px;color:var(--t3);padding:6px 0">尚無假日資料，請新增</div>';
     }
-    rows+='</div>';
+    rows+='</div></div>';
   });
-  return '<div class="sec-title fu" style="margin-top:20px"><span>📅 國定假日管理</span></div>'
+  return '<div class="sec-title fu" style="margin-top:20px"><span>📅 國定假日管理</span>'
+    +'<span style="font-size:11px;font-weight:400;color:var(--t3);margin-left:8px">依行政院人事行政總處公告</span></div>'
     +'<div class="card fu">'
     +'<div style="margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">'
     +'<div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--t2)">新增假日</div>'
@@ -2099,7 +2094,7 @@ function renderHolidaySettings(){
     +'<div class="fg"><label>日期</label><input type="date" id="hol_date"></div>'
     +'<div class="fg"><label>假日名稱</label><input type="text" id="hol_name" placeholder="例：元旦"></div>'
     +'</div>'
-    +'<button class="save-btn" onclick="saveHoliday()">➕ 新增假日</button>'
+    +'<button class="save-btn" onclick="window.saveHoliday()">➕ 新增假日</button>'
     +'</div>'
     +rows
     +'</div>';
@@ -3630,6 +3625,23 @@ window.deleteEmp=function(empId){
     console.error('[deleteEmp] error:',err);
     toast('❌','刪除失敗：'+err.message);
   });
+};
+
+// ── 國定假日 CRUD ─────────────────────────────────
+window.saveHoliday=function(){
+  var d=document.getElementById('hol_date').value;
+  var n=(document.getElementById('hol_name').value||'').trim();
+  if(!d||!n){toast('⚠️','請填寫日期與假日名稱');return;}
+  var yr=parseInt(d.split('-')[0]);
+  sbins('holidays',{date:d,name:n,year:yr}).then(function(){
+    toast('✅','假日已新增');return loadAllData();
+  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','新增失敗：'+(e&&e.message||e));});
+};
+window.deleteHoliday=function(id){
+  if(!confirm('確定刪除此假日？'))return;
+  sbdel('holidays',{id:id}).then(function(){
+    toast('✅','已刪除');return loadAllData();
+  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','刪除失敗：'+(e&&e.message||e));});
 };
 
 // ── Global edit helper ───────────────────────────
