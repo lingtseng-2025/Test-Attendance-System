@@ -1288,7 +1288,8 @@ function renderAdminDashboard(s){
             var h=rec?calcHours(rec.in,rec.out,emp.workRule):0;
             var dist=rec&&rec.gpsIn?haversine(rec.gpsIn.lat,rec.gpsIn.lng,cfg.lat,cfg.lng):null;
             var isAdmin=getAccounts().find(function(a){return a.id===emp.id&&a.role==='admin';});
-            var badge=rec&&rec.in&&rec.out?'<span class="bgg bg-g">已下班</span>':rec&&rec.in?'<span class="bgg bg-b">上班中</span>':'<span class="bgg bg-gr">未打卡</span>';
+            var todayLeave=getApps().find(function(a){return a.empId===emp.id&&a.status==='approved'&&today>=a.startDate&&today<=a.endDate;});
+            var badge=todayLeave?'<span class="bgg bg-b">'+(LEAVE_LABEL[todayLeave.type]||todayLeave.type)+'</span>':rec&&rec.in&&rec.out?'<span class="bgg bg-g">已下班</span>':rec&&rec.in?'<span class="bgg bg-b">上班中</span>':'<span class="bgg bg-gr">未打卡</span>';
             return '<tr>'
               +'<td><div style="display:flex;align-items:center;gap:8px">'
               +'<div style="width:28px;height:28px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700">'+emp.name[0]+'</div>'
@@ -1670,7 +1671,11 @@ function doReview(status){
 
 // ── Employees ──────────────────────────────────────
 function renderEmployees(s){
-  var emps=getEmps();
+  var emps=getEmps().slice().sort(function(a,b){
+    var na=parseInt(a.id.replace(/\D/g,''))||99999;
+    var nb=parseInt(b.id.replace(/\D/g,''))||99999;
+    return na-nb;
+  });
   var today=todayKey();
   var accounts=getAccounts();
   var tableRows = emps.map(function(emp){
@@ -1941,7 +1946,10 @@ function showNewEmpInfo(name,id,pw){
 
 // ── Reports ────────────────────────────────────────
 function renderReports(s){
-  var emps=getEmps();
+  var emps=getEmps().filter(function(e){
+    var acc=getAccounts().find(function(a){return a.id===e.id;});
+    return !(acc&&acc.role==='admin');
+  });
   var now=new Date();
   var yy=now.getFullYear(), mm=String(now.getMonth()+1).padStart(2,'0');
   var empOpts='<option value="all">全部員工</option>'
@@ -3494,7 +3502,10 @@ window.confirmMakeupGps=function(){
 // ── Salary Management ────────────────────────────
 // ── Salary Management ─────────────────────────────
 window.renderSalary = function(s) {
-  var emps = getEmps();
+  var emps = getEmps().filter(function(e){
+    var acc=getAccounts().find(function(a){return a.id===e.id;});
+    return !(acc&&acc.role==='admin');
+  });
   var now = new Date();
   var defaultMonth = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
 
@@ -3527,7 +3538,11 @@ window.calcSalary = function() {
   var empId = document.getElementById('salEmp').value;
   var parts = monthVal.split('-');
   var y = parseInt(parts[0]), m = parseInt(parts[1]);
-  var emps = empId === 'all' ? getEmps() : getEmps().filter(function(e){return e.id===empId;});
+  var allEmps = getEmps().filter(function(e){
+    var acc=getAccounts().find(function(a){return a.id===e.id;});
+    return !(acc&&acc.role==='admin');
+  });
+  var emps = empId === 'all' ? allEmps : allEmps.filter(function(e){return e.id===empId;});
   var container = document.getElementById('salaryResult');
   if(!container) return;
 
