@@ -1253,7 +1253,7 @@ function renderAdminDashboard(s){
   const today=todayKey();
   const recs=getRecs().filter(r=>r.date===today&&r.in);
   const emps=getEmps();
-  const pending=getApps().filter(a=>a.status==='pending');
+  const pending=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved');
   const cfg=getCfg();
   const allPending=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length
     +getMakeupApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
