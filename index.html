@@ -2898,13 +2898,24 @@ var EDGE_API=SB_URL+'/functions/v1/api';
 
 // Edge Function 呼叫工具
 function edgeCall(action, body, token){
-  var headers={'Content-Type':'application/json','apikey':SB_KEY};
-  if(token) headers['Authorization']='Bearer '+token;
+  // Supabase Edge Function 需要 anon key 作為預設 Bearer token
+  // 若有使用者 JWT token 則覆蓋
+  var bearer=token||SB_KEY;
+  var headers={
+    'Content-Type':'application/json',
+    'apikey':SB_KEY,
+    'Authorization':'Bearer '+bearer
+  };
   return fetch(EDGE_API,{
     method:'POST',
     headers:headers,
     body:JSON.stringify(Object.assign({action:action},body||{}))
-  }).then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||r.statusText);return d;});});
+  }).then(function(r){
+    return r.json().then(function(d){
+      if(!r.ok)throw new Error(d.error||d.message||('HTTP '+r.status));
+      return d;
+    });
+  });
 }
 
 // JWT token 存取（sessionStorage — 關閉分頁自動清除）
