@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#dcdaf6">
 <title>iROBOT MEDICINE 智能人醫</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Nunito:wght@700;800;900&display=swap');
 :root {
@@ -935,7 +936,6 @@ function renderEmpMonthly(s){
   <div class="ra fu fu2">
     <button class="ra-btn ol" onclick="window.print()">🖨️ 列印</button>
     <button class="ra-btn so" onclick="exportExcel('${emp.id}',${y},${m+1})">📥 Excel</button>
-    <button class="ra-btn ol" onclick="openEmailSheet(${y},${m+1})" style="grid-column:1/-1">📧 Email 寄送</button>
   </div>
   <div class="card fu fu2" style="overflow-x:auto;padding:10px">
     <table>
@@ -2070,6 +2070,7 @@ function renderSettings(s){
   <div class="pc-grid-2" style="align-items:start;margin-bottom:20px"><div>
   <div class="sec-title fu"><span>🏢 公司 GPS 設定</span></div>
   <div class="card fu fu1">
+    <div style="font-size:12px;font-weight:700;color:var(--pd);margin-bottom:10px">🏢 總部（主要地點）</div>
     <div class="fg"><label>公司名稱</label><input id="cfg_name" value="${cfg.name}"></div>
     <div class="fg"><label>公司地址</label><input id="cfg_addr" value="${cfg.address}"></div>
     <div class="fr2">
@@ -2087,8 +2088,41 @@ function renderSettings(s){
         <span class="toggle-slider"></span>
       </label>
     </div>
-    <div style="background:var(--bg);border-radius:9px;padding:10px 12px;font-size:11px;color:var(--t2);margin-bottom:12px">📍 預設：台北市大同區市民大道一段209號12樓<br>座標：25.0473, 121.5124</div>
     <button class="save-btn" onclick="saveSettings()">💾 儲存公司設定</button>
+  </div>
+  <div class="sec-title fu fu2"><span>📍 其他工作地點</span></div>
+  <div class="card fu fu2" id="extraLocsCard">
+    ${renderExtraLocs(cfg)}
+    <button onclick="showAddLocForm()" style="width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:10px;background:transparent;color:var(--pd);font-size:13px;font-weight:700;cursor:pointer;margin-top:8px">＋ 新增工作地點</button>
+    <div id="addLocForm" style="display:none;margin-top:12px;padding:12px;background:var(--bg);border-radius:10px">
+      <div style="font-size:12px;font-weight:700;color:var(--pd);margin-bottom:8px">新增地點</div>
+      <div class="fg"><label>地點名稱</label><input id="newLoc_name" placeholder="例：台中辦公室"></div>
+      <div class="fg"><label>地址</label><input id="newLoc_addr" placeholder="選填"></div>
+      <div class="fr2">
+        <div class="fg"><label>緯度</label><input type="number" step="0.0001" id="newLoc_lat" placeholder="25.0000"></div>
+        <div class="fg"><label>經度</label><input type="number" step="0.0001" id="newLoc_lng" placeholder="121.0000"></div>
+      </div>
+      <div class="fg"><label>允許範圍（公尺）</label><input type="number" id="newLoc_range" placeholder="${cfg.rangeM}" value="${cfg.rangeM}"></div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button onclick="cancelAddLoc()" style="flex:1;padding:10px;border:1.5px solid var(--border);border-radius:10px;background:#fff;color:var(--t2);font-size:13px;cursor:pointer">取消</button>
+        <button onclick="confirmAddLoc()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--grad);color:#fff;font-size:13px;font-weight:700;cursor:pointer">✅ 確認新增</button>
+      </div>
+    </div>
+  </div>
+  <div class="sec-title fu fu3"><span>📧 Email 寄送設定</span></div>
+  <div class="card fu fu3">
+    <div style="font-size:12px;color:var(--t2);line-height:1.8;margin-bottom:10px;padding:10px;background:var(--bl);border-radius:9px">
+      📌 使用 <strong>EmailJS</strong> 可直接從系統寄送薪資單，無需開啟郵件程式<br>
+      1. 前往 <strong>emailjs.com</strong> 建立免費帳號（200封/月）<br>
+      2. Add Email Service（建議 Gmail）→ 取得 <strong>Service ID</strong><br>
+      3. Email Templates → 建立新樣板，加入變數：<code>{{to_email}}</code> <code>{{subject}}</code> <code>{{message}}</code> → 取得 <strong>Template ID</strong><br>
+      4. Account → API Keys → 複製 <strong>Public Key</strong>
+    </div>
+    <div class="fg"><label>Service ID</label><input id="cfg_emailjs_sid" value="${cfg.emailjsServiceId||''}" placeholder="service_xxxxxxx"></div>
+    <div class="fg"><label>Template ID</label><input id="cfg_emailjs_tid" value="${cfg.emailjsTemplateId||''}" placeholder="template_xxxxxxx"></div>
+    <div class="fg"><label>Public Key</label><input id="cfg_emailjs_pk" value="${cfg.emailjsPublicKey||''}" placeholder="xxxxxxxxxxxxxxxx"></div>
+    <div class="fg"><label>寄件者名稱</label><input id="cfg_sender_name" value="${cfg.senderName||'iROBOT MEDICINE 智能人醫'}" placeholder="公司名稱"></div>
+    <button class="save-btn" onclick="saveEmailjsSettings()">💾 儲存 Email 設定</button>
   </div>
   <div class="sec-title fu fu2"><span>⚙️ 全公司工時預設</span></div>
   <div class="card fu fu2">
@@ -2109,6 +2143,66 @@ function renderSettings(s){
   </div></div></div>
   ${renderHolidaySettings()}`;
 }
+
+function renderExtraLocs(cfg){
+  var locs=cfg.extraLocations||[];
+  if(!locs.length) return '<div style="font-size:12px;color:var(--t3);padding:8px 0">尚無其他地點</div>';
+  return locs.map(function(l,i){
+    return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
+      +'<div style="flex:1">'
+      +'<div style="font-size:13px;font-weight:700">📍 '+eh(l.name)+'</div>'
+      +(l.address?'<div style="font-size:11px;color:var(--t3)">'+eh(l.address)+'</div>':'')
+      +'<div style="font-size:11px;color:var(--t3)">座標：'+l.lat+', '+l.lng+' | 範圍：'+(l.rangeM||getCfg().rangeM)+'m</div>'
+      +'</div>'
+      +'<button onclick="deleteExtraLoc('+i+')" style="padding:5px 10px;border:1.5px solid #ffcccc;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:12px;cursor:pointer">刪除</button>'
+      +'</div>';
+  }).join('');
+}
+window._extraLocations=null;
+window.showAddLocForm=function(){
+  if(!window._extraLocations) window._extraLocations=(getCfg().extraLocations||[]).slice();
+  document.getElementById('addLocForm').style.display='block';
+};
+window.cancelAddLoc=function(){document.getElementById('addLocForm').style.display='none';};
+window.confirmAddLoc=function(){
+  var name=(document.getElementById('newLoc_name').value||'').trim();
+  var addr=(document.getElementById('newLoc_addr').value||'').trim();
+  var lat=parseFloat(document.getElementById('newLoc_lat').value);
+  var lng=parseFloat(document.getElementById('newLoc_lng').value);
+  var rangeM=parseInt(document.getElementById('newLoc_range').value)||getCfg().rangeM;
+  if(!name||!lat||!lng){toast('⚠️','請填寫地點名稱及經緯度');return;}
+  if(!window._extraLocations) window._extraLocations=[];
+  window._extraLocations.push({name:name,address:addr,lat:lat,lng:lng,rangeM:rangeM});
+  // Save immediately
+  sbups('company_settings',{id:1,extra_locations:window._extraLocations},'id')
+    .then(function(){return loadAllData();})
+    .then(function(){
+      toast('✅','地點已新增');
+      renderSettings(document.getElementById('adminScroll'));
+    });
+};
+window.deleteExtraLoc=function(idx){
+  if(!window._extraLocations) window._extraLocations=(getCfg().extraLocations||[]).slice();
+  window._extraLocations.splice(idx,1);
+  sbups('company_settings',{id:1,extra_locations:window._extraLocations},'id')
+    .then(function(){return loadAllData();})
+    .then(function(){
+      toast('✅','地點已刪除');
+      renderSettings(document.getElementById('adminScroll'));
+    });
+};
+window.saveEmailjsSettings=function(){
+  var sid=(document.getElementById('cfg_emailjs_sid').value||'').trim();
+  var tid=(document.getElementById('cfg_emailjs_tid').value||'').trim();
+  var pk=(document.getElementById('cfg_emailjs_pk').value||'').trim();
+  var sn=(document.getElementById('cfg_sender_name').value||'').trim()||'iROBOT MEDICINE 智能人醫';
+  sbups('company_settings',{id:1,emailjs_service_id:sid,emailjs_template_id:tid,emailjs_public_key:pk,sender_name:sn},'id')
+    .then(function(){return loadAllData();})
+    .then(function(){
+      if(pk) try{emailjs.init(pk);}catch(e){}
+      toast('✅','Email 設定已儲存');
+    });
+};
 
 function renderHolidaySettings(){
   var hols=window.getHolidays?window.getHolidays():{};
@@ -2839,26 +2933,48 @@ window.emailSalarySlip=function(empId,y,m){
 function doSendEmail(){
   var to=document.getElementById('emailTo').value.trim();
   if(!to){toast('⚠️','請填寫收件人 Email');return;}
-  var subj=document.getElementById('emailSubj').value.trim();
-
+  var subj=document.getElementById('emailSubj').value.trim()||'薪資通知';
+  var cfg=getCfg();
+  var body='';
   if(window._salaryEmailData){
-    // 薪資單：用 mailto: 開啟郵件程式並帶入完整內容
-    var body=window._salaryEmailData.body;
+    body=window._salaryEmailData.body;
     var note=(document.getElementById('emailNote').value||'').trim();
     if(note) body=note+'\n\n'+body;
-    var link='mailto:'+encodeURIComponent(to)
-      +'?subject='+encodeURIComponent(subj)
-      +'&body='+encodeURIComponent(body);
-    var a=document.createElement('a');
-    a.href=link; a.style.display='none';
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  }
+  // 使用 EmailJS 正式寄送
+  if(cfg.emailjsPublicKey&&cfg.emailjsServiceId&&cfg.emailjsTemplateId){
+    try{
+      emailjs.init(cfg.emailjsPublicKey);
+      var btn=document.querySelector('#emailSheet .sbtn.confirm');
+      if(btn){btn.disabled=true;btn.textContent='寄送中...';}
+      emailjs.send(cfg.emailjsServiceId,cfg.emailjsTemplateId,{
+        to_name:to, to_email:to, subject:subj, message:body,
+        from_name:cfg.senderName||'iROBOT MEDICINE 智能人醫'
+      }).then(function(){
+        window._salaryEmailData=null;
+        closeSheet('emailSheet');
+        toast('📧','薪資單已寄出至 '+to+' ✓');
+      }).catch(function(e){
+        if(btn){btn.disabled=false;btn.textContent='📧 寄送';}
+        toast('❌','寄送失敗：'+(e.text||e.message||JSON.stringify(e)));
+        console.error('EmailJS error:',e);
+      });
+      return;
+    }catch(e){
+      console.warn('EmailJS error, fallback to mailto:',e);
+    }
+  }
+  // Fallback: mailto
+  if(body){
+    var link='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+    var a=document.createElement('a');a.href=link;a.style.display='none';
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
     window._salaryEmailData=null;
     closeSheet('emailSheet');
-    toast('📧','已開啟郵件程式，請確認後寄出');
+    toast('📧','已開啟郵件程式（未設定 EmailJS）');
   } else {
-    // 工作時間明細（原有邏輯）
     closeSheet('emailSheet');
-    toast('📧','已傳送至 '+to+'（模擬）');
+    toast('⚠️','請先至系統設定完成 EmailJS 設定');
   }
 }
 
@@ -3029,7 +3145,10 @@ function loadAllData(){
     var q=qRows[0]||{};
     DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0};
     var cfg=cfgRows[0]||{};
-    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false};
+    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[],emailjsServiceId:cfg.emailjs_service_id||'',emailjsTemplateId:cfg.emailjs_template_id||'',emailjsPublicKey:cfg.emailjs_public_key||'',senderName:cfg.sender_name||'iROBOT MEDICINE 智能人醫'};
+    window.OFFICES=buildOffices(DB.cfg);
+    if(!window.pendingOffice)window.pendingOffice=window.OFFICES[0];
+    if(DB.cfg.emailjsPublicKey){try{emailjs.init(DB.cfg.emailjsPublicKey);}catch(e){}}
     DB.holidays={};
     holRows.forEach(function(h){DB.holidays[h.date]={name:h.name,year:h.year,id:h.id};});
   });
@@ -3087,6 +3206,11 @@ window.getApps=function(){return DB.leaves||[];};
 window.getMakeupApps=function(){return DB.makeups||[];};
 window.getQuota=function(){return DB.quota||{};};
 window.getCfg=function(){return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};};
+// Initialize EmailJS if configured
+window.initEmailJS=function(){
+  var cfg=getCfg();
+  if(cfg.emailjsPublicKey){try{emailjs.init(cfg.emailjsPublicKey);}catch(e){console.warn('EmailJS init:',e);}}
+};
 window.getEmpById=function(id){return (DB.emps||[]).find(function(e){return e.id===id;})||null;};
 window.getHolidays=function(){return DB.holidays||{};};
 window.isHoliday=function(dateStr){return !!(DB.holidays&&DB.holidays[dateStr]);};
@@ -3158,22 +3282,25 @@ window.doLogout=function(){
 // ══════════════════════════════════════════════════
 //  多辦公室支援
 // ══════════════════════════════════════════════════
-var OFFICES=[
-  {id:'taipei', name:'台北辦公室', address:'台北市大同區市民大道一段209號12樓', lat:25.0473, lng:121.5124},
-  {id:'taoyuan',name:'桃園辦公室', address:'桃園市中壢區高鐵站前西路一段268號18樓', lat:24.9793, lng:121.2280}
-];
-window.OFFICES=OFFICES;
-window.pendingOffice=OFFICES[0];
+function buildOffices(cfg){
+  var o=[{id:'hq',name:cfg.name||'總部',address:cfg.address||'',lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,rangeM:cfg.rangeM||300}];
+  (cfg.extraLocations||[]).forEach(function(l,i){
+    o.push({id:'loc'+i,name:l.name||('地點'+(i+1)),address:l.address||'',lat:parseFloat(l.lat)||0,lng:parseFloat(l.lng)||0,rangeM:parseInt(l.rangeM)||cfg.rangeM||300});
+  });
+  return o;
+}
+window.OFFICES=buildOffices(getCfg());
+window.pendingOffice=window.OFFICES[0];
 
 // 切換辦公室：重新計算距離
 window.selectOffice=function(idx){
-  window.pendingOffice=OFFICES[parseInt(idx)]||OFFICES[0];
+  window.pendingOffice=window.OFFICES[parseInt(idx)]||window.OFFICES[0];
   var gps=window.currentGPS;
   if(gps&&gps.lat){
-    var cfg=getCfg();
     var o=window.pendingOffice;
+    var rangeM=o.rangeM||getCfg().rangeM;
     var dist=haversine(gps.lat,gps.lng,o.lat,o.lng);
-    var isOK=dist<=cfg.rangeM, isWarn=dist<=cfg.rangeM*2;
+    var isOK=dist<=rangeM, isWarn=dist<=rangeM*2;
     var db=document.getElementById('distBadge');
     if(db) db.innerHTML='<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">📏 距'+o.name+' '+dist+'m '+(isOK?'✅ 範圍內':isWarn?'⚠️ 稍遠':'❌ 範圍外')+'</span>';
     var cb=document.getElementById('punchConfirmBtn');
@@ -3185,7 +3312,7 @@ window.selectOffice=function(idx){
 window.openPunch=function(action){
   window.pendingAction=action;
   window.currentGPS=null;
-  window.pendingOffice=OFFICES[0];
+  window.pendingOffice=window.OFFICES[0];
   var emp=window.currentUser.empData;
   document.getElementById('punchTitle').textContent=action==='in'?'🌅 上班打卡確認':'🌇 下班打卡確認';
   document.getElementById('gpsDot').className='gps-dot loading';
@@ -3195,7 +3322,7 @@ window.openPunch=function(action){
   document.getElementById('punchConfirmBtn').disabled=true;
   document.getElementById('punchConfirmBtn').textContent='確認打卡';
   var now=new Date();
-  var offOpts=OFFICES.map(function(o,i){return '<option value="'+i+'">'+o.name+' — '+o.address+'</option>';}).join('');
+  var offOpts=window.OFFICES.map(function(o,i){return '<option value="'+i+'">'+o.name+(o.address?' — '+o.address:'')+'</option>';}).join('');
   document.getElementById('punchBody').innerHTML=
     '<div style="margin-bottom:12px">'
     +'<div style="font-size:11px;font-weight:700;color:var(--t3);margin-bottom:5px">📍 今日上班地點</div>'
@@ -3213,9 +3340,9 @@ window.openPunch=function(action){
 // Override getGPS：使用選擇的辦公室座標進行距離比對
 window.getGPS=function(){
   var baseCfg=getCfg();
-  var o=window.pendingOffice||OFFICES[0];
-  // 以選擇的辦公室座標覆蓋 lat/lng，保留其餘設定
-  var cfg=Object.assign({},baseCfg,{lat:o.lat,lng:o.lng});
+  var o=window.pendingOffice||window.OFFICES[0];
+  // 以選擇的辦公室座標覆蓋 lat/lng 及 rangeM
+  var cfg=Object.assign({},baseCfg,{lat:o.lat,lng:o.lng,rangeM:o.rangeM||baseCfg.rangeM});
   if(!navigator.geolocation){showGPSError('此裝置不支援定位功能');return;}
   try{
     navigator.geolocation.getCurrentPosition(
@@ -3231,7 +3358,7 @@ window.confirmPunch=function(){
   var now=new Date(),empId=window.currentUser.id,emp=window.currentUser.empData,action=window.pendingAction;
   closeSheet('punchSheet');
   var dateStr=todayKey(),existing=getTodayRec(empId);
-  var officeName=(window.pendingOffice||OFFICES[0]).name;
+  var officeName=(window.pendingOffice||window.OFFICES[0]).name;
   var gpsData=window.currentGPS?Object.assign({},window.currentGPS,{office:officeName}):null;
   if(action==='in'){
     sbups('records',{emp_id:empId,date:dateStr,time_in:now.toISOString(),gps_in:gpsData},'emp_id,date')
