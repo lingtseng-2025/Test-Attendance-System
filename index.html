@@ -1260,8 +1260,18 @@ function adminTab(tab){
 }
 
 function updateAdminBadge(){
-  const lp=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
-  const mp=getMakeupApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
+  const myId=currentUser?currentUser.id:'';
+  const isHR=currentUser?currentUser.role==='admin':false;
+  const lp=getApps().filter(function(a){
+    if(a.status==='pending'&&a.supId===myId) return true;
+    if(a.status==='sup_approved'&&isHR) return true;
+    return false;
+  }).length;
+  const mp=getMakeupApps().filter(function(a){
+    if(a.status==='pending'&&a.supId===myId) return true;
+    if(a.status==='sup_approved'&&isHR) return true;
+    return false;
+  }).length;
   const p=lp+mp;
   ['adminApproveBadge','adminApproveBadgeMobile'].forEach(function(id){
     const b=document.getElementById(id);
@@ -2108,21 +2118,6 @@ function renderSettings(s){
         <button onclick="confirmAddLoc()" style="flex:2;padding:10px;border:none;border-radius:10px;background:var(--grad);color:#fff;font-size:13px;font-weight:700;cursor:pointer">✅ 確認新增</button>
       </div>
     </div>
-  </div>
-  <div class="sec-title fu fu3"><span>📧 Email 寄送設定</span></div>
-  <div class="card fu fu3">
-    <div style="font-size:12px;color:var(--t2);line-height:1.8;margin-bottom:10px;padding:10px;background:var(--bl);border-radius:9px">
-      📌 使用 <strong>EmailJS</strong> 可直接從系統寄送薪資單，無需開啟郵件程式<br>
-      1. 前往 <strong>emailjs.com</strong> 建立免費帳號（200封/月）<br>
-      2. Add Email Service（建議 Gmail）→ 取得 <strong>Service ID</strong><br>
-      3. Email Templates → 建立新樣板，加入變數：<code>{{to_email}}</code> <code>{{subject}}</code> <code>{{message}}</code> → 取得 <strong>Template ID</strong><br>
-      4. Account → API Keys → 複製 <strong>Public Key</strong>
-    </div>
-    <div class="fg"><label>Service ID</label><input id="cfg_emailjs_sid" value="${cfg.emailjsServiceId||''}" placeholder="service_xxxxxxx"></div>
-    <div class="fg"><label>Template ID</label><input id="cfg_emailjs_tid" value="${cfg.emailjsTemplateId||''}" placeholder="template_xxxxxxx"></div>
-    <div class="fg"><label>Public Key</label><input id="cfg_emailjs_pk" value="${cfg.emailjsPublicKey||''}" placeholder="xxxxxxxxxxxxxxxx"></div>
-    <div class="fg"><label>寄件者名稱</label><input id="cfg_sender_name" value="${cfg.senderName||'iROBOT MEDICINE 智能人醫'}" placeholder="公司名稱"></div>
-    <button class="save-btn" onclick="saveEmailjsSettings()">💾 儲存 Email 設定</button>
   </div>
   <div class="sec-title fu fu2"><span>⚙️ 全公司工時預設</span></div>
   <div class="card fu fu2">
