@@ -738,13 +738,14 @@ function startEmpSession(){
 
 let currentEmpTab='clock';
 function empTab(tab){
+  const prevTab=currentEmpTab;
   currentEmpTab=tab;
   document.querySelectorAll('#empTabbar .tb-item').forEach(t=>t.classList.remove('active'));
   document.getElementById('etab-'+tab).classList.add('active');
   const s=document.getElementById('empScroll');
   s.innerHTML='';
   if(tab==='clock') renderEmpClock(s);
-  else if(tab==='monthly') renderEmpMonthly(s);
+  else if(tab==='monthly'){if(prevTab!=='monthly') window._empMonthSel=null; renderEmpMonthly(s);}
   else if(tab==='leave') renderLeaveList(s);
   else if(tab==='status') renderLeaveStatus(s);
   else if(tab==='quota') renderQuota(s);
@@ -884,10 +885,21 @@ function recentRows(emp,limit){
 }
 
 // ── Employee Monthly ───────────────────────────────
+window.empMonthNav=function(dir){
+  const now=new Date();
+  if(!window._empMonthSel) window._empMonthSel={y:now.getFullYear(),m:now.getMonth()};
+  let {y,m}=window._empMonthSel;
+  m+=dir; if(m<0){m=11;y--;} if(m>11){m=0;y++;}
+  if(y>now.getFullYear()||(y===now.getFullYear()&&m>now.getMonth())) return;
+  window._empMonthSel={y,m};
+  renderEmpMonthly(document.getElementById('empScroll'));
+};
 function renderEmpMonthly(s){
   const emp=currentUser.empData;
   const now=new Date();
-  const y=now.getFullYear(),m=now.getMonth();
+  if(!window._empMonthSel) window._empMonthSel={y:now.getFullYear(),m:now.getMonth()};
+  const y=window._empMonthSel.y, m=window._empMonthSel.m;
+  const isCurrentMonth=(y===now.getFullYear()&&m===now.getMonth());
   const recs=getMonthRecs(y,m,emp.id);
   const leaveApps=getApps().filter(a=>a.empId===emp.id&&a.status==='approved');
   const daysInMonth=new Date(y,m+1,0).getDate();
@@ -914,8 +926,13 @@ function renderEmpMonthly(s){
     rows.push({ds,dow,d,rec,h,OT,badge,isDayOff,holName});
   }
   s.innerHTML=`
-  <div class="ms fu"><div class="ms-item"><div class="ms-label">出勤天數</div><div class="ms-val" style="color:var(--pd)">${wDays}</div></div><div class="ms-item"><div class="ms-label">總工時</div><div class="ms-val" style="color:var(--green)">${tH.toFixed(1)}</div></div><div class="ms-item"><div class="ms-label">加班時數</div><div class="ms-val" style="color:var(--orange)">${tOT.toFixed(1)}</div></div></div>
-  <div class="ra fu fu1">
+  <div class="fu" style="display:flex;align-items:center;justify-content:space-between;padding:4px 2px 8px">
+    <button onclick="empMonthNav(-1)" style="background:var(--pu-light);border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;color:var(--pd);display:flex;align-items:center;justify-content:center">◀</button>
+    <span style="font-weight:800;font-size:16px;color:var(--pd)">${y}年${m+1}月</span>
+    <button onclick="empMonthNav(1)" ${isCurrentMonth?'disabled':''} style="background:var(--pu-light);border:none;border-radius:50%;width:36px;height:36px;font-size:18px;cursor:pointer;color:var(--pd);display:flex;align-items:center;justify-content:center;${isCurrentMonth?'opacity:0.3;cursor:default':''}">▶</button>
+  </div>
+  <div class="ms fu fu1"><div class="ms-item"><div class="ms-label">出勤天數</div><div class="ms-val" style="color:var(--pd)">${wDays}</div></div><div class="ms-item"><div class="ms-label">總工時</div><div class="ms-val" style="color:var(--green)">${tH.toFixed(1)}</div></div><div class="ms-item"><div class="ms-label">加班時數</div><div class="ms-val" style="color:var(--orange)">${tOT.toFixed(1)}</div></div></div>
+  <div class="ra fu fu2">
     <button class="ra-btn ol" onclick="window.print()">🖨️ 列印</button>
     <button class="ra-btn so" onclick="exportExcel('${emp.id}',${y},${m+1})">📥 Excel</button>
     <button class="ra-btn ol" onclick="openEmailSheet(${y},${m+1})" style="grid-column:1/-1">📧 Email 寄送</button>
@@ -1582,7 +1599,7 @@ function applyMakeupToRecord(a){
   var recs=getRecs();
   var existing=recs.find(function(r){return r.date===a.date&&r.empId===a.empId;});
   var emp=getEmpById(a.empId);
-  var timeISO=a.date+'T'+a.punchTime+':00';
+  var timeISO=new Date(a.date+'T'+a.punchTime+':00').toISOString();
   if(existing){
     if(a.punchType==='in'&&!existing.in){
       existing.in=timeISO;
@@ -3472,7 +3489,7 @@ window.doReview=function(status){
     else if(a.status==='pending'){upd={status:'sup_approved',stage:'hr',sup_note:note,sup_reviewed_at:now};}
     else if(a.status==='sup_approved'){
       upd={status:'approved',stage:'done',hr_note:note,hr_reviewed_at:now};
-      var timeISO=a.date+'T'+a.punchTime+':00';
+      var timeISO=new Date(a.date+'T'+a.punchTime+':00').toISOString();
       var ex=getRecs().find(function(r){return r.date===a.date&&r.empId===a.empId;});
       if(ex){sbupd('records',a.punchType==='in'?{time_in:timeISO,gps_in:Object.assign({},a.gps,{makeup:true})}:{time_out:timeISO,gps_out:Object.assign({},a.gps,{makeup:true})},{emp_id:a.empId,date:a.date});}
       else{sbins('records',{emp_id:a.empId,date:a.date,time_in:a.punchType==='in'?timeISO:null,time_out:a.punchType==='out'?timeISO:null,gps_in:a.punchType==='in'?Object.assign({},a.gps,{makeup:true}):null,gps_out:a.punchType==='out'?Object.assign({},a.gps,{makeup:true}):null});}
