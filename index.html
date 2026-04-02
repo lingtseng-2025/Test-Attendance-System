@@ -1284,10 +1284,20 @@ function renderAdminDashboard(s){
   const today=todayKey();
   const recs=getRecs().filter(r=>r.date===today&&r.in);
   const emps=getEmps();
-  const pending=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved');
+  const _myId=currentUser?currentUser.id:'';
+  const _isHR=currentUser?currentUser.role==='admin':false;
+  const pending=getApps().filter(function(a){
+    if(a.status==='pending'&&a.supId===_myId) return true;
+    if(a.status==='sup_approved'&&_isHR) return true;
+    return false;
+  });
   const cfg=getCfg();
-  const allPending=getApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length
-    +getMakeupApps().filter(a=>a.status==='pending'||a.status==='sup_approved').length;
+  const allPending=pending.length
+    +getMakeupApps().filter(function(a){
+      if(a.status==='pending'&&a.supId===_myId) return true;
+      if(a.status==='sup_approved'&&_isHR) return true;
+      return false;
+    }).length;
   const now=new Date();
 
   s.innerHTML=`
