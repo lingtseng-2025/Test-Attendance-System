@@ -8,7 +8,6 @@
 <meta name="theme-color" content="#dcdaf6">
 <title>iROBOT MEDICINE 智能人醫</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700;900&family=Nunito:wght@700;800;900&display=swap');
 :root {
@@ -2196,18 +2195,6 @@ window.deleteExtraLoc=function(idx){
       renderSettings(document.getElementById('adminScroll'));
     });
 };
-window.saveEmailjsSettings=function(){
-  var sid=(document.getElementById('cfg_emailjs_sid').value||'').trim();
-  var tid=(document.getElementById('cfg_emailjs_tid').value||'').trim();
-  var pk=(document.getElementById('cfg_emailjs_pk').value||'').trim();
-  var sn=(document.getElementById('cfg_sender_name').value||'').trim()||'iROBOT MEDICINE 智能人醫';
-  sbups('company_settings',{id:1,emailjs_service_id:sid,emailjs_template_id:tid,emailjs_public_key:pk,sender_name:sn},'id')
-    .then(function(){return loadAllData();})
-    .then(function(){
-      if(pk) try{emailjs.init(pk);}catch(e){}
-      toast('✅','Email 設定已儲存');
-    });
-};
 
 function renderHolidaySettings(){
   var hols=window.getHolidays?window.getHolidays():{};
@@ -2939,48 +2926,19 @@ function doSendEmail(){
   var to=document.getElementById('emailTo').value.trim();
   if(!to){toast('⚠️','請填寫收件人 Email');return;}
   var subj=document.getElementById('emailSubj').value.trim()||'薪資通知';
-  var cfg=getCfg();
   var body='';
   if(window._salaryEmailData){
     body=window._salaryEmailData.body;
     var note=(document.getElementById('emailNote').value||'').trim();
     if(note) body=note+'\n\n'+body;
   }
-  // 使用 EmailJS 正式寄送
-  if(cfg.emailjsPublicKey&&cfg.emailjsServiceId&&cfg.emailjsTemplateId){
-    try{
-      emailjs.init(cfg.emailjsPublicKey);
-      var btn=document.querySelector('#emailSheet .sbtn.confirm');
-      if(btn){btn.disabled=true;btn.textContent='寄送中...';}
-      emailjs.send(cfg.emailjsServiceId,cfg.emailjsTemplateId,{
-        to_name:to, to_email:to, subject:subj, message:body,
-        from_name:cfg.senderName||'iROBOT MEDICINE 智能人醫'
-      }).then(function(){
-        window._salaryEmailData=null;
-        closeSheet('emailSheet');
-        toast('📧','薪資單已寄出至 '+to+' ✓');
-      }).catch(function(e){
-        if(btn){btn.disabled=false;btn.textContent='📧 寄送';}
-        toast('❌','寄送失敗：'+(e.text||e.message||JSON.stringify(e)));
-        console.error('EmailJS error:',e);
-      });
-      return;
-    }catch(e){
-      console.warn('EmailJS error, fallback to mailto:',e);
-    }
-  }
-  // Fallback: mailto
-  if(body){
-    var link='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
-    var a=document.createElement('a');a.href=link;a.style.display='none';
-    document.body.appendChild(a);a.click();document.body.removeChild(a);
-    window._salaryEmailData=null;
-    closeSheet('emailSheet');
-    toast('📧','已開啟郵件程式（未設定 EmailJS）');
-  } else {
-    closeSheet('emailSheet');
-    toast('⚠️','請先至系統設定完成 EmailJS 設定');
-  }
+  if(!body){toast('⚠️','無薪資資料可寄送');return;}
+  var link='mailto:'+encodeURIComponent(to)+'?subject='+encodeURIComponent(subj)+'&body='+encodeURIComponent(body);
+  var a=document.createElement('a');a.href=link;a.style.display='none';
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  window._salaryEmailData=null;
+  closeSheet('emailSheet');
+  toast('📧','已開啟郵件程式，請確認後寄出');
 }
 
 // ══════════════════════════════════════════════════
@@ -3150,10 +3108,9 @@ function loadAllData(){
     var q=qRows[0]||{};
     DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0};
     var cfg=cfgRows[0]||{};
-    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[],emailjsServiceId:cfg.emailjs_service_id||'',emailjsTemplateId:cfg.emailjs_template_id||'',emailjsPublicKey:cfg.emailjs_public_key||'',senderName:cfg.sender_name||'iROBOT MEDICINE 智能人醫'};
+    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[]};
     window.OFFICES=buildOffices(DB.cfg);
     if(!window.pendingOffice)window.pendingOffice=window.OFFICES[0];
-    if(DB.cfg.emailjsPublicKey){try{emailjs.init(DB.cfg.emailjsPublicKey);}catch(e){}}
     DB.holidays={};
     holRows.forEach(function(h){DB.holidays[h.date]={name:h.name,year:h.year,id:h.id};});
   });
@@ -3211,11 +3168,6 @@ window.getApps=function(){return DB.leaves||[];};
 window.getMakeupApps=function(){return DB.makeups||[];};
 window.getQuota=function(){return DB.quota||{};};
 window.getCfg=function(){return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};};
-// Initialize EmailJS if configured
-window.initEmailJS=function(){
-  var cfg=getCfg();
-  if(cfg.emailjsPublicKey){try{emailjs.init(cfg.emailjsPublicKey);}catch(e){console.warn('EmailJS init:',e);}}
-};
 window.getEmpById=function(id){return (DB.emps||[]).find(function(e){return e.id===id;})||null;};
 window.getHolidays=function(){return DB.holidays||{};};
 window.isHoliday=function(dateStr){return !!(DB.holidays&&DB.holidays[dateStr]);};
@@ -3526,8 +3478,30 @@ window.submitLeave=function(){
     .then(function(){return loadAllData();}).then(function(){
       closeSheet('leaveSheet');
       if(supEmp&&supEmp.email){
+        // 整理主管所有待審假期申請
+        var pendingLeaves=getApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+        var pendingMkps=getMakeupApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+        var listText='';
+        pendingLeaves.forEach(function(a,i){
+          listText+='\n'+(i+1)+'. '+a.empName+' — '+(LEAVE_LABEL[a.type]||a.type)
+            +'\n   期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' （'+a.days+'天）':'')
+            +'\n   原因：'+(a.reason||'--');
+        });
+        pendingMkps.forEach(function(a,i){
+          var tl=a.punchType==='in'?'補上班打卡':'補下班打卡';
+          listText+='\n'+(pendingLeaves.length+i+1)+'. '+a.empName+' — '+tl
+            +'\n   日期：'+a.date+' '+a.punchTime
+            +'\n   原因：'+(a.reason||'--');
+        });
+        var total=pendingLeaves.length+pendingMkps.length;
+        var emailBody='您好，\n\n'+emp.name+' 已送出請假申請，請審核。\n'
+          +'申請內容：'+(LEAVE_LABEL[type]||type)+' '+start+(start!==end?' ～ '+end:'')+'\n\n'
+          +'===== 您目前有 '+total+' 筆待審核申請 ====='+listText
+          +'\n\n請登入 iROBOT 出勤系統進行審核。';
         var a2=document.createElement('a');
-        a2.href='mailto:'+supEmp.email+'?subject='+encodeURIComponent('[請假通知] '+emp.name)+'&body='+encodeURIComponent(emp.name+' 申請請假。期間：'+start+(start!==end?' ~ '+end:'')+' 原因：'+reason);
+        a2.href='mailto:'+supEmp.email
+          +'?subject='+encodeURIComponent('[待審核 '+total+'筆] '+emp.name+' 申請請假')
+          +'&body='+encodeURIComponent(emailBody);
         a2.style.display='none';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
       }
       toast('✅','假期申請已送出！');
@@ -3669,9 +3643,32 @@ window.confirmMakeupGps=function(){
     closeSheet('makeupGpsSheet');
     window.makeupPendingData=null;window.makeupGpsData=null;
     if(supEmp&&supEmp.email){
-      var tl=d.type==='in'?'上班':'下班';
+      var tl=d.type==='in'?'補上班打卡':'補下班打卡';
+      var supId=d.supId;
+      // 整理主管所有待審申請
+      var pendingLeaves=getApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+      var pendingMkps=getMakeupApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+      var listText='';
+      pendingLeaves.forEach(function(a,i){
+        listText+='\n'+(i+1)+'. '+a.empName+' — '+(LEAVE_LABEL[a.type]||a.type)
+          +'\n   期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' （'+a.days+'天）':'')
+          +'\n   原因：'+(a.reason||'--');
+      });
+      pendingMkps.forEach(function(a,i){
+        var mkTl=a.punchType==='in'?'補上班打卡':'補下班打卡';
+        listText+='\n'+(pendingLeaves.length+i+1)+'. '+a.empName+' — '+mkTl
+          +'\n   日期：'+a.date+' '+a.punchTime
+          +'\n   原因：'+(a.reason||'--');
+      });
+      var total=pendingLeaves.length+pendingMkps.length;
+      var emailBody='您好，\n\n'+emp.name+' 已送出補打卡申請，請審核。\n'
+        +'申請內容：'+tl+' '+d.date+' '+d.time+'\n\n'
+        +'===== 您目前有 '+total+' 筆待審核申請 ====='+listText
+        +'\n\n請登入 iROBOT 出勤系統進行審核。';
       var el=document.createElement('a');
-      el.href='mailto:'+supEmp.email+'?subject='+encodeURIComponent('[補打卡審核] '+emp.name)+'&body='+encodeURIComponent(emp.name+' 申請補打卡。日期：'+d.date+' 類型：'+tl+'打卡 '+d.time+' 原因：'+d.reason);
+      el.href='mailto:'+supEmp.email
+        +'?subject='+encodeURIComponent('[待審核 '+total+'筆] '+emp.name+' 申請補打卡')
+        +'&body='+encodeURIComponent(emailBody);
       el.style.display='none';document.body.appendChild(el);el.click();document.body.removeChild(el);
     }
     toast('✅','補打卡申請已送出！等待主管審核');
