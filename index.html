@@ -449,6 +449,9 @@ body.admin-mode > #adminScreen{
         <div class="snav-item" id="snav-leaves" onclick="adminTab('leaves')">
           <span class="snav-icon">🎯</span><span>假別管理</span>
         </div>
+        <div class="snav-item" id="snav-leavebalance" onclick="adminTab('leavebalance')">
+          <span class="snav-icon">📊</span><span>假別餘額</span>
+        </div>
         <div class="snav-item" id="snav-gps" onclick="adminTab('gps')">
           <span class="snav-icon">🗺️</span><span>GPS 地圖</span>
         </div>
@@ -1315,6 +1318,7 @@ function adminTab(tab){
   else if(tab==='settings') renderSettings(s);
   else if(tab==='salary') renderSalary(s);
   else if(tab==='leaves') renderLeaveManagement(s);
+  else if(tab==='leavebalance') { if(window.renderLeaveBalance) window.renderLeaveBalance(s); }
   updateAdminBadge();
 }
 
@@ -1847,7 +1851,10 @@ function renderEmployees(s){
   s.innerHTML=''
     +'<div class="pc-page-header">'
     +'<div><div class="pc-page-title">&#x1F465; 員工管理</div><div class="pc-page-sub">共 '+emps.length+' 位員工</div></div>'
+    +'<div style="display:flex;gap:8px">'
+    +'<button onclick="exportEmployeesExcel()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-family:Nunito,sans-serif;font-size:13px;font-weight:700;cursor:pointer">📥 匯出 Excel</button>'
     +'<button onclick="openAddEmp()" style="padding:10px 20px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:13px;font-weight:800;cursor:pointer">&#xFF0B; 新增員工</button>'
+    +'</div>'
     +'</div>'
     +'<div class="pc-section">'
     +'<table class="pc-table" style="width:100%">'
@@ -2150,82 +2157,7 @@ function renderReports(s){
     +'<button onclick="loadReport()" style="padding:10px 28px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">&#x1F50D; 查詢</button>'
     +'</div>'
     +'</div>'
-    +'<div id="reportResult"></div>'
-    // ── 假別餘額報表 ──
-    +'<div class="pc-page-header" style="margin-top:24px">'
-    +'<div><div class="pc-page-title" style="font-size:17px">🎯 假別餘額一覽</div><div class="pc-page-sub">各員工今年可用假別天數</div></div>'
-    +'</div>'
-    +'<div class="pc-section" style="overflow-x:auto">'
-    +'<div id="leaveBalanceReport"></div>'
-    +'</div>'
-    // ── 加班申請紀錄 ──
-    +'<div class="pc-page-header" style="margin-top:24px">'
-    +'<div><div class="pc-page-title" style="font-size:17px">⏰ 加班申請紀錄</div><div class="pc-page-sub">所有加班申請狀態</div></div>'
-    +'</div>'
-    +'<div class="pc-section">'
-    +'<div id="otReport"></div>'
-    +'</div>';
-  // 渲染假別餘額
-  (function(){
-    var KEYS=['annual','sick','personal','menstrual','maternity','paternity','makeup'];
-    var LABELS={annual:'特休',sick:'病假',personal:'事假',menstrual:'生理假',maternity:'產假',paternity:'陪產假',makeup:'補休'};
-    var allLeaves=window.getApps?window.getApps():[];
-    var html='<table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr><th style="text-align:left;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">員工</th>'
-      +KEYS.map(function(k){return '<th style="text-align:center;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">'+LABELS[k]+'</th>';}).join('')
-      +'</tr></thead><tbody>';
-    emps.forEach(function(emp){
-      var q=window.getEmpQuota?window.getEmpQuota(emp.id):(window.getQuota?window.getQuota():{});
-      html+='<tr>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);font-weight:600">'+emp.name+'<div style="font-size:10px;color:var(--t3)">'+emp.dept+'</div></td>';
-      KEYS.forEach(function(k){
-        var total=q[k]||0;
-        var used=allLeaves.filter(function(a){return a.empId===emp.id&&a.type===k&&(a.status==='approved'||a.status==='pending'||a.status==='sup_approved');}).reduce(function(s,a){return s+(a.days||0);},0);
-        var rem=total-used;
-        var color=rem<=0?'var(--pd)':rem<=3?'var(--orange)':'var(--green)';
-        html+='<td style="text-align:center;padding:8px;border-bottom:1px solid var(--bg)">'
-          +'<span style="font-family:Nunito,sans-serif;font-size:14px;font-weight:800;color:'+color+'">'+rem+'</span>'
-          +'<span style="font-size:9px;color:var(--t3)">/'+total+'</span></td>';
-      });
-      html+='</tr>';
-    });
-    html+='</tbody></table>';
-    var el=document.getElementById('leaveBalanceReport');
-    if(el) el.innerHTML=html;
-  })();
-  // 渲染加班申請紀錄
-  (function(){
-    var otas=window.getOvertimeApps?window.getOvertimeApps():[];
-    if(!otas.length){
-      var el2=document.getElementById('otReport');
-      if(el2) el2.innerHTML='<div style="text-align:center;padding:16px;color:var(--t3)">尚無加班申請記錄</div>';
-      return;
-    }
-    var html2='<table style="width:100%;border-collapse:collapse;font-size:12px">'
-      +'<thead><tr>'
-      +'<th style="text-align:left;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">員工</th>'
-      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">日期</th>'
-      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">時間</th>'
-      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">時數</th>'
-      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">狀態</th>'
-      +'<th style="text-align:left;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">原因</th>'
-      +'</tr></thead><tbody>';
-    otas.forEach(function(a){
-      var sc=a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='cancelled'?'#999':'var(--blue)';
-      var sl=a.status==='approved'?'✅ 核准':a.status==='rejected'?'❌ 拒絕':a.status==='cancelled'?'取消':'⏳ 待審';
-      html2+='<tr>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);font-weight:600">'+a.empName+'</td>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center">'+a.date+'</td>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center">'+a.startTime+'~'+a.endTime+'</td>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center;font-family:Nunito,sans-serif;font-weight:800;color:var(--orange)">'+a.hours.toFixed(1)+'h</td>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center"><span style="color:'+sc+';font-weight:700">'+sl+'</span></td>'
-        +'<td style="padding:8px;border-bottom:1px solid var(--bg);color:var(--t2)">'+((a.reason||'').slice(0,30))+'</td>'
-        +'</tr>';
-    });
-    html2+='</tbody></table>';
-    var el2=document.getElementById('otReport');
-    if(el2) el2.innerHTML=html2;
-  })();
+    +'<div id="reportResult"></div>';
 }
 
 function loadReport(){
@@ -4052,17 +3984,9 @@ window.renderLeaveManagement=function(s){
     +'</div>'
     +'<button class="save-btn" style="margin-top:12px" onclick="window.saveGlobalQuotaFromLeave()">💾 儲存全員預設</button>'
     +'</div>'
-    // 個別員工表格
-    +'<div class="sec-title fu"><span>👥 各員工假別剩餘（剩餘/額度）</span></div>'
-    +'<div class="card" style="overflow-x:auto;padding:10px">'
-    +'<table style="width:100%;border-collapse:collapse">'
-    +'<thead><tr style="border-bottom:2px solid var(--border)">'
-    +'<th style="text-align:left;padding:6px 10px;font-size:12px">員工</th>'
-    +theadCols
-    +'<th style="text-align:center;font-size:11px;padding:6px 4px">操作</th>'
-    +'</tr></thead>'
-    +'<tbody>'+rows+'</tbody>'
-    +'</table>'
+    +'<div style="background:var(--pl);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--pd);display:flex;align-items:center;justify-content:space-between">'
+    +'<span>📊 各員工剩餘假別一覽</span>'
+    +'<button onclick="adminTab(\'leavebalance\')" style="padding:6px 14px;border-radius:8px;border:none;background:var(--pd);color:#fff;font-size:12px;font-weight:700;cursor:pointer">前往查看 →</button>'
     +'</div>';
 };
 
@@ -4112,7 +4036,9 @@ window.saveEmpQuota=function(){
   sbupsert('emp_leave_quota',row).then(function(){return loadAllData();}).then(function(){
     closeSheet('quotaEditSheet');
     toast('✅','假別額度已儲存');
-    renderLeaveManagement(document.getElementById('adminScroll'));
+    var scr=document.getElementById('adminScroll');
+    if(window.renderLeaveBalance) window.renderLeaveBalance(scr);
+    else renderLeaveManagement(scr);
   });
 };
 
@@ -4122,7 +4048,9 @@ window.clearEmpQuota=function(){
   sbdel('emp_leave_quota',{emp_id:_editQuotaEmpId}).then(function(){return loadAllData();}).then(function(){
     closeSheet('quotaEditSheet');
     toast('✅','已清除個人設定，恢復全員預設');
-    renderLeaveManagement(document.getElementById('adminScroll'));
+    var scr=document.getElementById('adminScroll');
+    if(window.renderLeaveBalance) window.renderLeaveBalance(scr);
+    else renderLeaveManagement(scr);
   });
 };
 
@@ -4842,6 +4770,133 @@ window.showSeniorityHint=function(hireDate){
   var d=window.calcSeniorityLeave(hireDate);
   days.textContent=d;
   hint.style.display='block';
+};
+
+// ══════════════════════════════════════════════════
+//  假別餘額頁面
+// ══════════════════════════════════════════════════
+window.renderLeaveBalance=function(s){
+  var emps=window.getEmps().filter(function(e){
+    var acc=(window.getAccounts()||[]).find(function(a){return a.id===e.id;});
+    return !(acc&&acc.role==='admin');
+  }).sort(function(a,b){
+    var na=parseInt(a.id.replace(/\D/g,''))||99999;
+    var nb=parseInt(b.id.replace(/\D/g,''))||99999;
+    return na-nb;
+  });
+  var allLeaves=window.getApps?window.getApps():[];
+  var LEAVE_TYPES_KEYS=['annual','sick','personal','menstrual','maternity','paternity','parental','makeup'];
+  var LEAVE_TYPES_LABELS={annual:'🌴 特休',sick:'🤒 病假',personal:'🎉 事假',menstrual:'🌸 生理假',maternity:'🤱 產假',paternity:'👶 陪產假',parental:'🌿 育嬰',makeup:'🔄 補休'};
+
+  function usedQ(empId,type){
+    return allLeaves.filter(function(a){
+      return a.empId===empId&&a.type===type&&(a.status==='approved'||a.status==='pending'||a.status==='sup_approved');
+    }).reduce(function(s,a){return s+(a.days||0);},0);
+  }
+
+  var theadCols=LEAVE_TYPES_KEYS.map(function(k){
+    return '<th style="text-align:center;padding:7px 6px;font-size:11px;white-space:nowrap;min-width:60px">'+LEAVE_TYPES_LABELS[k]+'</th>';
+  }).join('');
+
+  var rows=emps.map(function(emp){
+    var q=window.getEmpQuota?window.getEmpQuota(emp.id):(window.getQuota?window.getQuota():{});
+    var hasOverride=!!(DB.empQuota&&DB.empQuota[emp.id]);
+    var cells=LEAVE_TYPES_KEYS.map(function(k){
+      var total=q[k]||0;
+      var used=usedQ(emp.id,k);
+      var rem=total-used;
+      var col=rem<=0?'#cc0000':rem<=2?'var(--orange)':'var(--green)';
+      return '<td style="text-align:center;padding:7px 4px">'
+        +'<span style="font-family:Nunito,sans-serif;font-size:14px;font-weight:800;color:'+col+'">'+rem+'</span>'
+        +'<span style="font-size:9px;color:var(--t3)">/'+total+'</span></td>';
+    }).join('');
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:8px 10px;white-space:nowrap">'
+      +'<div style="font-weight:700;font-size:13px">'+escapeHtml(emp.name)+'</div>'
+      +'<div style="font-size:10px;color:var(--t3)">'+emp.dept+(hasOverride?' · <span style="color:var(--pd)">個人設定</span>':'')+'</div>'
+      +'</td>'
+      +cells
+      +'<td style="padding:6px 8px;text-align:center">'
+      +'<button onclick="window.openEmpQuotaEdit(\''+emp.id+'\')" style="padding:4px 10px;border:1.5px solid var(--pd);border-radius:8px;background:#fff;color:var(--pd);font-size:12px;font-weight:700;cursor:pointer">設定</button>'
+      +'</td></tr>';
+  }).join('');
+
+  s.innerHTML='<div class="pc-page-header" style="margin-bottom:20px">'
+    +'<div><div class="pc-page-title">📊 假別餘額</div><div class="pc-page-sub">各員工剩餘假別天數（剩餘/額度），點「設定」可調整個人額度</div></div>'
+    +'<button onclick="exportLeaveBalanceExcel()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-family:Nunito,sans-serif;font-size:13px;font-weight:700;cursor:pointer">📥 匯出 Excel</button>'
+    +'</div>'
+    +'<div class="pc-section" style="overflow-x:auto;padding:10px">'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<thead><tr style="border-bottom:2px solid var(--border)">'
+    +'<th style="text-align:left;padding:7px 10px;font-size:12px">員工</th>'
+    +theadCols
+    +'<th style="text-align:center;font-size:11px;padding:7px 4px">操作</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table>'
+    +'</div>';
+};
+
+// ── 員工資料匯出 Excel ────────────────────────────
+window.exportEmployeesExcel=function(){
+  var emps=window.getEmps();
+  var accs=window.getAccounts();
+  var RULE_LABEL_EX={subtract:'直接相減',deduct_lunch:'扣除午休1h',deduct_both:'扣除午休+晚餐2h'};
+  var CONTRACT_LABEL={full_time:'全職',part_time:'兼職',contract:'約聘'};
+  var GENDER_LABEL={M:'男',F:'女',other:'其他','':'未填'};
+  var headers=['工號','姓名','部門','職稱','角色','狀態','月薪','Email','手機','性別','生日','到職日','合約型態','直屬主管工號','直屬主管姓名','緊急聯絡人','緊急聯絡電話','工時規則'];
+  var rows=emps.map(function(e){
+    var acc=accs.find(function(a){return a.id===e.id;});
+    var sup=window.getEmpById(e.supervisorId||'');
+    return [
+      e.id,e.name,e.dept,e.pos,
+      acc?acc.role:'employee',
+      e.status==='inactive'?'離職':'在職',
+      e.salary,e.email,e.phone||'',
+      {M:'男',F:'女',other:'其他'}[e.gender]||'',
+      e.birthDate||'',e.hireDate||'',
+      {full_time:'全職',part_time:'兼職',contract:'約聘'}[e.contractType]||e.contractType||'',
+      e.supervisorId||'',sup?sup.name:'',
+      e.emergencyName||'',e.emergencyPhone||'',
+      RULE_LABEL_EX[e.workRule]||e.workRule||''
+    ];
+  });
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  // 設定欄寬
+  ws['!cols']=[{wch:12},{wch:10},{wch:12},{wch:14},{wch:8},{wch:6},{wch:10},{wch:22},{wch:14},{wch:5},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:12},{wch:14},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws,'員工資料');
+  var fn='員工資料_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  XLSX.writeFile(wb,fn);
+  toast('📥','員工資料已匯出：'+fn);
+};
+
+// ── 假別餘額匯出 Excel ────────────────────────────
+window.exportLeaveBalanceExcel=function(){
+  var emps=window.getEmps().filter(function(e){
+    var acc=(window.getAccounts()||[]).find(function(a){return a.id===e.id;});
+    return !(acc&&acc.role==='admin');
+  });
+  var allLeaves=window.getApps?window.getApps():[];
+  var KEYS=['annual','sick','personal','menstrual','maternity','paternity','parental','makeup'];
+  var LABELS={annual:'特休假',sick:'病假',personal:'事假',menstrual:'生理假',maternity:'產假',paternity:'陪產假',parental:'育嬰',makeup:'補休'};
+  var headers=['工號','姓名','部門'].concat(KEYS.map(function(k){return LABELS[k]+'(餘)';}).concat(KEYS.map(function(k){return LABELS[k]+'(總)';}))).concat(['匯出時間']);
+  var rows=emps.map(function(e){
+    var q=window.getEmpQuota?window.getEmpQuota(e.id):(window.getQuota?window.getQuota():{});
+    var rem=KEYS.map(function(k){
+      var used=allLeaves.filter(function(a){return a.empId===e.id&&a.type===k&&(a.status==='approved'||a.status==='pending'||a.status==='sup_approved');}).reduce(function(s,a){return s+(a.days||0);},0);
+      return Math.max(0,(q[k]||0)-used);
+    });
+    var tot=KEYS.map(function(k){return q[k]||0;});
+    return [e.id,e.name,e.dept].concat(rem).concat(tot).concat([new Date().toLocaleString()]);
+  });
+  var wb=XLSX.utils.book_new();
+  var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
+  ws['!cols']=[{wch:12},{wch:10},{wch:12}].concat(KEYS.map(function(){return {wch:9};})).concat(KEYS.map(function(){return {wch:9};})).concat([{wch:18}]);
+  XLSX.utils.book_append_sheet(wb,ws,'假別餘額');
+  var fn='假別餘額_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  XLSX.writeFile(wb,fn);
+  toast('📥','假別餘額已匯出：'+fn);
 };
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
