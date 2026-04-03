@@ -404,6 +404,7 @@ body.admin-mode > #adminScreen{
     <div class="tb-item" id="etab-monthly" onclick="empTab('monthly')"><div class="tbi">📊</div><span>月報</span></div>
     <div class="tb-item" id="etab-leave" onclick="empTab('leave')"><div class="tbi">🌴</div><span>申請假</span></div>
     <div class="tb-item" id="etab-status" onclick="empTab('status')"><div class="tbi">📋</div><span>假期狀態</span><span class="tb-badge" id="empLeaveBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-overtime" onclick="empTab('overtime')"><div class="tbi">⏰</div><span>加班</span><span class="tb-badge" id="empOTBadge" style="display:none">0</span></div>
     <div class="tb-item" id="etab-profile" onclick="empTab('profile')"><div class="tbi">👤</div><span>帳號</span></div>
   </div>
 </div>
@@ -586,6 +587,32 @@ body.admin-mode > #adminScreen{
   </div>
 </div>
 
+<!-- Overtime Application Sheet -->
+<div class="overlay" id="overtimeSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hd"><div class="sh-title">⏰ 申請加班</div><button class="sh-close" onclick="closeSheet('overtimeSheet')">✕</button></div>
+    <div class="sh-body" id="overtimeFormBody"></div>
+    <div class="sh-btns two">
+      <button class="sbtn cancel" onclick="closeSheet('overtimeSheet')">取消</button>
+      <button class="sbtn confirm" onclick="submitOvertime()">📤 送出申請</button>
+    </div>
+  </div>
+</div>
+
+<!-- OT Review Sheet -->
+<div class="overlay" id="otReviewSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hd"><div class="sh-title">⏰ 審核加班申請</div><button class="sh-close" onclick="closeSheet('otReviewSheet')">✕</button></div>
+    <div class="sh-body" id="otReviewBody"></div>
+    <div class="sh-btns two">
+      <button class="sbtn cancel" onclick="doOTReview('rejected')" style="background:#ffe4e4;color:var(--pd);border:1.5px solid #ffb3b3">❌ 拒絕</button>
+      <button class="sbtn confirm" onclick="doOTReview('approved')">✅ 核准</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="makeupGpsSheet">
   <div class="sheet">
     <div class="sh-handle"></div>
@@ -625,7 +652,7 @@ body.admin-mode > #adminScreen{
 // ══════════════════════════════════════════════════
 const WDAY=['日','一','二','三','四','五','六'];
 const RULE_LABEL={subtract:'直接相減',deduct_lunch:'扣午休1h',deduct_both:'扣午休+晚餐'};
-const LEAVE_LABEL={annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'};
+const LEAVE_LABEL={annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假',menstrual:'生理假',maternity:'產假',paternity:'陪產假',parental:'育嬰留職停薪',makeup:'補休'};
 const COMPANY_DEFAULTS={lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
 
 var LS={
@@ -768,6 +795,7 @@ function empTab(tab){
   else if(tab==='leave') renderLeaveList(s);
   else if(tab==='status') renderLeaveStatus(s);
   else if(tab==='quota') renderQuota(s);
+  else if(tab==='overtime') renderOvertimeSection(s);
   else if(tab==='profile') renderEmpProfile(s);
   updateEmpBadge();
 }
@@ -779,6 +807,10 @@ function updateEmpBadge(){
   const p=leavePending+makeupPending;
   const b=document.getElementById('empLeaveBadge');
   if(b){b.style.display=p?'inline':'none';b.textContent=p;}
+  // OT badge
+  const otPending=(window.getOvertimeApps?window.getOvertimeApps():DB.otas||[]).filter(function(a){return a.empId===currentUser.id&&a.status==='pending';}).length;
+  const ob=document.getElementById('empOTBadge');
+  if(ob){ob.style.display=otPending?'inline':'none';ob.textContent=otPending;}
 }
 
 // ── Employee Clock ─────────────────────────────────
@@ -1299,7 +1331,10 @@ function updateAdminBadge(){
     if(a.status==='sup_approved'&&isHR) return true;
     return false;
   }).length;
-  const p=lp+mp;
+  const op=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){
+    return a.status==='pending'&&a.supId===myId;
+  }).length;
+  const p=lp+mp+op;
   ['adminApproveBadge','adminApproveBadgeMobile'].forEach(function(id){
     const b=document.getElementById(id);
     if(b){b.style.display=p?'inline':'none';b.textContent=p;}
@@ -1324,6 +1359,9 @@ function renderAdminDashboard(s){
       if(a.status==='pending'&&a.supId===_myId) return true;
       if(a.status==='sup_approved'&&_isHR) return true;
       return false;
+    }).length
+    +(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){
+      return a.status==='pending'&&a.supId===_myId;
     }).length;
   const now=new Date();
 
@@ -1538,6 +1576,48 @@ function renderApprove(s){
           +'</div>';
       });
     }
+    html+='</div>';
+  }
+
+  // ── 加班申請審核 ──
+  var myOT=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){
+    return a.status==='pending'&&a.supId===myId;
+  });
+  var doneOT=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.status==='approved'||a.status==='rejected';});
+  html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x23F0; 加班申請（'+myOT.length+'）</span></div>'
+    +'<div class="card fu">';
+  if(!myOT.length){
+    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審加班申請</div>';
+  } else {
+    myOT.forEach(function(a){
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)">&#x23F0;</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+a.empName+' &#x2014; 加班申請</div>'
+        +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
+        +'<div class="lr-sub" style="color:var(--t3)">'+(a.reason||'--')+'</div>'
+        +'</div>'
+        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview(\''+a.id+'\')">審核</button>'
+        +'</div>';
+    });
+  }
+  html+='</div>';
+  if(doneOT.length){
+    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F4C1; 已完成加班（'+doneOT.length+'）</span></div>'
+      +'<div class="card fu fu2">';
+    doneOT.slice(0,10).forEach(function(a){
+      var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+      var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x23F0;</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+a.empName+' — 加班</div>'
+        +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
+        +(a.supNote?'<div class="lr-sub">備註：'+a.supNote+'</div>':'')
+        +'</div>'
+        +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+        +'</div>';
+    });
     html+='</div>';
   }
 
@@ -1810,6 +1890,21 @@ function openEditEmp(empId){
     +'<div class="fg"><label>月薪</label><input type="number" id="ee_sal" value="'+emp.salary+'"></div>'
     +'<div class="fg"><label>Email</label><input type="email" id="ee_email" value="'+(emp.email||'')+'"></div>'
     +'</div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>生日</label><input type="date" id="ee_birth" value="'+(emp.birthDate||'')+'"></div>'
+    +'<div class="fg"><label>到職日</label><input type="date" id="ee_hire" value="'+(emp.hireDate||'')+'" onchange="window.showSeniorityHint(this.value)"></div>'
+    +'</div>'
+    +'<div id="seniorityHint" style="display:'+(emp.hireDate?'block':'none')+';background:var(--pl);border-radius:8px;padding:7px 12px;font-size:11px;color:var(--pd);margin-bottom:8px">🌴 依年資建議特休：<strong id="seniorityDays">'+(emp.hireDate?window.calcSeniorityLeave?window.calcSeniorityLeave(emp.hireDate):'-':'-')+'</strong> 天</div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>手機</label><input type="tel" id="ee_phone" value="'+(emp.phone||'')+'"></div>'
+    +'<div class="fg"><label>性別</label><select id="ee_gender"><option value="">未設定</option><option value="M"'+(emp.gender==='M'?' selected':'')+'>男</option><option value="F"'+(emp.gender==='F'?' selected':'')+'>女</option><option value="other"'+(emp.gender==='other'?' selected':'')+'>其他</option></select></div>'
+    +'</div>'
+    +'<div class="fg"><label>合約型態</label><select id="ee_contract"><option value="full_time"'+(emp.contractType==='full_time'||!emp.contractType?' selected':'')+'>全職</option><option value="part_time"'+(emp.contractType==='part_time'?' selected':'')+'>兼職</option><option value="contract"'+(emp.contractType==='contract'?' selected':'')+'>約聘</option></select></div>'
+    +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;margin-bottom:8px">'
+    +'<div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:8px">🆘 緊急聯絡人</div>'
+    +'<div class="fr2"><div class="fg" style="margin:0"><label>姓名</label><input id="ee_ename" value="'+(emp.emergencyName||'')+'" placeholder="緊急聯絡人姓名"></div>'
+    +'<div class="fg" style="margin:0"><label>電話</label><input type="tel" id="ee_ephone" value="'+(emp.emergencyPhone||'')+'" placeholder="緊急聯絡電話"></div></div>'
+    +'</div>'
     +'<div class="fg"><label>直屬主管</label><select id="ee_sup">'+supOptions+'</select></div>'
     +'<div class="fg"><label>工時計算規則</label>'
     +'<select id="ee_rule">'
@@ -1820,6 +1915,7 @@ function openEditEmp(empId){
     +'<div class="fg"><label>角色權限</label>'
     +'<select id="ee_role">'
     +'<option value="employee"'+(acc&&acc.role==='employee'?' selected':'')+'>👤 員工</option>'
+    +'<option value="manager"'+(acc&&acc.role==='manager'?' selected':'')+'>👔 主管</option>'
     +'<option value="admin"'+(acc&&acc.role==='admin'?' selected':'')+'>⚙️ 管理員</option>'
     +'</select></div>'
     +'<div class="fg"><label>員工狀態</label>'
@@ -1890,9 +1986,32 @@ function openAddEmp(){
       <div class="fg"><label>月薪</label><input type="number" id="ne_sal" placeholder="月薪"></div>
       <div class="fg"><label>Email</label><input type="email" id="ne_email" placeholder="Email"></div>
     </div>
+    <div class="fr2">
+      <div class="fg"><label>生日</label><input type="date" id="ne_birth"></div>
+      <div class="fg"><label>到職日</label><input type="date" id="ne_hire"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>手機</label><input type="tel" id="ne_phone" placeholder="手機號碼"></div>
+      <div class="fg"><label>性別</label>
+        <select id="ne_gender">
+          <option value="">不填寫</option>
+          <option value="M">男</option>
+          <option value="F">女</option>
+          <option value="other">其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>合約型態</label>
+      <select id="ne_contract">
+        <option value="full_time">全職</option>
+        <option value="part_time">兼職</option>
+        <option value="contract">約聘</option>
+      </select>
+    </div>
     <div class="fg"><label>角色</label>
       <select id="ne_role">
         <option value="employee">👤 員工</option>
+        <option value="manager">👔 主管</option>
         <option value="admin">⚙️ 管理員</option>
       </select>
     </div>
@@ -2031,7 +2150,82 @@ function renderReports(s){
     +'<button onclick="loadReport()" style="padding:10px 28px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">&#x1F50D; 查詢</button>'
     +'</div>'
     +'</div>'
-    +'<div id="reportResult"></div>';
+    +'<div id="reportResult"></div>'
+    // ── 假別餘額報表 ──
+    +'<div class="pc-page-header" style="margin-top:24px">'
+    +'<div><div class="pc-page-title" style="font-size:17px">🎯 假別餘額一覽</div><div class="pc-page-sub">各員工今年可用假別天數</div></div>'
+    +'</div>'
+    +'<div class="pc-section" style="overflow-x:auto">'
+    +'<div id="leaveBalanceReport"></div>'
+    +'</div>'
+    // ── 加班申請紀錄 ──
+    +'<div class="pc-page-header" style="margin-top:24px">'
+    +'<div><div class="pc-page-title" style="font-size:17px">⏰ 加班申請紀錄</div><div class="pc-page-sub">所有加班申請狀態</div></div>'
+    +'</div>'
+    +'<div class="pc-section">'
+    +'<div id="otReport"></div>'
+    +'</div>';
+  // 渲染假別餘額
+  (function(){
+    var KEYS=['annual','sick','personal','menstrual','maternity','paternity','makeup'];
+    var LABELS={annual:'特休',sick:'病假',personal:'事假',menstrual:'生理假',maternity:'產假',paternity:'陪產假',makeup:'補休'};
+    var allLeaves=window.getApps?window.getApps():[];
+    var html='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr><th style="text-align:left;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">員工</th>'
+      +KEYS.map(function(k){return '<th style="text-align:center;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">'+LABELS[k]+'</th>';}).join('')
+      +'</tr></thead><tbody>';
+    emps.forEach(function(emp){
+      var q=window.getEmpQuota?window.getEmpQuota(emp.id):(window.getQuota?window.getQuota():{});
+      html+='<tr>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);font-weight:600">'+emp.name+'<div style="font-size:10px;color:var(--t3)">'+emp.dept+'</div></td>';
+      KEYS.forEach(function(k){
+        var total=q[k]||0;
+        var used=allLeaves.filter(function(a){return a.empId===emp.id&&a.type===k&&(a.status==='approved'||a.status==='pending'||a.status==='sup_approved');}).reduce(function(s,a){return s+(a.days||0);},0);
+        var rem=total-used;
+        var color=rem<=0?'var(--pd)':rem<=3?'var(--orange)':'var(--green)';
+        html+='<td style="text-align:center;padding:8px;border-bottom:1px solid var(--bg)">'
+          +'<span style="font-family:Nunito,sans-serif;font-size:14px;font-weight:800;color:'+color+'">'+rem+'</span>'
+          +'<span style="font-size:9px;color:var(--t3)">/'+total+'</span></td>';
+      });
+      html+='</tr>';
+    });
+    html+='</tbody></table>';
+    var el=document.getElementById('leaveBalanceReport');
+    if(el) el.innerHTML=html;
+  })();
+  // 渲染加班申請紀錄
+  (function(){
+    var otas=window.getOvertimeApps?window.getOvertimeApps():[];
+    if(!otas.length){
+      var el2=document.getElementById('otReport');
+      if(el2) el2.innerHTML='<div style="text-align:center;padding:16px;color:var(--t3)">尚無加班申請記錄</div>';
+      return;
+    }
+    var html2='<table style="width:100%;border-collapse:collapse;font-size:12px">'
+      +'<thead><tr>'
+      +'<th style="text-align:left;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">員工</th>'
+      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">日期</th>'
+      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">時間</th>'
+      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">時數</th>'
+      +'<th style="padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">狀態</th>'
+      +'<th style="text-align:left;padding:8px;background:var(--bg);border-bottom:2px solid var(--border)">原因</th>'
+      +'</tr></thead><tbody>';
+    otas.forEach(function(a){
+      var sc=a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='cancelled'?'#999':'var(--blue)';
+      var sl=a.status==='approved'?'✅ 核准':a.status==='rejected'?'❌ 拒絕':a.status==='cancelled'?'取消':'⏳ 待審';
+      html2+='<tr>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);font-weight:600">'+a.empName+'</td>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center">'+a.date+'</td>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center">'+a.startTime+'~'+a.endTime+'</td>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center;font-family:Nunito,sans-serif;font-weight:800;color:var(--orange)">'+a.hours.toFixed(1)+'h</td>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);text-align:center"><span style="color:'+sc+';font-weight:700">'+sl+'</span></td>'
+        +'<td style="padding:8px;border-bottom:1px solid var(--bg);color:var(--t2)">'+((a.reason||'').slice(0,30))+'</td>'
+        +'</tr>';
+    });
+    html2+='</tbody></table>';
+    var el2=document.getElementById('otReport');
+    if(el2) el2.innerHTML=html2;
+  })();
 }
 
 function loadReport(){
@@ -2109,7 +2303,7 @@ function loadReport(){
 function renderSettings(s){
   const cfg=getCfg();
   const q=getQuota();
-  const qTypes=[{k:'annual',l:'🌴 特休假'},{k:'sick',l:'🤒 病假'},{k:'personal',l:'🎉 事假'},{k:'marriage',l:'💐 婚假'},{k:'funeral',l:'😢 喪假'},{k:'official',l:'🏛️ 公假'}];
+  const qTypes=[{k:'annual',l:'🌴 特休假'},{k:'sick',l:'🤒 病假'},{k:'personal',l:'🎉 事假'},{k:'marriage',l:'💐 婚假'},{k:'funeral',l:'😢 喪假'},{k:'official',l:'🏛️ 公假'},{k:'menstrual',l:'🌸 生理假'},{k:'maternity',l:'🤱 產假'},{k:'paternity',l:'👶 陪產假'},{k:'parental',l:'🌿 育嬰留職停薪'},{k:'makeup',l:'🔄 補休'}];
   s.innerHTML=`
   <div class="pc-page-header" style="margin-bottom:20px">
     <div><div class="pc-page-title">⚙️ 系統設定</div><div class="pc-page-sub">公司 GPS、工時規則、假期額度設定</div></div>
@@ -2290,7 +2484,7 @@ function saveSettings(){
   toast('✅','公司設定已儲存');
 }
 function saveQuota(){
-  const keys=['annual','sick','personal','marriage','funeral','official'];
+  const keys=['annual','sick','personal','marriage','funeral','official','menstrual','maternity','paternity','parental','makeup'];
   const q={};keys.forEach(k=>{q[k]=Number(document.getElementById('q_'+k)?.value)||0});
   LS.set('leaveQuota',q);toast('✅','假期額度已儲存');
 }
@@ -2501,6 +2695,11 @@ function openLeaveSheet(){
     +'<option value="marriage">&#x1F490; 婚假</option>'
     +'<option value="funeral">&#x1F622; 喪假</option>'
     +'<option value="official">&#x1F3DB; 公假</option>'
+    +'<option value="menstrual">&#x1F338; 生理假</option>'
+    +'<option value="maternity">&#x1F931; 產假</option>'
+    +'<option value="paternity">&#x1F476; 陪產假</option>'
+    +'<option value="parental">&#x1F331; 育嬰留職停薪</option>'
+    +'<option value="makeup">&#x1F504; 補休</option>'
     +'</select></div>'
     +'<div class="fr2">'
     +'<div class="fg"><label>開始日期</label><input type="date" id="lStart" value="'+today+'"></div>'
@@ -3108,10 +3307,11 @@ window.escapeHtml=escapeHtml;
 // ── In-memory cache ───────────────────────────────
 var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],holidays:{},quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
 
-function toEmp(e){return{id:e.id,name:e.name,dept:e.dept||'',pos:e.pos||'',workRule:e.work_rule||'deduct_lunch',salary:e.salary||0,email:e.email||'',color:e.color||'#5046e0',supervisorId:e.supervisor_id||'',role:e.role||'employee',status:e.status||'active'};}
+function toEmp(e){return{id:e.id,name:e.name,dept:e.dept||'',pos:e.pos||'',workRule:e.work_rule||'deduct_lunch',salary:e.salary||0,email:e.email||'',color:e.color||'#5046e0',supervisorId:e.supervisor_id||'',role:e.role||'employee',status:e.status||'active',birthDate:e.birth_date||'',hireDate:e.hire_date||'',contractType:e.contract_type||'full_time',gender:e.gender||'',phone:e.phone||'',emergencyName:e.emergency_contact_name||'',emergencyPhone:e.emergency_contact_phone||''};}
 function toRec(r){return{date:r.date,empId:r.emp_id,in:r.time_in||null,out:r.time_out||null,gpsIn:r.gps_in||null,gpsOut:r.gps_out||null};}
 function toLea(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',type:a.type||'',startDate:a.start_date||'',endDate:a.end_date||'',days:a.days||0,reason:a.reason||'',proxy:a.proxy||'',supId:a.sup_id||'',attachName:a.attach_name||'',attachData:a.attach_data||'',status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||'',managerNote:a.sup_note||''};}
 function toMkp(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',date:a.date||'',punchType:a.punch_type||'',punchTime:a.punch_time||'',supId:a.sup_id||'',reason:a.reason||'',gps:a.gps||null,status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||''};}
+function toOTA(a){return{id:a.id,empId:a.emp_id||'',empName:a.emp_name||'',date:a.date||'',startTime:a.start_time||'',endTime:a.end_time||'',hours:parseFloat(a.hours)||0,reason:a.reason||'',supId:a.sup_id||'',status:a.status||'pending',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',appliedAt:a.applied_at||''};}
 
 function loadAllData(){
   // 只抓最近 3 個月打卡記錄，防止資料量無限成長
@@ -3126,19 +3326,21 @@ function loadAllData(){
     sbq('leave_quota',{select:'*'}),
     sbq('company_settings',{select:'*'}),
     sbq('holidays',{select:'*',order:'date.asc'}).catch(function(){return [];}),
-    sbq('emp_leave_quota',{select:'*'}).catch(function(){return [];})
+    sbq('emp_leave_quota',{select:'*'}).catch(function(){return [];}),
+    sbq('overtime_apps',{select:'*',order:'applied_at.desc'}).catch(function(){return [];})
   ]).then(function(res){
-    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[],empQRows=res[7]||[];
+    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[],empQRows=res[7]||[],otRows=res[8]||[];
     DB.emps=emps.map(toEmp);
     DB.accs=emps.map(function(e){return{id:e.id,pw:e.password_hash,role:e.role||'employee'};});
     DB.recs=recs.map(toRec);
     DB.leaves=leaves.map(toLea);
     DB.makeups=makeups.map(toMkp);
     var q=qRows[0]||{};
-    DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0};
+    DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0,menstrual:q.menstrual!=null?q.menstrual:1,maternity:q.maternity!=null?q.maternity:56,paternity:q.paternity!=null?q.paternity:7,parental:q.parental||0,makeup:q.makeup||0};
     // 個人假別額度（若無記錄則沿用全公司預設）
     DB.empQuota={};
     empQRows.forEach(function(r){DB.empQuota[r.emp_id]=r;});
+    DB.otas=otRows.map(toOTA);
     var cfg=cfgRows[0]||{};
     DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[]};
     window.OFFICES=buildOffices(DB.cfg);
@@ -3198,13 +3400,14 @@ window.getAccounts=function(){return DB.accs||[];};
 window.getRecs=function(){return DB.recs||[];};
 window.getApps=function(){return DB.leaves||[];};
 window.getMakeupApps=function(){return DB.makeups||[];};
+window.getOvertimeApps=function(){return DB.otas||[];};
 window.getQuota=function(){return DB.quota||{};};
 // 取得某員工的假別額度（個人設定優先，未設定欄位沿用全公司預設）
 window.getEmpQuota=function(empId){
   var global=window.getQuota();
   var over=DB.empQuota&&DB.empQuota[empId];
   if(!over) return global;
-  var KEYS=['annual','sick','personal','marriage','funeral','official'];
+  var KEYS=['annual','sick','personal','marriage','funeral','official','menstrual','maternity','paternity','parental','makeup'];
   var r={};
   KEYS.forEach(function(k){r[k]=(over[k]!=null&&over[k]>=0)?over[k]:global[k];});
   return r;
@@ -3384,15 +3587,20 @@ window.confirmPunch=function(){
 
 // ── Override saveEmp ──────────────────────────────
 window.saveEmp=function(empId){
-  console.log('[saveEmp] called with empId='+empId);
   var newPw=document.getElementById('ee_pw')?document.getElementById('ee_pw').value:'';
-  console.log('[saveEmp] ee_name='+(document.getElementById('ee_name')?document.getElementById('ee_name').value:'NOT FOUND'));
   var d={name:document.getElementById('ee_name').value,dept:document.getElementById('ee_dept').value,
     pos:document.getElementById('ee_pos').value,salary:Number(document.getElementById('ee_sal').value)||0,
     email:document.getElementById('ee_email').value,work_rule:document.getElementById('ee_rule').value,
     supervisor_id:(document.getElementById('ee_sup')?document.getElementById('ee_sup').value:'')||'',
     role:document.getElementById('ee_role').value,
-    status:document.getElementById('ee_status')?document.getElementById('ee_status').value:'active'};
+    status:document.getElementById('ee_status')?document.getElementById('ee_status').value:'active',
+    birth_date:document.getElementById('ee_birth')?document.getElementById('ee_birth').value||null:null,
+    hire_date:document.getElementById('ee_hire')?document.getElementById('ee_hire').value||null:null,
+    contract_type:document.getElementById('ee_contract')?document.getElementById('ee_contract').value:'full_time',
+    gender:document.getElementById('ee_gender')?document.getElementById('ee_gender').value:'',
+    phone:document.getElementById('ee_phone')?document.getElementById('ee_phone').value:'',
+    emergency_contact_name:document.getElementById('ee_ename')?document.getElementById('ee_ename').value:'',
+    emergency_contact_phone:document.getElementById('ee_ephone')?document.getElementById('ee_ephone').value:''};
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
     console.log('[saveEmp] calling sbupd id='+empId+' data='+JSON.stringify(d));
@@ -3441,6 +3649,11 @@ window.doAddEmp=function(){
       supervisor_id:gv('ne_sup')||'',
       role:gv('ne_role'),
       status:'active',
+      birth_date:gv('ne_birth')||null,
+      hire_date:gv('ne_hire')||null,
+      contract_type:gv('ne_contract')||'full_time',
+      gender:gv('ne_gender')||'',
+      phone:gv('ne_phone')||'',
       color:colors[(DB.emps||[]).length%colors.length],password_hash:hash});
   }).then(function(res){
     if(!res){errEl.textContent='⚠️ 新增失敗，請檢查網路連線或工號是否重複';errEl.style.display='block';return Promise.reject(new Error('insert failed'));}
@@ -3493,7 +3706,7 @@ window.saveSettings=function(){
 
 // ── Override saveQuota ────────────────────────────
 window.saveQuota=function(){
-  var keys=['annual','sick','personal','marriage','funeral','official'];
+  var keys=['annual','sick','personal','marriage','funeral','official','menstrual','maternity','paternity','parental','makeup'];
   var row={id:1};
   keys.forEach(function(k){row[k]=Number(document.getElementById('q_'+k)?document.getElementById('q_'+k).value:0)||0;});
   sbups('leave_quota',row,'id').then(function(){return loadAllData();}).then(function(){toast('✅','假期額度已儲存');});
@@ -3522,9 +3735,20 @@ window.submitLeave=function(){
   while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
   var supEmp=getEmpById(supId);
   function saveLeave(attachData){
+    // 快照申請當下假別餘額（Phase 1.5 法遵要求）
+    var balSnap={};
+    try{
+      var q2=window.getEmpQuota?window.getEmpQuota(window.currentUser.id):window.getQuota();
+      var allLeaves=getApps().filter(function(a){return a.empId===window.currentUser.id&&(a.status==='pending'||a.status==='sup_approved'||a.status==='approved');});
+      ['annual','sick','personal','marriage','funeral','official','menstrual','maternity','paternity','parental','makeup'].forEach(function(k){
+        var used=allLeaves.filter(function(a){return a.type===k;}).reduce(function(s,a){return s+(a.days||0);},0);
+        balSnap[k]=(q2[k]||0)-used;
+      });
+    }catch(e){console.warn('[submitLeave] balance snapshot error',e);}
     sbins('leave_apps',{id:'LA'+Date.now(),emp_id:window.currentUser.id,emp_name:emp?emp.name:window.currentUser.id,
       type:type,start_date:start,end_date:end,days:days,reason:reason,proxy:proxy,sup_id:supId,
-      attach_name:file?file.name:'',attach_data:attachData||'',status:'pending',stage:'sup',applied_at:new Date().toISOString()})
+      attach_name:file?file.name:'',attach_data:attachData||'',status:'pending',stage:'sup',
+      balance_at_apply:balSnap,applied_at:new Date().toISOString()})
     .then(function(){return loadAllData();}).then(function(){
       closeSheet('leaveSheet');
       if(supEmp&&supEmp.email){
@@ -3566,7 +3790,7 @@ window.submitLeave=function(){
 // ── 取消送審 ──────────────────────────────────────
 window.cancelLeaveApp=function(id){
   if(!confirm('確定要取消這筆假期申請嗎？')) return;
-  sbups('leave_apps',{status:'cancelled'},{'id':id})
+  sbupd('leave_apps',{status:'cancelled'},{id:id})
     .then(function(){return loadAllData();})
     .then(function(){
       toast('✅','申請已取消');
@@ -3576,7 +3800,7 @@ window.cancelLeaveApp=function(id){
 };
 window.cancelMakeupApp=function(id){
   if(!confirm('確定要取消這筆補打卡申請嗎？')) return;
-  sbups('makeup_apps',{status:'cancelled'},{'id':id})
+  sbupd('makeup_apps',{status:'cancelled'},{id:id})
     .then(function(){return loadAllData();})
     .then(function(){
       toast('✅','申請已取消');
@@ -3753,12 +3977,17 @@ window.confirmMakeupGps=function(){
 
 // ── Leave Management ──────────────────────────────
 var LEAVE_TYPES=[
-  {key:'annual',icon:'🌴',label:'特休假',color:'var(--green)'},
-  {key:'sick',  icon:'🤒',label:'病假',  color:'var(--blue)'},
-  {key:'personal',icon:'🎉',label:'事假',color:'var(--orange)'},
-  {key:'marriage',icon:'💐',label:'婚假',color:'var(--pink)'},
-  {key:'funeral',icon:'😢',label:'喪假', color:'#999'},
-  {key:'official',icon:'🏛️',label:'公假',color:'#777'}
+  {key:'annual',   icon:'🌴',label:'特休假',       color:'var(--green)'},
+  {key:'sick',     icon:'🤒',label:'病假',          color:'var(--blue)'},
+  {key:'personal', icon:'🎉',label:'事假',          color:'var(--orange)'},
+  {key:'marriage', icon:'💐',label:'婚假',          color:'var(--pink)'},
+  {key:'funeral',  icon:'😢',label:'喪假',          color:'#999'},
+  {key:'official', icon:'🏛️',label:'公假',          color:'#777'},
+  {key:'menstrual',icon:'🌸',label:'生理假',        color:'#e91e8c'},
+  {key:'maternity',icon:'🤱',label:'產假',          color:'#9c27b0'},
+  {key:'paternity',icon:'👶',label:'陪產假',        color:'#3f51b5'},
+  {key:'parental', icon:'🌿',label:'育嬰留職停薪',  color:'#607d8b'},
+  {key:'makeup',   icon:'🔄',label:'補休',          color:'#00838f'}
 ];
 
 window.renderLeaveManagement=function(s){
@@ -4072,7 +4301,8 @@ window.calcSalary = function() {
       // 薪資明細
       + '<div style="background:var(--bg);border-radius:12px;padding:14px">'
       + '<div style="font-size:12px;font-weight:700;color:var(--t2);margin-bottom:10px">📋 薪資明細</div>'
-      + salRow('本月底薪', row.baseSalary, 'var(--text)')
+      + (row.baseSalary>0&&row.baseSalary<28590?'<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:8px;padding:7px 10px;font-size:11px;color:#856404;margin-bottom:8px">⚠️ 底薪 $'+row.baseSalary.toLocaleString()+' 低於 2026 年法定最低工資 $28,590，請確認是否符合勞基法規定</div>':'')
+      + salRow('本月底薪', row.baseSalary, row.baseSalary>0&&row.baseSalary<28590?'#cc0000':'var(--text)')
       + salRow('日薪基數（÷'+row.scheduledDays+'天）', row.dailyRate, 'var(--t3)')
       + (row.otHoursNormal>0?salRow('平日加班費（前2h×1.34，後×1.67）', row.otPay-(row.otHoursHoliday*(row.dailyRate/8)*2), 'var(--orange)'):'')
       + (row.otHoursHoliday>0?salRow('假日出勤費（'+row.otHoursHoliday.toFixed(1)+'h×2.0）', row.otHoursHoliday*(row.dailyRate/8)*2, 'var(--orange)'):'')
@@ -4383,6 +4613,236 @@ window.deleteHoliday=function(id){
 // Called from dynamically generated buttons
 window._editEmp = function(id){ window.openEditEmp(id); };
 window._addEmp  = function(){ openAddEmp(); };
+
+// ══════════════════════════════════════════════════
+//  OVERTIME MODULE
+// ══════════════════════════════════════════════════
+
+// 員工加班頁面
+window.renderOvertimeSection=function(s){
+  var empId=window.currentUser.id;
+  var emp=window.currentUser.empData;
+  var otas=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.empId===empId;});
+  // 本月加班時數（已核准）
+  var now=new Date();
+  var ym=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  var monthApproved=otas.filter(function(a){return a.status==='approved'&&a.date&&a.date.slice(0,7)===ym;});
+  var monthHours=monthApproved.reduce(function(s,a){return s+a.hours;},0);
+  var warn46=monthHours>40; // 接近46小時上限時警示
+
+  var html='<div class="card" style="background:var(--grad);color:#fff;border-radius:var(--r);margin-bottom:4px">'
+    +'<div style="font-size:12px;opacity:.8;margin-bottom:4px">本月已核准加班</div>'
+    +'<div style="font-family:Nunito,sans-serif;font-size:32px;font-weight:900">'+monthHours.toFixed(1)+'<span style="font-size:14px;font-weight:400;margin-left:4px">h</span></div>'
+    +(warn46?'<div style="background:rgba(255,200,0,.2);border-radius:8px;padding:5px 9px;font-size:11px;margin-top:8px">⚠️ 本月已逾40h，請注意勞基法第32條每月46h上限</div>':'')
+    +'</div>'
+    +'<div class="card" onclick="openOvertimeSheet()" style="cursor:pointer;display:flex;align-items:center;gap:12px;border:1.5px dashed var(--border)">'
+    +'<div style="width:40px;height:40px;border-radius:12px;background:var(--ol);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">⏰</div>'
+    +'<div><div style="font-size:13px;font-weight:700">申請加班</div>'
+    +'<div style="font-size:11px;color:var(--t3);margin-top:2px">需主管事前核准</div></div>'
+    +'<div style="margin-left:auto;color:var(--t3);font-size:18px">›</div></div>'
+    +'<div class="sec-title" style="margin-top:8px"><span>📋 我的加班申請</span></div>';
+
+  if(!otas.length){
+    html+='<div class="card" style="text-align:center;padding:20px;color:var(--t3);font-size:13px">尚無加班申請記錄</div>';
+  } else {
+    html+='<div class="card" style="padding:0;overflow:hidden">';
+    otas.slice(0,20).forEach(function(a){
+      var stColor=a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='cancelled'?'#999':'var(--blue)';
+      var stLabel=a.status==='approved'?'✅ 已核准':a.status==='rejected'?'❌ 已拒絕':a.status==='cancelled'?'取消':'⏳ 待審核';
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)">⏰</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+a.date+' '+a.startTime+'~'+a.endTime+'</div>'
+        +'<div class="lr-sub" style="color:var(--orange);font-weight:700">'+a.hours.toFixed(1)+'h 加班</div>'
+        +'<div class="lr-sub">'+(a.reason||'--')+'</div>'
+        +(a.supNote?'<div class="lr-sub">主管備註：'+a.supNote+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
+        +'<span class="bgg" style="background:'+stColor+'22;color:'+stColor+'">'+stLabel+'</span>'
+        +(a.status==='pending'?'<button onclick="window.cancelOTApp(\''+a.id+'\')" style="padding:2px 7px;border:1px solid #cc0000;border-radius:6px;background:#fff5f5;color:#cc0000;font-size:10px;font-weight:700;cursor:pointer">取消</button>':'')
+        +'</div>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
+  s.innerHTML=html;
+};
+
+// 開啟加班申請 sheet
+window.openOvertimeSheet=function(){
+  var today=new Date().toISOString().slice(0,10);
+  var emp=window.currentUser.empData;
+  var emps=window.getEmps().filter(function(e){return e.id!==window.currentUser.id;});
+  var defaultSup=emp?emp.supervisorId||'':'';
+  var supOptions=emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===defaultSup?' selected':'')+'>'+e.name+' ('+e.dept+')</option>';}).join('');
+  document.getElementById('overtimeFormBody').innerHTML=
+    '<div class="fg"><label>加班日期</label><input type="date" id="ot_date" value="'+today+'"></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>開始時間</label><input type="time" id="ot_start" value="18:00"></div>'
+    +'<div class="fg"><label>結束時間</label><input type="time" id="ot_end" value="20:00"></div>'
+    +'</div>'
+    +'<div class="fg" id="ot_hours_hint" style="background:var(--pl);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--pd)">預計加班時數：<strong id="ot_hours_val">2.0</strong> 小時</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="ot_sup"><option value="">-- 請選擇主管 --</option>'+supOptions+'</select></div>'
+    +'<div class="fg"><label>加班原因</label><textarea id="ot_reason" placeholder="請說明加班事由..." style="min-height:80px"></textarea></div>'
+    +'<div id="otFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px"></div>';
+  // 即時計算時數
+  setTimeout(function(){
+    function calcOtHours(){
+      var s2=document.getElementById('ot_start'),e2=document.getElementById('ot_end');
+      if(!s2||!e2) return;
+      var sm=s2.value.split(':'),em=e2.value.split(':');
+      if(sm.length<2||em.length<2) return;
+      var h=(parseInt(em[0])*60+parseInt(em[1]))-(parseInt(sm[0])*60+parseInt(sm[1]));
+      var hVal=document.getElementById('ot_hours_val');
+      if(hVal) hVal.textContent=(h>0?(h/60).toFixed(1):'0.0');
+    }
+    var st=document.getElementById('ot_start'),et=document.getElementById('ot_end');
+    if(st) st.addEventListener('change',calcOtHours);
+    if(et) et.addEventListener('change',calcOtHours);
+  },50);
+  openSheet('overtimeSheet');
+};
+
+// 送出加班申請
+window.submitOvertime=function(){
+  var date=document.getElementById('ot_date')?document.getElementById('ot_date').value:'';
+  var start=document.getElementById('ot_start')?document.getElementById('ot_start').value:'';
+  var end=document.getElementById('ot_end')?document.getElementById('ot_end').value:'';
+  var supId=(document.getElementById('ot_sup')?document.getElementById('ot_sup').value:'')||'';
+  var reason=(document.getElementById('ot_reason')?document.getElementById('ot_reason').value:'').trim();
+  var errEl=document.getElementById('otFormErr');
+  if(!date){errEl.textContent='⚠️ 請選擇日期';errEl.style.display='block';return;}
+  if(!start||!end){errEl.textContent='⚠️ 請填寫時間';errEl.style.display='block';return;}
+  if(start>=end){errEl.textContent='⚠️ 結束時間必須晚於開始時間';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫加班原因';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  // 計算時數（分鐘差 / 60）
+  var sm=start.split(':'),em=end.split(':');
+  var mins=(parseInt(em[0])*60+parseInt(em[1]))-(parseInt(sm[0])*60+parseInt(sm[1]));
+  var hours=Math.round(mins/60*100)/100;
+  // 46h 上限警示
+  var nowD=new Date(),ym=date.slice(0,7);
+  var existH=(window.getOvertimeApps?window.getOvertimeApps():[])
+    .filter(function(a){return a.empId===window.currentUser.id&&(a.status==='pending'||a.status==='approved')&&a.date&&a.date.slice(0,7)===ym;})
+    .reduce(function(s,a){return s+a.hours;},0);
+  if(existH+hours>46){
+    if(!confirm('⚠️ 申請後本月加班時數將超過 46 小時（勞基法第32條上限），確定要繼續送出？')) return;
+  }
+  var emp=window.currentUser.empData;
+  sbins('overtime_apps',{
+    id:'OT'+Date.now(),
+    emp_id:window.currentUser.id,
+    emp_name:emp?emp.name:window.currentUser.id,
+    date:date,start_time:start,end_time:end,hours:hours,
+    reason:reason,sup_id:supId,status:'pending',
+    applied_at:new Date().toISOString()
+  }).then(function(){return loadAllData();}).then(function(){
+    closeSheet('overtimeSheet');
+    toast('✅','加班申請已送出！');
+    empTab('overtime');
+    updateEmpBadge();
+    // 通知主管
+    var supEmp=window.getEmpById(supId);
+    if(supEmp&&supEmp.email){
+      var pendingOTs=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.supId===supId&&a.status==='pending';});
+      var body2='您好，\n\n'+emp.name+' 申請加班核准，請審核。\n加班日期：'+date+' '+start+'~'+end+' ('+hours.toFixed(1)+'h)\n原因：'+reason;
+      if(pendingOTs.length>1) body2+='\n\n您目前共有 '+pendingOTs.length+' 筆待審加班申請。';
+      var a2=document.createElement('a');
+      a2.href='mailto:'+encodeURIComponent(supEmp.email)
+        +'?subject='+encodeURIComponent('[加班申請] '+emp.name+' '+date)
+        +'&body='+encodeURIComponent(body2);
+      a2.style.display='none';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+    }
+  }).catch(function(err){
+    console.error('[submitOvertime]',err);
+    errEl.textContent='⚠️ 送出失敗，請重試';errEl.style.display='block';
+  });
+};
+
+// 取消加班申請
+window.cancelOTApp=function(id){
+  if(!confirm('確定要取消此加班申請嗎？')) return;
+  sbupd('overtime_apps',{status:'cancelled'},{id:id})
+    .then(function(){return loadAllData();})
+    .then(function(){toast('✅','加班申請已取消');empTab('overtime');updateEmpBadge();});
+};
+
+// 主管審核加班申請（打開審核 sheet）
+window.openOTReview=function(id){
+  var a=(window.getOvertimeApps?window.getOvertimeApps():[]).find(function(x){return x.id===id;});
+  if(!a) return;
+  window._reviewingOTId=id;
+  var empEmp=window.getEmpById(a.empId||'');
+  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
+    +'<div>&#x1F464; <strong>'+(a.empName||'')+'</strong>'+(empEmp?' — '+empEmp.dept:'')+'</div>'
+    +'<div>&#x1F4C5; '+a.date+'</div>'
+    +'<div>&#x23F0; 加班時間：'+a.startTime+' ~ '+a.endTime+' （<strong style="color:var(--orange)">'+a.hours.toFixed(1)+'h</strong>）</div>'
+    +'<div>&#x1F4DD; 原因：'+(a.reason||'--')+'</div>'
+    +'<div>&#x1F4E5; 申請時間：'+(a.appliedAt?a.appliedAt.slice(0,16):'')+'</div>'
+    +'</div>';
+  // 本月累計提示
+  var ym=a.date?a.date.slice(0,7):'';
+  if(ym){
+    var empMonthH=(window.getOvertimeApps?window.getOvertimeApps():[])
+      .filter(function(x){return x.empId===a.empId&&(x.status==='approved'||x.status==='pending')&&x.date&&x.date.slice(0,7)===ym&&x.id!==id;})
+      .reduce(function(s,x){return s+x.hours;},0);
+    var afterApprove=empMonthH+a.hours;
+    var cap46Color=afterApprove>46?'#cc0000':'var(--t2)';
+    body+='<div style="background:var(--bg);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">'
+      +'&#x1F4CA; 本月其他加班：'+empMonthH.toFixed(1)+'h，核准後合計：<strong style="color:'+cap46Color+'">'+afterApprove.toFixed(1)+'h</strong>'
+      +(afterApprove>46?' <span style="color:#cc0000;font-weight:700">（超過法定上限46h！）</span>':'')+'</div>';
+  }
+  body+='<div class="fg"><label>審核備註（選填）</label><input id="otReviewNote" placeholder="備註說明..."></div>';
+  document.getElementById('otReviewBody').innerHTML=body;
+  openSheet('otReviewSheet');
+};
+
+// 執行加班審核動作
+window.doOTReview=function(status){
+  var id=window._reviewingOTId;
+  if(!id) return;
+  var note=(document.getElementById('otReviewNote')?document.getElementById('otReviewNote').value:'')||'';
+  sbupd('overtime_apps',{status:status,sup_note:note,sup_reviewed_at:new Date().toISOString()},{id:id})
+    .then(function(){return loadAllData();})
+    .then(function(){
+      closeSheet('otReviewSheet');
+      window._reviewingOTId=null;
+      toast(status==='approved'?'✅':'❌',status==='approved'?'加班申請已核准':'加班申請已拒絕');
+      renderApprove(document.getElementById('adminScroll'));
+      updateAdminBadge();
+    });
+};
+
+// ── 年資特休計算（勞基法第38條）────────────────────
+// 6個月=3天, 1年=7天, 2年=10天, 3年=14天, 4年=14天, 5年=15天,
+// 6~9年=15天, 10年+=min(30, 15+(years-10))
+window.calcSeniorityLeave=function(hireDate){
+  if(!hireDate) return 0;
+  var hire=new Date(hireDate);
+  var now=new Date();
+  var diffMs=now-hire;
+  if(diffMs<0) return 0;
+  var diffDays=diffMs/(1000*60*60*24);
+  var years=diffDays/365.25;
+  if(years<0.5) return 0;
+  if(years<1)   return 3;
+  if(years<2)   return 7;
+  if(years<3)   return 10;
+  if(years<5)   return 14;
+  if(years<10)  return 15;
+  return Math.min(30, 15+Math.floor(years-10));
+};
+
+window.showSeniorityHint=function(hireDate){
+  var hint=document.getElementById('seniorityHint');
+  var days=document.getElementById('seniorityDays');
+  if(!hint||!days) return;
+  if(!hireDate){hint.style.display='none';return;}
+  var d=window.calcSeniorityLeave(hireDate);
+  days.textContent=d;
+  hint.style.display='block';
+};
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
 window.seedData();
