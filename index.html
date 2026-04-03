@@ -445,6 +445,9 @@ body.admin-mode > #adminScreen{
         <div class="snav-item" id="snav-salary" onclick="adminTab('salary')">
           <span class="snav-icon">💰</span><span>薪資管理</span>
         </div>
+        <div class="snav-item" id="snav-leaves" onclick="adminTab('leaves')">
+          <span class="snav-icon">🎯</span><span>假別管理</span>
+        </div>
         <div class="snav-item" id="snav-gps" onclick="adminTab('gps')">
           <span class="snav-icon">🗺️</span><span>GPS 地圖</span>
         </div>
@@ -475,6 +478,7 @@ body.admin-mode > #adminScreen{
     <div class="tb-item" id="atab-employees" onclick="adminTab('employees')"><div class="tbi">👥</div><span>員工</span></div>
     <div class="tb-item" id="atab-reports" onclick="adminTab('reports')"><div class="tbi">📊</div><span>報表</span></div>
     <div class="tb-item" id="atab-salary" onclick="adminTab('salary')"><div class="tbi">💰</div><span>薪資</span></div>
+    <div class="tb-item" id="atab-leaves" onclick="adminTab('leaves')"><div class="tbi">🎯</div><span>假別</span></div>
     <div class="tb-item" id="atab-settings" onclick="adminTab('settings')"><div class="tbi">⚙️</div><span>設定</span></div>
   </div>
 </div>
@@ -567,6 +571,21 @@ body.admin-mode > #adminScreen{
 </div>
 
 <!-- Makeup GPS Sheet -->
+<!-- 假別額度編輯 Sheet -->
+<div class="overlay" id="quotaEditSheet">
+  <div class="sheet">
+    <div class="sh-handle"></div>
+    <div class="sh-hd"><div class="sh-title" id="quotaEditTitle">🎯 設定假別額度</div><button class="sh-close" onclick="closeSheet('quotaEditSheet')">✕</button></div>
+    <div class="sh-body">
+      <div id="quotaEditBody"></div>
+    </div>
+    <div class="sh-btns two">
+      <button class="sbtn cancel" onclick="closeSheet('quotaEditSheet')">取消</button>
+      <button class="sbtn confirm" onclick="saveEmpQuota()">💾 儲存</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="makeupGpsSheet">
   <div class="sheet">
     <div class="sh-handle"></div>
@@ -1006,13 +1025,14 @@ function renderLeaveStatus(s){
   } else {
     apps.forEach(function(a,i){
       var supEmp=getEmpById(a.supId||'');
-      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s">'
+      var isCancelled=a.status==='cancelled';
+      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s'+(isCancelled?';opacity:.55':'')+';">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
         +'<div><div style="font-size:14px;font-weight:700">'+(LEAVE_LABEL[a.type]||a.type)+'</div>'
         +'<div style="font-size:11px;color:var(--t3);margin-top:2px">'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div></div>'
-        +leaveStatusBadge(a)
+        +(isCancelled?'<span class="bgg" style="background:#eee;color:#999">已取消</span>':leaveStatusBadge(a))
         +'</div>'
-        +leaveStageBar(a)
+        +(isCancelled?'':leaveStageBar(a))
         +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7;margin-top:6px">'
         +'<div>原因：'+a.reason+'</div>'
         +'<div>直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
@@ -1021,7 +1041,10 @@ function renderLeaveStatus(s){
         +(a.supNote?'<div style="color:var(--t3)">主管備註：'+a.supNote+'</div>':'')
         +(a.hrNote?'<div style="color:var(--t3)">HR備註：'+a.hrNote+'</div>':'')
         +'</div>'
-        +'<div style="font-size:10px;color:var(--t3);margin-top:6px">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
+        +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
+        +(a.status==='pending'?'<button onclick="window.cancelLeaveApp(\''+a.id+'\')" style="padding:4px 12px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:11px;font-weight:700;cursor:pointer">✕ 取消申請</button>':'')
+        +'</div>'
         +'</div>';
     });
   }
@@ -1029,10 +1052,11 @@ function renderLeaveStatus(s){
   if(makeupApps.length){
     html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F527; 補打卡申請狀態</span></div>';
     makeupApps.forEach(function(a,i){
-      var sc=a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='sup_approved'?'var(--blue)':'var(--yellow)';
-      var sl=a.status==='approved'?'&#x2705; 已核准':a.status==='rejected'?'&#x274C; 已拒絕':a.status==='sup_approved'?'&#x1F4CB; HR審核中':'&#x23F3; 審核中';
+      var isCancelled=a.status==='cancelled';
+      var sc=isCancelled?'#999':a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='sup_approved'?'var(--blue)':'var(--yellow)';
+      var sl=isCancelled?'已取消':a.status==='approved'?'&#x2705; 已核准':a.status==='rejected'?'&#x274C; 已拒絕':a.status==='sup_approved'?'&#x1F4CB; HR審核中':'&#x23F3; 審核中';
       var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
-      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s">'
+      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s'+(isCancelled?';opacity:.55':'')+';">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
         +'<div><div style="font-size:14px;font-weight:700">&#x1F527; 補打卡 — '+typeLabel+'</div>'
         +'<div style="font-size:11px;color:var(--t3);margin-top:2px">'+a.date+' '+a.punchTime+'</div></div>'
@@ -1044,7 +1068,10 @@ function renderLeaveStatus(s){
         +(a.supNote?'<div>主管備註：'+a.supNote+'</div>':'')
         +(a.hrNote?'<div>HR備註：'+a.hrNote+'</div>':'')
         +'</div>'
-        +'<div style="font-size:10px;color:var(--t3);margin-top:6px">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
+        +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
+        +(a.status==='pending'?'<button onclick="window.cancelMakeupApp(\''+a.id+'\')" style="padding:4px 12px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:11px;font-weight:700;cursor:pointer">✕ 取消申請</button>':'')
+        +'</div>'
         +'</div>';
     });
   }
@@ -1054,7 +1081,7 @@ function renderLeaveStatus(s){
 // ── Quota ──────────────────────────────────────────
 function renderQuota(s,empId=null){
   const id=empId||currentUser.id;
-  const q=getQuota();
+  const q=window.getEmpQuota?window.getEmpQuota(id):getQuota();
   const apps=getApps().filter(a=>a.empId===id&&a.status==='approved');
   function usedDays(type){return apps.filter(a=>a.type===type).reduce((sum,a)=>{let d=0,cur=new Date(a.startDate),end=new Date(a.endDate);while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)d++;cur.setDate(cur.getDate()+1);}return sum+d;},0);}
   const types=[{key:'annual',icon:'🌴',label:'特休假',color:'var(--green)'},{key:'sick',icon:'🤒',label:'病假',color:'var(--blue)'},{key:'personal',icon:'🎉',label:'事假',color:'var(--orange)'},{key:'marriage',icon:'💐',label:'婚假',color:'var(--pink)'},{key:'funeral',icon:'😢',label:'喪假',color:'#999'},{key:'official',icon:'🏛️',label:'公假',color:'#999'}];
@@ -1255,6 +1282,7 @@ function adminTab(tab){
   else if(tab==='reports') renderReports(s);
   else if(tab==='settings') renderSettings(s);
   else if(tab==='salary') renderSalary(s);
+  else if(tab==='leaves') renderLeaveManagement(s);
   updateAdminBadge();
 }
 
@@ -3097,9 +3125,10 @@ function loadAllData(){
     sbq('makeup_apps',{select:'*',order:'applied_at.desc'}),
     sbq('leave_quota',{select:'*'}),
     sbq('company_settings',{select:'*'}),
-    sbq('holidays',{select:'*',order:'date.asc'}).catch(function(){return [];})
+    sbq('holidays',{select:'*',order:'date.asc'}).catch(function(){return [];}),
+    sbq('emp_leave_quota',{select:'*'}).catch(function(){return [];})
   ]).then(function(res){
-    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[];
+    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[],empQRows=res[7]||[];
     DB.emps=emps.map(toEmp);
     DB.accs=emps.map(function(e){return{id:e.id,pw:e.password_hash,role:e.role||'employee'};});
     DB.recs=recs.map(toRec);
@@ -3107,6 +3136,9 @@ function loadAllData(){
     DB.makeups=makeups.map(toMkp);
     var q=qRows[0]||{};
     DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0};
+    // 個人假別額度（若無記錄則沿用全公司預設）
+    DB.empQuota={};
+    empQRows.forEach(function(r){DB.empQuota[r.emp_id]=r;});
     var cfg=cfgRows[0]||{};
     DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[]};
     window.OFFICES=buildOffices(DB.cfg);
@@ -3167,6 +3199,24 @@ window.getRecs=function(){return DB.recs||[];};
 window.getApps=function(){return DB.leaves||[];};
 window.getMakeupApps=function(){return DB.makeups||[];};
 window.getQuota=function(){return DB.quota||{};};
+// 取得某員工的假別額度（個人設定優先，未設定欄位沿用全公司預設）
+window.getEmpQuota=function(empId){
+  var global=window.getQuota();
+  var over=DB.empQuota&&DB.empQuota[empId];
+  if(!over) return global;
+  var KEYS=['annual','sick','personal','marriage','funeral','official'];
+  var r={};
+  KEYS.forEach(function(k){r[k]=(over[k]!=null&&over[k]>=0)?over[k]:global[k];});
+  return r;
+};
+// Upsert helper（insert or update by primary key）
+function sbupsert(t,d){
+  return fetch(SB_URL+'/rest/v1/'+t,{
+    method:'POST',
+    headers:Object.assign({},H,{'Prefer':'resolution=merge-duplicates,return=representation'}),
+    body:JSON.stringify(d)
+  }).then(function(r){return r.json();}).catch(function(e){console.error('[sbupsert]',e);return null;});
+}
 window.getCfg=function(){return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};};
 window.getEmpById=function(id){return (DB.emps||[]).find(function(e){return e.id===id;})||null;};
 window.getHolidays=function(){return DB.holidays||{};};
@@ -3513,6 +3563,28 @@ window.submitLeave=function(){
   else saveLeave('');
 };
 
+// ── 取消送審 ──────────────────────────────────────
+window.cancelLeaveApp=function(id){
+  if(!confirm('確定要取消這筆假期申請嗎？')) return;
+  sbups('leave_apps',{status:'cancelled'},{'id':id})
+    .then(function(){return loadAllData();})
+    .then(function(){
+      toast('✅','申請已取消');
+      empTab('status');
+      updateEmpBadge();
+    });
+};
+window.cancelMakeupApp=function(id){
+  if(!confirm('確定要取消這筆補打卡申請嗎？')) return;
+  sbups('makeup_apps',{status:'cancelled'},{'id':id})
+    .then(function(){return loadAllData();})
+    .then(function(){
+      toast('✅','申請已取消');
+      empTab('status');
+      updateEmpBadge();
+    });
+};
+
 // ── Override openReview & openMakeupReview ────────
 // 修正：主程式用 let reviewingId（區域），patch 用 window.reviewingId（全域）
 // 同時設定兩者，確保 doReview 能正確讀取
@@ -3678,6 +3750,152 @@ window.confirmMakeupGps=function(){
 };
 
 // debugLogin 已移除（生產環境不應暴露 DB 狀態）
+
+// ── Leave Management ──────────────────────────────
+var LEAVE_TYPES=[
+  {key:'annual',icon:'🌴',label:'特休假',color:'var(--green)'},
+  {key:'sick',  icon:'🤒',label:'病假',  color:'var(--blue)'},
+  {key:'personal',icon:'🎉',label:'事假',color:'var(--orange)'},
+  {key:'marriage',icon:'💐',label:'婚假',color:'var(--pink)'},
+  {key:'funeral',icon:'😢',label:'喪假', color:'#999'},
+  {key:'official',icon:'🏛️',label:'公假',color:'#777'}
+];
+
+window.renderLeaveManagement=function(s){
+  var emps=getEmps().filter(function(e){
+    var acc=getAccounts().find(function(a){return a.id===e.id;});
+    return !(acc&&acc.role==='admin');
+  }).sort(function(a,b){
+    return (parseInt(a.id.replace(/\D/g,''))||99999)-(parseInt(b.id.replace(/\D/g,''))||99999);
+  });
+  var globalQ=window.getQuota();
+
+  // 計算每位員工每種假別已使用天數
+  function usedDays(empId,type){
+    return getApps().filter(function(a){return a.empId===empId&&a.type===type&&a.status==='approved';})
+      .reduce(function(sum,a){
+        var d=0,cur=new Date(a.startDate),end=new Date(a.endDate);
+        while(cur<=end){if(cur.getDay()!==0&&cur.getDay()!==6)d++;cur.setDate(cur.getDate()+1);}
+        return sum+d;
+      },0);
+  }
+
+  var theadCols=LEAVE_TYPES.map(function(t){
+    return '<th style="text-align:center;font-size:11px;padding:6px 4px;color:'+t.color+'">'+t.icon+'<br>'+t.label+'</th>';
+  }).join('');
+
+  var rows=emps.map(function(emp){
+    var q=window.getEmpQuota(emp.id);
+    var hasOverride=!!(DB.empQuota&&DB.empQuota[emp.id]);
+    var cells=LEAVE_TYPES.map(function(t){
+      var total=q[t.key]||0;
+      var used=usedDays(emp.id,t.key);
+      var rem=Math.max(0,total-used);
+      var pct=total>0?Math.round(rem/total*100):0;
+      var col=rem<=0?'#cc0000':rem<=2?'var(--orange)':t.color;
+      return '<td style="text-align:center;padding:6px 4px;font-size:12px">'
+        +'<span style="font-weight:700;color:'+col+'">'+rem+'</span>'
+        +'<span style="font-size:10px;color:var(--t3)">/'+total+'</span></td>';
+    }).join('');
+    return '<tr style="border-bottom:1px solid var(--border)">'
+      +'<td style="padding:8px 10px;white-space:nowrap">'
+      +'<div style="font-weight:700;font-size:13px">'+escapeHtml(emp.name)+'</div>'
+      +'<div style="font-size:10px;color:var(--t3)">'+emp.id+(hasOverride?' · <span style="color:var(--pd)">個人設定</span>':'')+'</div>'
+      +'</td>'
+      +cells
+      +'<td style="padding:6px 8px;text-align:center">'
+      +'<button onclick="window.openEmpQuotaEdit(\''+emp.id+'\')" style="padding:4px 10px;border:1.5px solid var(--pd);border-radius:8px;background:#fff;color:var(--pd);font-size:12px;font-weight:700;cursor:pointer">編輯</button>'
+      +'</td></tr>';
+  }).join('');
+
+  s.innerHTML='<div class="pc-page-header" style="margin-bottom:20px">'
+    +'<div><div class="pc-page-title">🎯 假別管理</div><div class="pc-page-sub">查看全員剩餘假別，可針對個別員工設定不同天數</div></div>'
+    +'</div>'
+    // 全員批次設定
+    +'<div class="sec-title fu"><span>📋 全員預設額度</span></div>'
+    +'<div class="card" style="margin-bottom:20px">'
+    +'<div style="font-size:12px;color:var(--t3);margin-bottom:12px">調整後將作為「未個別設定」員工的額度</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+    +LEAVE_TYPES.map(function(t){
+      return '<div class="fg" style="margin:0"><label style="font-size:11px">'+t.icon+' '+t.label+'</label>'
+        +'<input type="number" id="gq_'+t.key+'" value="'+(globalQ[t.key]||0)+'" min="0" style="width:100%;padding:8px;border:1.5px solid var(--border);border-radius:8px;font-size:14px;text-align:center"></div>';
+    }).join('')
+    +'</div>'
+    +'<button class="save-btn" style="margin-top:12px" onclick="window.saveGlobalQuotaFromLeave()">💾 儲存全員預設</button>'
+    +'</div>'
+    // 個別員工表格
+    +'<div class="sec-title fu"><span>👥 各員工假別剩餘（剩餘/額度）</span></div>'
+    +'<div class="card" style="overflow-x:auto;padding:10px">'
+    +'<table style="width:100%;border-collapse:collapse">'
+    +'<thead><tr style="border-bottom:2px solid var(--border)">'
+    +'<th style="text-align:left;padding:6px 10px;font-size:12px">員工</th>'
+    +theadCols
+    +'<th style="text-align:center;font-size:11px;padding:6px 4px">操作</th>'
+    +'</tr></thead>'
+    +'<tbody>'+rows+'</tbody>'
+    +'</table>'
+    +'</div>';
+};
+
+// 儲存全員預設額度（從假別管理頁面）
+window.saveGlobalQuotaFromLeave=function(){
+  var row={id:1};
+  LEAVE_TYPES.forEach(function(t){
+    var el=document.getElementById('gq_'+t.key);
+    row[t.key]=parseInt(el&&el.value)||0;
+  });
+  sbups('leave_quota',row,'id').then(function(){return loadAllData();}).then(function(){
+    toast('✅','全員預設額度已儲存');
+    renderLeaveManagement(document.getElementById('adminScroll'));
+  });
+};
+
+// 開啟編輯個人假別額度 Sheet
+var _editQuotaEmpId=null;
+window.openEmpQuotaEdit=function(empId){
+  _editQuotaEmpId=empId;
+  var emp=getEmpById(empId);
+  var q=window.getEmpQuota(empId);
+  var hasOverride=!!(DB.empQuota&&DB.empQuota[empId]);
+  document.getElementById('quotaEditTitle').textContent='🎯 '+(emp?emp.name:'')+'的假別額度';
+  document.getElementById('quotaEditBody').innerHTML=
+    '<div style="font-size:12px;color:var(--t3);margin-bottom:12px">'
+    +(hasOverride?'目前有個人設定，覆蓋全公司預設':'目前使用全公司預設，設定後將優先使用個人值')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'
+    +LEAVE_TYPES.map(function(t){
+      return '<div class="fg" style="margin:0"><label style="font-size:12px">'+t.icon+' '+t.label+'</label>'
+        +'<input type="number" id="eq_'+t.key+'" value="'+(q[t.key]||0)+'" min="0" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:8px;font-size:15px;text-align:center"></div>';
+    }).join('')
+    +'</div>'
+    +(hasOverride?'<div style="margin-top:16px;text-align:center"><button onclick="window.clearEmpQuota()" style="padding:8px 20px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:12px;font-weight:700;cursor:pointer">🗑 清除個人設定（恢復預設）</button></div>':'');
+  openSheet('quotaEditSheet');
+};
+
+// 儲存個人假別額度
+window.saveEmpQuota=function(){
+  if(!_editQuotaEmpId) return;
+  var row={emp_id:_editQuotaEmpId,updated_at:new Date().toISOString()};
+  LEAVE_TYPES.forEach(function(t){
+    var el=document.getElementById('eq_'+t.key);
+    row[t.key]=parseInt(el&&el.value)||0;
+  });
+  sbupsert('emp_leave_quota',row).then(function(){return loadAllData();}).then(function(){
+    closeSheet('quotaEditSheet');
+    toast('✅','假別額度已儲存');
+    renderLeaveManagement(document.getElementById('adminScroll'));
+  });
+};
+
+// 清除個人設定，恢復全公司預設
+window.clearEmpQuota=function(){
+  if(!_editQuotaEmpId) return;
+  sbdel('emp_leave_quota',{emp_id:_editQuotaEmpId}).then(function(){return loadAllData();}).then(function(){
+    closeSheet('quotaEditSheet');
+    toast('✅','已清除個人設定，恢復全員預設');
+    renderLeaveManagement(document.getElementById('adminScroll'));
+  });
+};
 
 // ── Salary Management ────────────────────────────
 // ── Salary Management ─────────────────────────────
