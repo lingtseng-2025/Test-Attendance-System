@@ -3666,8 +3666,41 @@ window.submitLeave=function(){
   var days=0,cur=new Date(start),endD=new Date(end);
   while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
   var supEmp=getEmpById(supId);
+
+  // ── 開啟郵件（同步，在點擊事件堆疊內執行，瀏覽器才不會封鎖）──
+  var didOpenMail=false;
+  if(supEmp&&supEmp.email){
+    var curPendingLeaves=getApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+    var curPendingMkps=getMakeupApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+    var total=curPendingLeaves.length+curPendingMkps.length+1; // +1 = 本次申請
+    var listText='\n1. '+emp.name+' — '+(LEAVE_LABEL[type]||type)
+      +'\n   期間：'+start+(start!==end?' ～ '+end:'')+'（'+days+'天）'
+      +'\n   原因：'+(reason||'--')+'　【本次新送出】';
+    curPendingLeaves.forEach(function(a,i){
+      listText+='\n'+(i+2)+'. '+a.empName+' — '+(LEAVE_LABEL[a.type]||a.type)
+        +'\n   期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' （'+a.days+'天）':'')
+        +'\n   原因：'+(a.reason||'--');
+    });
+    curPendingMkps.forEach(function(a,i){
+      var tl=a.punchType==='in'?'補上班打卡':'補下班打卡';
+      listText+='\n'+(curPendingLeaves.length+i+2)+'. '+a.empName+' — '+tl
+        +'\n   日期：'+a.date+' '+a.punchTime
+        +'\n   原因：'+(a.reason||'--');
+    });
+    var emailBody='您好，\n\n'+emp.name+' 已送出請假申請，請審核。\n'
+      +'申請內容：'+(LEAVE_LABEL[type]||type)+' '+start+(start!==end?' ～ '+end:'')+'（'+days+'天）\n\n'
+      +'===== 您目前共有 '+total+' 筆待審核申請 ====='+listText
+      +'\n\n請登入 iROBOT 出勤系統進行審核。\n謝謝！';
+    var mailA=document.createElement('a');
+    mailA.href='mailto:'+supEmp.email
+      +'?subject='+encodeURIComponent('[待審核 '+total+'筆] '+emp.name+' 申請請假')
+      +'&body='+encodeURIComponent(emailBody);
+    mailA.style.display='none';document.body.appendChild(mailA);mailA.click();document.body.removeChild(mailA);
+    didOpenMail=true;
+  }
+
+  // ── 儲存申請至資料庫 ──
   function saveLeave(attachData){
-    // 快照申請當下假別餘額（Phase 1.5 法遵要求）
     var balSnap={};
     try{
       var q2=window.getEmpQuota?window.getEmpQuota(window.currentUser.id):window.getQuota();
@@ -3683,34 +3716,13 @@ window.submitLeave=function(){
       balance_at_apply:balSnap,applied_at:new Date().toISOString()})
     .then(function(){return loadAllData();}).then(function(){
       closeSheet('leaveSheet');
-      if(supEmp&&supEmp.email){
-        // 整理主管所有待審假期申請
-        var pendingLeaves=getApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
-        var pendingMkps=getMakeupApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
-        var listText='';
-        pendingLeaves.forEach(function(a,i){
-          listText+='\n'+(i+1)+'. '+a.empName+' — '+(LEAVE_LABEL[a.type]||a.type)
-            +'\n   期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' （'+a.days+'天）':'')
-            +'\n   原因：'+(a.reason||'--');
-        });
-        pendingMkps.forEach(function(a,i){
-          var tl=a.punchType==='in'?'補上班打卡':'補下班打卡';
-          listText+='\n'+(pendingLeaves.length+i+1)+'. '+a.empName+' — '+tl
-            +'\n   日期：'+a.date+' '+a.punchTime
-            +'\n   原因：'+(a.reason||'--');
-        });
-        var total=pendingLeaves.length+pendingMkps.length;
-        var emailBody='您好，\n\n'+emp.name+' 已送出請假申請，請審核。\n'
-          +'申請內容：'+(LEAVE_LABEL[type]||type)+' '+start+(start!==end?' ～ '+end:'')+'\n\n'
-          +'===== 您目前有 '+total+' 筆待審核申請 ====='+listText
-          +'\n\n請登入 iROBOT 出勤系統進行審核。';
-        var a2=document.createElement('a');
-        a2.href='mailto:'+supEmp.email
-          +'?subject='+encodeURIComponent('[待審核 '+total+'筆] '+emp.name+' 申請請假')
-          +'&body='+encodeURIComponent(emailBody);
-        a2.style.display='none';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+      if(didOpenMail){
+        toast('📧','申請已送出！郵件程式已開啟，請按「寄出」通知 '+(supEmp?supEmp.name:'主管'));
+      } else if(supEmp&&!supEmp.email){
+        toast('✅','假期申請已送出！（主管未設定 Email，請自行通知審核）');
+      } else {
+        toast('✅','假期申請已送出！');
       }
-      toast('✅','假期申請已送出！');
       if(window.currentUser.role==='employee')empTab('status');
       updateEmpBadge();
     });
@@ -3864,42 +3876,55 @@ window.confirmMakeupGps=function(){
   var d=window.makeupPendingData;
   var emp=window.currentUser.empData;
   var supEmp=getEmpById(d.supId);
+  var tl=d.type==='in'?'補上班打卡':'補下班打卡';
+  var supId=d.supId;
+
+  // ── 開啟郵件（同步，在點擊事件堆疊內執行）──
+  var didOpenMail=false;
+  if(supEmp&&supEmp.email){
+    var curPendingLeaves=getApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+    var curPendingMkps=getMakeupApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
+    var total=curPendingLeaves.length+curPendingMkps.length+1; // +1 = 本次申請
+    var listText='\n1. '+emp.name+' — '+tl
+      +'\n   日期：'+d.date+' '+d.time
+      +'\n   原因：'+(d.reason||'--')+'　【本次新送出】';
+    curPendingLeaves.forEach(function(a,i){
+      listText+='\n'+(i+2)+'. '+a.empName+' — '+(LEAVE_LABEL[a.type]||a.type)
+        +'\n   期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' （'+a.days+'天）':'')
+        +'\n   原因：'+(a.reason||'--');
+    });
+    curPendingMkps.forEach(function(a,i){
+      var mkTl=a.punchType==='in'?'補上班打卡':'補下班打卡';
+      listText+='\n'+(curPendingLeaves.length+i+2)+'. '+a.empName+' — '+mkTl
+        +'\n   日期：'+a.date+' '+a.punchTime
+        +'\n   原因：'+(a.reason||'--');
+    });
+    var emailBody='您好，\n\n'+emp.name+' 已送出補打卡申請，請審核。\n'
+      +'申請內容：'+tl+' '+d.date+' '+d.time+'\n\n'
+      +'===== 您目前共有 '+total+' 筆待審核申請 ====='+listText
+      +'\n\n請登入 iROBOT 出勤系統進行審核。\n謝謝！';
+    var mailEl=document.createElement('a');
+    mailEl.href='mailto:'+supEmp.email
+      +'?subject='+encodeURIComponent('[待審核 '+total+'筆] '+emp.name+' 申請補打卡')
+      +'&body='+encodeURIComponent(emailBody);
+    mailEl.style.display='none';document.body.appendChild(mailEl);mailEl.click();document.body.removeChild(mailEl);
+    didOpenMail=true;
+  }
+
+  // ── 儲存申請至資料庫 ──
   sbins('makeup_apps',{id:'MK'+Date.now(),emp_id:window.currentUser.id,emp_name:emp?emp.name:window.currentUser.id,
     date:d.date,punch_type:d.type,punch_time:d.time,sup_id:d.supId,reason:d.reason,
     gps:window.makeupGpsData,status:'pending',stage:'sup',applied_at:new Date().toISOString()})
   .then(function(){return loadAllData();}).then(function(){
     closeSheet('makeupGpsSheet');
     window.makeupPendingData=null;window.makeupGpsData=null;
-    if(supEmp&&supEmp.email){
-      var tl=d.type==='in'?'補上班打卡':'補下班打卡';
-      var supId=d.supId;
-      // 整理主管所有待審申請
-      var pendingLeaves=getApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
-      var pendingMkps=getMakeupApps().filter(function(a){return a.supId===supId&&a.status==='pending';});
-      var listText='';
-      pendingLeaves.forEach(function(a,i){
-        listText+='\n'+(i+1)+'. '+a.empName+' — '+(LEAVE_LABEL[a.type]||a.type)
-          +'\n   期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+(a.days?' （'+a.days+'天）':'')
-          +'\n   原因：'+(a.reason||'--');
-      });
-      pendingMkps.forEach(function(a,i){
-        var mkTl=a.punchType==='in'?'補上班打卡':'補下班打卡';
-        listText+='\n'+(pendingLeaves.length+i+1)+'. '+a.empName+' — '+mkTl
-          +'\n   日期：'+a.date+' '+a.punchTime
-          +'\n   原因：'+(a.reason||'--');
-      });
-      var total=pendingLeaves.length+pendingMkps.length;
-      var emailBody='您好，\n\n'+emp.name+' 已送出補打卡申請，請審核。\n'
-        +'申請內容：'+tl+' '+d.date+' '+d.time+'\n\n'
-        +'===== 您目前有 '+total+' 筆待審核申請 ====='+listText
-        +'\n\n請登入 iROBOT 出勤系統進行審核。';
-      var el=document.createElement('a');
-      el.href='mailto:'+supEmp.email
-        +'?subject='+encodeURIComponent('[待審核 '+total+'筆] '+emp.name+' 申請補打卡')
-        +'&body='+encodeURIComponent(emailBody);
-      el.style.display='none';document.body.appendChild(el);el.click();document.body.removeChild(el);
+    if(didOpenMail){
+      toast('📧','申請已送出！郵件程式已開啟，請按「寄出」通知 '+(supEmp?supEmp.name:'主管'));
+    } else if(supEmp&&!supEmp.email){
+      toast('✅','補打卡申請已送出！（主管未設定 Email，請自行通知審核）');
+    } else {
+      toast('✅','補打卡申請已送出！等待主管審核');
     }
-    toast('✅','補打卡申請已送出！等待主管審核');
     if(window.currentUser.role==='employee')empTab('clock');
     updateEmpBadge();
   });
