@@ -483,6 +483,7 @@ body.admin-mode > #adminScreen{
     <div class="tb-item" id="atab-reports" onclick="adminTab('reports')"><div class="tbi">📊</div><span>報表</span></div>
     <div class="tb-item" id="atab-salary" onclick="adminTab('salary')"><div class="tbi">💰</div><span>薪資</span></div>
     <div class="tb-item" id="atab-leaves" onclick="adminTab('leaves')"><div class="tbi">🎯</div><span>假別</span></div>
+    <div class="tb-item" id="atab-leavebalance" onclick="adminTab('leavebalance')"><div class="tbi">📊</div><span>假別餘額</span></div>
     <div class="tb-item" id="atab-settings" onclick="adminTab('settings')"><div class="tbi">⚙️</div><span>設定</span></div>
   </div>
 </div>
@@ -1301,13 +1302,10 @@ function adminTab(tab){
   document.querySelectorAll('.snav-item').forEach(t=>t.classList.remove('active'));
   var snavEl=document.getElementById('snav-'+tab);
   if(snavEl) snavEl.classList.add('active');
-  // Update mobile tabbar if visible
-  var tabbar=document.getElementById('adminTabbar');
-  if(tabbar&&tabbar.style.display!=='none'){
-    document.querySelectorAll('#adminTabbar .tb-item').forEach(t=>t.classList.remove('active'));
-    var mEl=document.getElementById('atab-'+tab);
-    if(mEl) mEl.classList.add('active');
-  }
+  // Update mobile tabbar (always sync, CSS media query controls visibility)
+  document.querySelectorAll('#adminTabbar .tb-item').forEach(t=>t.classList.remove('active'));
+  var mEl=document.getElementById('atab-'+tab);
+  if(mEl) mEl.classList.add('active');
   const s=document.getElementById('adminScroll');
   s.innerHTML='';
   if(tab==='dashboard') renderAdminDashboard(s);
@@ -2251,6 +2249,7 @@ function renderSettings(s){
     <div style="font-size:12px;font-weight:700;color:var(--pd);margin-bottom:10px">🏢 總部（主要地點）</div>
     <div class="fg"><label>公司名稱</label><input id="cfg_name" value="${cfg.name}"></div>
     <div class="fg"><label>公司地址</label><input id="cfg_addr" value="${cfg.address}"></div>
+    <div class="fg"><label>系統網址 <span style="font-size:10px;color:var(--t3)">（LINE 通知附上連結用）</span></label><input id="cfg_siteurl" value="${cfg.siteUrl||''}" placeholder="https://your-system-url.com"></div>
     <div class="fr2">
       <div class="fg"><label>緯度 (Lat)</label><input type="number" step="0.0001" id="cfg_lat" value="${cfg.lat}"></div>
       <div class="fg"><label>經度 (Lng)</label><input type="number" step="0.0001" id="cfg_lng" value="${cfg.lng}"></div>
@@ -3279,7 +3278,7 @@ function loadAllData(){
     empQRows.forEach(function(r){DB.empQuota[r.emp_id]=r;});
     DB.otas=otRows.map(toOTA);
     var cfg=cfgRows[0]||{};
-    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[]};
+    DB.cfg={lat:cfg.lat||25.0473,lng:cfg.lng||121.5124,name:cfg.name||'iROBOT MEDICINE 智能人醫',address:cfg.address||'台北市大同區市民大道一段209號12樓',rangeM:cfg.range_m||300,requireGPS:cfg.require_gps!==false,extraLocations:Array.isArray(cfg.extra_locations)?cfg.extra_locations:[],siteUrl:cfg.site_url||''};
     window.OFFICES=buildOffices(DB.cfg);
     if(!window.pendingOffice)window.pendingOffice=window.OFFICES[0];
     DB.holidays={};
@@ -3638,7 +3637,8 @@ window.saveSettings=function(){
   sbups('company_settings',{id:1,
     name:document.getElementById('cfg_name').value,address:document.getElementById('cfg_addr').value,
     lat:parseFloat(document.getElementById('cfg_lat').value),lng:parseFloat(document.getElementById('cfg_lng').value),
-    range_m:parseInt(document.getElementById('cfg_range').value)||300,require_gps:rg},'id')
+    range_m:parseInt(document.getElementById('cfg_range').value)||300,require_gps:rg,
+    site_url:(document.getElementById('cfg_siteurl')?document.getElementById('cfg_siteurl').value.trim():'')||null},'id')
   .then(function(){return loadAllData();}).then(function(){toast('✅','公司設定已儲存');});
 };
 
@@ -3725,11 +3725,13 @@ window.submitLeave=function(){
       // LINE 通知主管（非同步，不影響主流程）
       var supLineId=supEmp?supEmp.lineUserId||'':'';
       if(supLineId){
+        var _siteUrl=window.getCfg?window.getCfg().siteUrl||'':'';
         var lineMsg='📋 新待審核申請\n━━━━━━━━━━━━━━\n申請人：'+emp.name
           +'\n類型：'+(LEAVE_LABEL[type]||type)
           +'\n期間：'+start+(start!==end?' ～ '+end:'')+'（'+days+'天）'
           +'\n原因：'+(reason||'--')
-          +'\n\n請登入 iROBOT 系統進行審核';
+          +'\n\n請登入 iROBOT 系統進行審核'
+          +(_siteUrl?'\n🔗 '+_siteUrl:'');
         edgeCall('sendLine',{lineUserId:supLineId,message:lineMsg},getAuthToken())
           .then(function(){toast('💬','申請已送出！LINE 通知已發送給 '+(supEmp?supEmp.name:'主管'));})
           .catch(function(){toast('✅','假期申請已送出！（LINE 通知失敗，請自行聯繫主管）');});
@@ -3939,11 +3941,13 @@ window.confirmMakeupGps=function(){
     var supLineIdM=supEmp?supEmp.lineUserId||'':'';
     if(supLineIdM){
       var tlM=d.type==='in'?'補上班打卡':'補下班打卡';
+      var _siteUrlM=window.getCfg?window.getCfg().siteUrl||'':'';
       var lineMsgM='📋 新待審核申請\n━━━━━━━━━━━━━━\n申請人：'+emp.name
         +'\n類型：'+tlM
         +'\n日期：'+d.date+' '+d.time
         +'\n原因：'+(d.reason||'--')
-        +'\n\n請登入 iROBOT 系統進行審核';
+        +'\n\n請登入 iROBOT 系統進行審核'
+        +(_siteUrlM?'\n🔗 '+_siteUrlM:'');
       edgeCall('sendLine',{lineUserId:supLineIdM,message:lineMsgM},getAuthToken())
         .then(function(){toast('💬','申請已送出！LINE 通知已發送給 '+(supEmp?supEmp.name:'主管'));})
         .catch(function(){toast('✅','補打卡申請已送出！（LINE 通知失敗，請自行聯繫主管）');});
