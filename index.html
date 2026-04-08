@@ -1912,6 +1912,11 @@ function openEditEmp(empId){
     +'<div class="fr2"><div class="fg" style="margin:0"><label>姓名</label><input id="ee_ename" value="'+(emp.emergencyName||'')+'" placeholder="緊急聯絡人姓名"></div>'
     +'<div class="fg" style="margin:0"><label>電話</label><input type="tel" id="ee_ephone" value="'+(emp.emergencyPhone||'')+'" placeholder="緊急聯絡電話"></div></div>'
     +'</div>'
+    +'<div class="fg">'
+    +'<label>LINE User ID <span style="font-size:10px;color:var(--t3)">（審核通知用，非必填）</span></label>'
+    +'<input id="ee_line" value="'+(emp.lineUserId||'')+'" placeholder="U1234abcd... 加 Bot 好友後傳訊取得">'
+    +'<div style="font-size:10px;color:var(--t3);margin-top:3px">📌 主管加 LINE Bot 好友 → 傳任意訊息 → Bot 自動回覆其 User ID</div>'
+    +'</div>'
     +'<div class="fg"><label>直屬主管</label><select id="ee_sup">'+supOptions+'</select></div>'
     +'<div class="fg"><label>工時計算規則</label>'
     +'<select id="ee_rule">'
@@ -3239,7 +3244,7 @@ window.escapeHtml=escapeHtml;
 // ── In-memory cache ───────────────────────────────
 var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],holidays:{},quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
 
-function toEmp(e){return{id:e.id,name:e.name,dept:e.dept||'',pos:e.pos||'',workRule:e.work_rule||'deduct_lunch',salary:e.salary||0,email:e.email||'',color:e.color||'#5046e0',supervisorId:e.supervisor_id||'',role:e.role||'employee',status:e.status||'active',birthDate:e.birth_date||'',hireDate:e.hire_date||'',contractType:e.contract_type||'full_time',gender:e.gender||'',phone:e.phone||'',emergencyName:e.emergency_contact_name||'',emergencyPhone:e.emergency_contact_phone||''};}
+function toEmp(e){return{id:e.id,name:e.name,dept:e.dept||'',pos:e.pos||'',workRule:e.work_rule||'deduct_lunch',salary:e.salary||0,email:e.email||'',color:e.color||'#5046e0',supervisorId:e.supervisor_id||'',role:e.role||'employee',status:e.status||'active',birthDate:e.birth_date||'',hireDate:e.hire_date||'',contractType:e.contract_type||'full_time',gender:e.gender||'',phone:e.phone||'',emergencyName:e.emergency_contact_name||'',emergencyPhone:e.emergency_contact_phone||'',lineUserId:e.line_user_id||''};}
 function toRec(r){return{date:r.date,empId:r.emp_id,in:r.time_in||null,out:r.time_out||null,gpsIn:r.gps_in||null,gpsOut:r.gps_out||null};}
 function toLea(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',type:a.type||'',startDate:a.start_date||'',endDate:a.end_date||'',days:a.days||0,reason:a.reason||'',proxy:a.proxy||'',supId:a.sup_id||'',attachName:a.attach_name||'',attachData:a.attach_data||'',status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||'',managerNote:a.sup_note||''};}
 function toMkp(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',date:a.date||'',punchType:a.punch_type||'',punchTime:a.punch_time||'',supId:a.sup_id||'',reason:a.reason||'',gps:a.gps||null,status:a.status||'pending',stage:a.stage||'sup',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',hrNote:a.hr_note||'',hrReviewedAt:a.hr_reviewed_at||'',appliedAt:a.applied_at||''};}
@@ -3532,7 +3537,8 @@ window.saveEmp=function(empId){
     gender:document.getElementById('ee_gender')?document.getElementById('ee_gender').value:'',
     phone:document.getElementById('ee_phone')?document.getElementById('ee_phone').value:'',
     emergency_contact_name:document.getElementById('ee_ename')?document.getElementById('ee_ename').value:'',
-    emergency_contact_phone:document.getElementById('ee_ephone')?document.getElementById('ee_ephone').value:''};
+    emergency_contact_phone:document.getElementById('ee_ephone')?document.getElementById('ee_ephone').value:'',
+    line_user_id:(document.getElementById('ee_line')?document.getElementById('ee_line').value.trim():'')||null};
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
     console.log('[saveEmp] calling sbupd id='+empId+' data='+JSON.stringify(d));
@@ -3716,10 +3722,21 @@ window.submitLeave=function(){
       balance_at_apply:balSnap,applied_at:new Date().toISOString()})
     .then(function(){return loadAllData();}).then(function(){
       closeSheet('leaveSheet');
-      if(didOpenMail){
+      // LINE 通知主管（非同步，不影響主流程）
+      var supLineId=supEmp?supEmp.lineUserId||'':'';
+      if(supLineId){
+        var lineMsg='📋 新待審核申請\n━━━━━━━━━━━━━━\n申請人：'+emp.name
+          +'\n類型：'+(LEAVE_LABEL[type]||type)
+          +'\n期間：'+start+(start!==end?' ～ '+end:'')+'（'+days+'天）'
+          +'\n原因：'+(reason||'--')
+          +'\n\n請登入 iROBOT 系統進行審核';
+        edgeCall('sendLine',{lineUserId:supLineId,message:lineMsg},getAuthToken())
+          .then(function(){toast('💬','申請已送出！LINE 通知已發送給 '+(supEmp?supEmp.name:'主管'));})
+          .catch(function(){toast('✅','假期申請已送出！（LINE 通知失敗，請自行聯繫主管）');});
+      } else if(didOpenMail){
         toast('📧','申請已送出！郵件程式已開啟，請按「寄出」通知 '+(supEmp?supEmp.name:'主管'));
       } else if(supEmp&&!supEmp.email){
-        toast('✅','假期申請已送出！（主管未設定 Email，請自行通知審核）');
+        toast('✅','假期申請已送出！（主管未設定通知方式，請自行告知審核）');
       } else {
         toast('✅','假期申請已送出！');
       }
@@ -3918,10 +3935,22 @@ window.confirmMakeupGps=function(){
   .then(function(){return loadAllData();}).then(function(){
     closeSheet('makeupGpsSheet');
     window.makeupPendingData=null;window.makeupGpsData=null;
-    if(didOpenMail){
+    // LINE 通知主管（非同步，不影響主流程）
+    var supLineIdM=supEmp?supEmp.lineUserId||'':'';
+    if(supLineIdM){
+      var tlM=d.type==='in'?'補上班打卡':'補下班打卡';
+      var lineMsgM='📋 新待審核申請\n━━━━━━━━━━━━━━\n申請人：'+emp.name
+        +'\n類型：'+tlM
+        +'\n日期：'+d.date+' '+d.time
+        +'\n原因：'+(d.reason||'--')
+        +'\n\n請登入 iROBOT 系統進行審核';
+      edgeCall('sendLine',{lineUserId:supLineIdM,message:lineMsgM},getAuthToken())
+        .then(function(){toast('💬','申請已送出！LINE 通知已發送給 '+(supEmp?supEmp.name:'主管'));})
+        .catch(function(){toast('✅','補打卡申請已送出！（LINE 通知失敗，請自行聯繫主管）');});
+    } else if(didOpenMail){
       toast('📧','申請已送出！郵件程式已開啟，請按「寄出」通知 '+(supEmp?supEmp.name:'主管'));
     } else if(supEmp&&!supEmp.email){
-      toast('✅','補打卡申請已送出！（主管未設定 Email，請自行通知審核）');
+      toast('✅','補打卡申請已送出！（主管未設定通知方式，請自行告知審核）');
     } else {
       toast('✅','補打卡申請已送出！等待主管審核');
     }
