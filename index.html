@@ -355,7 +355,10 @@ body.admin-mode.admin-mobile-view .card input[type="month"],
 body.admin-mode.admin-mobile-view .card select{padding:7px 10px!important;font-size:13px!important;border-radius:9px!important}
 /* Flex form rows: stack vertically on mobile */
 body.admin-mode.admin-mobile-view .pc-section > div[style*="display:flex"][style*="align-items:flex-end"],
-body.admin-mode.admin-mobile-view .card[style*="display:flex"][style*="align-items:center"]{flex-direction:column!important;align-items:stretch!important;gap:10px!important}
+body.admin-mode.admin-mobile-view .card > div[style*="display:flex"],
+body.admin-mode.admin-mobile-view .card[style*="display:flex"]{flex-direction:column!important;align-items:stretch!important;gap:10px!important}
+/* Salary button margin fix when stacked */
+body.admin-mode.admin-mobile-view .card > div[style*="margin-top:12px"] button{margin-top:0!important;width:100%!important}
 /* Salary gradient header: compact */
 body.admin-mode.admin-mobile-view [style*="background:var(--grad)"][style*="border-radius:16px"]{padding:14px 16px!important}
 body.admin-mode.admin-mobile-view [style*="background:var(--grad)"][style*="border-radius:16px"] [style*="font-size:24px"]{font-size:18px!important}
@@ -1542,29 +1545,32 @@ function renderGPSMap(s){
   const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}${tooltipCSS}</style></head><body><div id="map"></div>\u003Cscript>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
   const blob=new Blob([mapHTML],{type:'text/html'});
   const blobURL=URL.createObjectURL(blob);
-  s.innerHTML=`
-  <div class="pc-page-header" style="margin-bottom:20px">
-    <div><div class="pc-page-title">🗺️ GPS 打卡地圖</div><div class="pc-page-sub">今日員工打卡位置即時追蹤</div></div>
-  </div>
-  <div class="sec-title fu"><span>🗺️ 今日打卡 GPS 地圖</span></div>
-  <div class="card fu fu1 gps-map-card" style="padding:0;overflow:hidden">
-    <iframe src="${blobURL}" class="gps-map-iframe" style="width:100%;height:310px;border:none;display:block"></iframe>
-  </div>
-  <div class="map-legend fu fu1">
-    <div class="leg-item"><div class="leg-dot" style="background:#e00"></div>公司</div>
-    <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>上班</div>
-    <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>下班</div>
-    <div class="leg-item"><div class="leg-dot" style="background:rgba(80,70,224,.25);border:2px dashed var(--pink)"></div>範圍 ${cfg.rangeM}m</div>
-  </div>
-  <div class="sec-title fu fu2"><span>📍 座標明細</span></div>
-  <div class="card fu fu2">
-    ${recs.length===0?'<div style="text-align:center;padding:16px;color:var(--t3);font-size:13px">今日尚無打卡紀錄</div>':
-    recs.map(rec=>{
+  const empDetailHTML=recs.length===0
+    ?'<div style="text-align:center;padding:16px;color:var(--t3);font-size:13px">今日尚無打卡紀錄</div>'
+    :recs.map(rec=>{
       const emp=emps.find(e=>e.id===rec.empId);if(!emp)return'';
       const distIn=rec.gpsIn?haversine(rec.gpsIn.lat,rec.gpsIn.lng,cfg.lat,cfg.lng):null;
       const distOut=rec.gpsOut?haversine(rec.gpsOut.lat,rec.gpsOut.lng,cfg.lat,cfg.lng):null;
       return `<div class="gps-rec"><div class="gr-header"><div class="gr-name">${emp.name}</div><span class="bgg" style="background:${emp.color}22;color:${emp.color}">${emp.dept}</span></div>${rec.gpsIn?`<div class="gr-row"><span>🟢 上班 ${fmtTime(rec.in)}</span><span class="bgg ${distIn<=cfg.rangeM?'bg-g':'bg-o'}">${distIn}m</span>${rec.gpsIn.simulated?'<span style="color:var(--t3);font-size:10px">(模擬)</span>':''}</div><div class="gr-coord">${rec.gpsIn.lat}, ${rec.gpsIn.lng}</div>`:''} ${rec.gpsOut?`<div class="gr-row" style="margin-top:4px"><span>🔵 下班 ${fmtTime(rec.out)}</span><span class="bgg ${distOut<=cfg.rangeM?'bg-g':'bg-o'}">${distOut}m</span></div><div class="gr-coord">${rec.gpsOut.lat}, ${rec.gpsOut.lng}</div>`:''}</div>`;
-    }).join('')}
+    }).join('');
+
+  s.innerHTML=`
+  <div class="pc-page-header" style="margin-bottom:16px">
+    <div><div class="pc-page-title">🗺️ GPS 打卡地圖</div><div class="pc-page-sub">今日員工打卡位置即時追蹤</div></div>
+  </div>
+  <div class="sec-title fu"><span>📍 今日打卡明細</span></div>
+  <div class="card fu fu1" style="margin-bottom:16px">
+    ${empDetailHTML}
+  </div>
+  <div class="sec-title fu fu2"><span>🗺️ GPS 地圖</span></div>
+  <div class="card fu fu2 gps-map-card" style="padding:0;overflow:hidden">
+    <iframe src="${blobURL}" class="gps-map-iframe" style="width:100%;height:320px;border:none;display:block"></iframe>
+  </div>
+  <div class="map-legend fu fu2">
+    <div class="leg-item"><div class="leg-dot" style="background:#e00"></div>公司</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--green)"></div>上班</div>
+    <div class="leg-item"><div class="leg-dot" style="background:var(--blue)"></div>下班</div>
+    <div class="leg-item"><div class="leg-dot" style="background:rgba(80,70,224,.25);border:2px dashed var(--pink)"></div>範圍 ${cfg.rangeM}m</div>
   </div>`;
 }
 
