@@ -338,6 +338,8 @@ body.admin-mode.admin-mobile-view .pc-table td:nth-child(8){display:none!importa
 /* Shrink first-column avatar row on mobile */
 body.admin-mode.admin-mobile-view .pc-table td:nth-child(1) > div{gap:7px!important}
 body.admin-mode.admin-mobile-view .pc-table td:nth-child(1) > div > div:first-child{width:28px!important;height:28px!important;font-size:12px!important}
+/* GPS map height smaller on mobile so employee detail is visible */
+body.admin-mode.admin-mobile-view .gps-map-iframe{height:220px!important}
 /* Page header on mobile */
 body.admin-mode.admin-mobile-view .pc-page-title{font-size:18px!important}
 body.admin-mode.admin-mobile-view .pc-page-sub{font-size:11px!important}
@@ -1533,9 +1535,11 @@ function renderGPSMap(s){
   });
   const markerJS=markers.map(m=>{
     const icon=m.type==='company'?'🏢':m.type==='in'?'🟢':'🔵';
-    return `L.marker([${m.lat},${m.lng}]).addTo(map).bindPopup('<b>${icon} ${m.label}</b><br>${m.lat}, ${m.lng}');`;
+    const color=m.type==='company'?'#cc0000':m.type==='in'?'#22c55e':'#3b82f6';
+    return `(function(){var mk=L.marker([${m.lat},${m.lng}]).addTo(map);mk.bindTooltip('<b>${icon} ${m.label}</b>',{permanent:true,direction:'top',offset:[0,-8],className:'emp-tip'});mk.bindPopup('<b>${icon} ${m.label}</b><br><span style="font-size:11px;color:#666">${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</span>');})();`;
   }).join('\n');
-  const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}</style></head><body><div id="map"></div>\u003Cscript>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
+  const tooltipCSS=`.emp-tip{background:#fff;border:1.5px solid #5046e0;border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap}.emp-tip::before{display:none}`;
+  const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}${tooltipCSS}</style></head><body><div id="map"></div>\u003Cscript>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
   const blob=new Blob([mapHTML],{type:'text/html'});
   const blobURL=URL.createObjectURL(blob);
   s.innerHTML=`
@@ -1543,8 +1547,8 @@ function renderGPSMap(s){
     <div><div class="pc-page-title">🗺️ GPS 打卡地圖</div><div class="pc-page-sub">今日員工打卡位置即時追蹤</div></div>
   </div>
   <div class="sec-title fu"><span>🗺️ 今日打卡 GPS 地圖</span></div>
-  <div class="card fu fu1" style="padding:0;overflow:hidden">
-    <iframe src="${blobURL}" style="width:100%;height:310px;border:none;display:block"></iframe>
+  <div class="card fu fu1 gps-map-card" style="padding:0;overflow:hidden">
+    <iframe src="${blobURL}" class="gps-map-iframe" style="width:100%;height:310px;border:none;display:block"></iframe>
   </div>
   <div class="map-legend fu fu1">
     <div class="leg-item"><div class="leg-dot" style="background:#e00"></div>公司</div>
@@ -2245,12 +2249,14 @@ function renderReports(s){
     +'<div><div class="pc-page-title">&#x1F4CA; 出勤報表</div><div class="pc-page-sub">查詢員工月度出勤紀錄</div></div>'
     +'</div>'
     +'<div class="pc-section" style="margin-bottom:20px">'
-    +'<div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">'
-    +'<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">查詢月份</label>'
-    +'<input type="month" id="selMonth" value="'+yy+'-'+mm+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none"></div>'
-    +'<div style="flex:2;min-width:200px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">員工</label>'
-    +'<select id="selEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none">'+empOpts+'</select></div>'
-    +'<button onclick="loadReport()" style="padding:10px 28px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap">&#x1F50D; 查詢</button>'
+    +'<div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">'
+    +'<div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">查詢月份</label>'
+    +'<input type="month" id="selMonth" value="'+yy+'-'+mm+'" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;box-sizing:border-box"></div>'
+    +'<div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:5px">員工</label>'
+    +'<select id="selEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none;box-sizing:border-box">'+empOpts+'</select></div>'
+    +'</div>'
+    +'<div style="margin-top:12px">'
+    +'<button onclick="loadReport()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:14px;font-weight:800;cursor:pointer">&#x1F50D; 查詢</button>'
     +'</div>'
     +'</div>'
     +'<div id="reportResult"></div>';
@@ -4225,15 +4231,19 @@ window.renderSalary = function(s) {
     + '<div style="font-size:12px;opacity:.8;margin-top:4px">自動計算工時、加班費、應扣款項</div>'
     + '</div>'
     // Controls
-    + '<div class="card" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">'
-    + '<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">計算月份</label>'
-    + '<input type="month" id="salMonth" value="' + defaultMonth + '" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none"></div>'
-    + '<div style="flex:1;min-width:160px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">員工</label>'
-    + '<select id="salEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none">'
+    + '<div class="card">'
+    + '<div style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap">'
+    + '<div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">計算月份</label>'
+    + '<input type="month" id="salMonth" value="' + defaultMonth + '" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;box-sizing:border-box"></div>'
+    + '<div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">員工</label>'
+    + '<select id="salEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none;box-sizing:border-box">'
     + '<option value="all">全部員工</option>'
     + emps.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('')
     + '</select></div>'
-    + '<button onclick="calcSalary()" style="padding:10px 24px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,var(--font);font-size:14px;font-weight:800;cursor:pointer;white-space:nowrap;margin-top:18px">🔍 計算薪資</button>'
+    + '</div>'
+    + '<div style="margin-top:12px">'
+    + '<button onclick="calcSalary()" style="width:100%;padding:10px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,var(--font);font-size:14px;font-weight:800;cursor:pointer">🔍 計算薪資</button>'
+    + '</div>'
     + '</div>'
     // Result area
     + '<div id="salaryResult"></div>'
