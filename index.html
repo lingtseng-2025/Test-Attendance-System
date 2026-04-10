@@ -4041,10 +4041,9 @@ window.doReview=function(status){
       closeSheet('reviewSheet');
       toast(status==='rejected'?'❌':'✅',status==='rejected'?'已拒絕補打卡':upd.status==='sup_approved'?'第1層核准！':'✅ 補打卡核准並寫入紀錄');
       renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
-      // LINE 通知申請人（結果通知，Reply 以外用 Push，非自我通知才發）
+      // LINE 通知申請人補打卡審核結果（一定要發）
       var empToNotify=getEmpById(a.empId||'');
-      var myLineId=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
-      if(empToNotify&&empToNotify.lineUserId&&empToNotify.lineUserId!==myLineId){
+      if(empToNotify&&empToNotify.lineUserId){
         var typeLabel2=a.punchType==='in'?'上班打卡':'下班打卡';
         var resultLabel=upd.status==='approved'?'✅ 已核准':upd.status==='rejected'?'❌ 已拒絕':'⏳ 主管已初審，待 HR 最終審核';
         var lineMsg2='📋 補打卡審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+typeLabel2+'\n日期：'+a.date+' '+a.punchTime+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
@@ -4073,12 +4072,11 @@ window.doReview=function(status){
     var msg=status==='rejected'?'已拒絕 '+b.empName+' 的申請':upd2.status==='sup_approved'?'第1層核准！已通知HR':'✅ 全數核准！';
     toast(status==='rejected'?'❌':'✅',msg);
     renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
-    // LINE 通知申請人審核結果（非自我通知才發）
+    // LINE 通知申請人審核結果（審核結果一定要發，包含自審）
     var LEAVE_LBL={annual:'特休',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假',maternity:'產假',paternity:'陪產假',other:'其他'};
     var empN=getEmpById(b.empId||'');
-    var myLineId=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
-    if(empN&&empN.lineUserId&&empN.lineUserId!==myLineId){
-      var resultLabel=upd2.status==='approved'?'✅ 已核准（HR最終核准）':upd2.status==='rejected'?'❌ 已拒絕':upd2.status==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
+    if(empN&&empN.lineUserId){
+      var resultLabel=upd2.status==='approved'?'✅ 已核准':upd2.status==='rejected'?'❌ 已拒絕':upd2.status==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
       if(resultLabel){
         var lineMsg3='📋 請假審核結果\n━━━━━━━━━━━━━━\n申請人：'+(b.empName||'')+'\n假別：'+(LEAVE_LBL[b.type]||b.type)+'（'+b.days+' 天）\n期間：'+b.startDate+(b.startDate!==b.endDate?' ～ '+b.endDate:'')+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
         edgeCall('sendLine',{lineUserId:empN.lineUserId,message:lineMsg3},getAuthToken()).catch(function(){});
@@ -5012,11 +5010,10 @@ window.doOTReview=function(status){
       toast(status==='approved'?'✅':'❌',status==='approved'?'加班申請已核准':'加班申請已拒絕');
       renderApprove(document.getElementById('adminScroll'));
       updateAdminBadge();
-      // LINE 通知申請人審核結果（非自我通知才發）
+      // LINE 通知申請人加班審核結果（一定要發）
       if(a_ot){
         var empOTNotify=getEmpById(a_ot.empId||'');
-        var myLineIdOTR=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
-        if(empOTNotify&&empOTNotify.lineUserId&&empOTNotify.lineUserId!==myLineIdOTR){
+        if(empOTNotify&&empOTNotify.lineUserId){
           var otResultLabel=status==='approved'?'✅ 已核准':'❌ 已拒絕';
           var otResultMsg='📋 加班申請審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a_ot.empName||'')+'\n日期：'+a_ot.date+'\n時間：'+a_ot.startTime+' ～ '+a_ot.endTime+'（'+a_ot.hours.toFixed(1)+'h）\n結果：'+otResultLabel+(note?'\n備註：'+note:'');
           edgeCall('sendLine',{lineUserId:empOTNotify.lineUserId,message:otResultMsg},getAuthToken()).catch(function(){});
