@@ -1556,39 +1556,39 @@ function renderAdminDashboard(s){
       ${(pending.length+pendingMakeup.length+pendingOT.length)===0
         ?'<div style="text-align:center;padding:40px;color:var(--t3)">🎉 目前無待審申請</div>'
         :[
-          ...pending.map(a=>`<div class="list-row">
-            <div class="lr-av" style="background:var(--pl);color:var(--pd)">${a.empName[0]}</div>
+          ...pending.map(a=>{const eh=window.escapeHtml||String;return `<div class="list-row">
+            <div class="lr-av" style="background:var(--pl);color:var(--pd)">${eh(a.empName)[0]||'?'}</div>
             <div class="lr-info">
-              <div class="lr-name">${a.empName} — ${LEAVE_LABEL[a.type]||a.type}${a.days?' · '+a.days+'天':''}</div>
-              <div class="lr-sub">${a.startDate}${a.startDate!==a.endDate?' ~ '+a.endDate:''} · ${a.reason||'--'}</div>
+              <div class="lr-name">${eh(a.empName)} — ${eh(LEAVE_LABEL[a.type]||a.type)}${a.days?' · '+eh(String(a.days))+'天':''}</div>
+              <div class="lr-sub">${eh(a.startDate)}${a.startDate!==a.endDate?' ~ '+eh(a.endDate):''} · ${eh(a.reason||'--')}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <span style="font-size:10px;background:var(--pl);color:var(--pd);padding:2px 7px;border-radius:8px;font-weight:700">請假</span>
-              <button style="padding:4px 12px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview('${a.id}')">審核</button>
+              <button style="padding:4px 12px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview('${eh(a.id)}')">審核</button>
             </div>
-          </div>`),
-          ...pendingMakeup.map(a=>`<div class="list-row">
-            <div class="lr-av" style="background:#fff3e0;color:#e65100">${(a.empName||'?')[0]}</div>
+          </div>`;}),
+          ...pendingMakeup.map(a=>{const eh=window.escapeHtml||String;return `<div class="list-row">
+            <div class="lr-av" style="background:#fff3e0;color:#e65100">${eh(a.empName||'?')[0]||'?'}</div>
             <div class="lr-info">
-              <div class="lr-name">${a.empName||'--'} — 補${a.punchType==='in'?'上班':'下班'}打卡</div>
-              <div class="lr-sub">${a.date} ${a.punchTime} · ${a.reason||'--'}</div>
+              <div class="lr-name">${eh(a.empName||'--')} — 補${a.punchType==='in'?'上班':'下班'}打卡</div>
+              <div class="lr-sub">${eh(a.date)} ${eh(a.punchTime)} · ${eh(a.reason||'--')}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <span style="font-size:10px;background:#fff3e0;color:#e65100;padding:2px 7px;border-radius:8px;font-weight:700">補打卡</span>
-              <button style="padding:4px 12px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview('${a.id}')">審核</button>
+              <button style="padding:4px 12px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview('${eh(a.id)}')">審核</button>
             </div>
-          </div>`),
-          ...pendingOT.map(a=>`<div class="list-row">
-            <div class="lr-av" style="background:#e8f5e9;color:#2e7d32">${(a.emp_name||'?')[0]}</div>
+          </div>`;}),
+          ...pendingOT.map(a=>{const eh=window.escapeHtml||String;return `<div class="list-row">
+            <div class="lr-av" style="background:#e8f5e9;color:#2e7d32">${eh(a.emp_name||'?')[0]||'?'}</div>
             <div class="lr-info">
-              <div class="lr-name">${a.emp_name||'--'} — 加班申請</div>
-              <div class="lr-sub">${a.date} ${a.start_time}～${a.end_time}（${a.hours||0}h） · ${a.reason||'--'}</div>
+              <div class="lr-name">${eh(a.emp_name||'--')} — 加班申請</div>
+              <div class="lr-sub">${eh(a.date)} ${eh(a.start_time)}～${eh(a.end_time)}（${eh(String(a.hours||0))}h） · ${eh(a.reason||'--')}</div>
             </div>
             <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">
               <span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:8px;font-weight:700">加班</span>
-              <button style="padding:4px 12px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview&&openOTReview('${a.id}')">審核</button>
+              <button style="padding:4px 12px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview&&openOTReview('${eh(a.id)}')">審核</button>
             </div>
-          </div>`)
+          </div>`;})
         ].join('')}
     </div>
   </div>`;
@@ -3431,7 +3431,7 @@ function loadAllData(){
   var d3m=new Date(); d3m.setMonth(d3m.getMonth()-3);
   var recFrom=d3m.toISOString().slice(0,10);
   return Promise.all([
-    sbq('employees',{select:'*'}),
+    sbq('employees',{select:'id,name,dept,pos,role,status,email,color,supervisor_id,salary,birth_date,hire_date,contract_type,gender,phone,emergency_contact_name,emergency_contact_phone,line_user_id,work_rule'}),
     sbq('records',{select:'*',range:{date:{gte:recFrom}}}),
     // attach_data 欄位不在此處抓取（可達 1MB+），審核時才 lazy load
     sbq('leave_apps',{select:'id,emp_id,emp_name,type,start_date,end_date,days,reason,proxy,sup_id,attach_name,status,stage,sup_note,sup_reviewed_at,hr_note,hr_reviewed_at,applied_at',order:'applied_at.desc'}),
@@ -3444,7 +3444,7 @@ function loadAllData(){
   ]).then(function(res){
     var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[],empQRows=res[7]||[],otRows=res[8]||[];
     DB.emps=emps.map(toEmp);
-    DB.accs=emps.map(function(e){return{id:e.id,pw:e.password_hash,role:e.role||'employee'};});
+    DB.accs=emps.map(function(e){return{id:e.id,role:e.role||'employee'};});  // pw 不存前端
     DB.recs=recs.map(toRec);
     DB.leaves=leaves.map(toLea);
     DB.makeups=makeups.map(toMkp);
@@ -4041,6 +4041,15 @@ window.doReview=function(status){
       closeSheet('reviewSheet');
       toast(status==='rejected'?'❌':'✅',status==='rejected'?'已拒絕補打卡':upd.status==='sup_approved'?'第1層核准！':'✅ 補打卡核准並寫入紀錄');
       renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
+      // LINE 通知申請人（結果通知，Reply 以外用 Push，非自我通知才發）
+      var empToNotify=getEmpById(a.empId||'');
+      var myLineId=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
+      if(empToNotify&&empToNotify.lineUserId&&empToNotify.lineUserId!==myLineId){
+        var typeLabel2=a.punchType==='in'?'上班打卡':'下班打卡';
+        var resultLabel=upd.status==='approved'?'✅ 已核准':upd.status==='rejected'?'❌ 已拒絕':'⏳ 主管已初審，待 HR 最終審核';
+        var lineMsg2='📋 補打卡審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+typeLabel2+'\n日期：'+a.date+' '+a.punchTime+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
+        edgeCall('sendLine',{lineUserId:empToNotify.lineUserId,message:lineMsg2},getAuthToken()).catch(function(){});
+      }
     });
     return;
   }
@@ -4064,6 +4073,17 @@ window.doReview=function(status){
     var msg=status==='rejected'?'已拒絕 '+b.empName+' 的申請':upd2.status==='sup_approved'?'第1層核准！已通知HR':'✅ 全數核准！';
     toast(status==='rejected'?'❌':'✅',msg);
     renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
+    // LINE 通知申請人審核結果（非自我通知才發）
+    var LEAVE_LBL={annual:'特休',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假',maternity:'產假',paternity:'陪產假',other:'其他'};
+    var empN=getEmpById(b.empId||'');
+    var myLineId=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
+    if(empN&&empN.lineUserId&&empN.lineUserId!==myLineId){
+      var resultLabel=upd2.status==='approved'?'✅ 已核准（HR最終核准）':upd2.status==='rejected'?'❌ 已拒絕':upd2.status==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
+      if(resultLabel){
+        var lineMsg3='📋 請假審核結果\n━━━━━━━━━━━━━━\n申請人：'+(b.empName||'')+'\n假別：'+(LEAVE_LBL[b.type]||b.type)+'（'+b.days+' 天）\n期間：'+b.startDate+(b.startDate!==b.endDate?' ～ '+b.endDate:'')+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
+        edgeCall('sendLine',{lineUserId:empN.lineUserId,message:lineMsg3},getAuthToken()).catch(function(){});
+      }
+    }
   });
 };
 
@@ -4910,17 +4930,29 @@ window.submitOvertime=function(){
     toast('✅','加班申請已送出！');
     empTab('overtime');
     updateEmpBadge();
-    // 通知主管
+    // 通知主管（LINE + Email）
     var supEmp=window.getEmpById(supId);
-    if(supEmp&&supEmp.email){
-      var pendingOTs=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.supId===supId&&a.status==='pending';});
-      var body2='您好，\n\n'+emp.name+' 申請加班核准，請審核。\n加班日期：'+date+' '+start+'~'+end+' ('+hours.toFixed(1)+'h)\n原因：'+reason;
-      if(pendingOTs.length>1) body2+='\n\n您目前共有 '+pendingOTs.length+' 筆待審加班申請。';
-      var a2=document.createElement('a');
-      a2.href='mailto:'+encodeURIComponent(supEmp.email)
-        +'?subject='+encodeURIComponent('[加班申請] '+emp.name+' '+date)
-        +'&body='+encodeURIComponent(body2);
-      a2.style.display='none';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+    if(supEmp){
+      var myLineIdOT=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
+      // LINE 通知主管（非自我通知才發）
+      if(supEmp.lineUserId&&supEmp.lineUserId!==myLineIdOT){
+        var pendingOTsLine=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.supId===supId&&a.status==='pending';});
+        var otLineMsg='📋 新待審核申請\n━━━━━━━━━━━━━━\n申請人：'+(emp?emp.name:'')+'\n類型：加班申請\n日期：'+date+'\n時間：'+start+' ～ '+end+'（'+hours.toFixed(1)+'h）\n原因：'+reason+(pendingOTsLine.length>1?'\n\n您目前共有 '+pendingOTsLine.length+' 筆待審加班申請。':'');
+        edgeCall('sendLine',{lineUserId:supEmp.lineUserId,message:otLineMsg},getAuthToken())
+          .then(function(){toast('💬','申請已送出！LINE 通知已發送給 '+supEmp.name);})
+          .catch(function(){toast('✅','加班申請已送出！（LINE 通知失敗）');});
+      }
+      // Email 通知（備援）
+      if(supEmp.email){
+        var pendingOTs=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.supId===supId&&a.status==='pending';});
+        var body2='您好，\n\n'+(emp?emp.name:'')+' 申請加班核准，請審核。\n加班日期：'+date+' '+start+'~'+end+' ('+hours.toFixed(1)+'h)\n原因：'+reason;
+        if(pendingOTs.length>1) body2+='\n\n您目前共有 '+pendingOTs.length+' 筆待審加班申請。';
+        var a2=document.createElement('a');
+        a2.href='mailto:'+encodeURIComponent(supEmp.email)
+          +'?subject='+encodeURIComponent('[加班申請] '+(emp?emp.name:'')+' '+date)
+          +'&body='+encodeURIComponent(body2);
+        a2.style.display='none';document.body.appendChild(a2);a2.click();document.body.removeChild(a2);
+      }
     }
   }).catch(function(err){
     console.error('[submitOvertime]',err);
@@ -4971,6 +5003,7 @@ window.doOTReview=function(status){
   var id=window._reviewingOTId;
   if(!id) return;
   var note=(document.getElementById('otReviewNote')?document.getElementById('otReviewNote').value:'')||'';
+  var a_ot=(window.getOvertimeApps?window.getOvertimeApps():[]).find(function(x){return x.id===id;});
   sbupd('overtime_apps',{status:status,sup_note:note,sup_reviewed_at:new Date().toISOString()},{id:id})
     .then(function(){return loadAllData();})
     .then(function(){
@@ -4979,6 +5012,16 @@ window.doOTReview=function(status){
       toast(status==='approved'?'✅':'❌',status==='approved'?'加班申請已核准':'加班申請已拒絕');
       renderApprove(document.getElementById('adminScroll'));
       updateAdminBadge();
+      // LINE 通知申請人審核結果（非自我通知才發）
+      if(a_ot){
+        var empOTNotify=getEmpById(a_ot.empId||'');
+        var myLineIdOTR=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
+        if(empOTNotify&&empOTNotify.lineUserId&&empOTNotify.lineUserId!==myLineIdOTR){
+          var otResultLabel=status==='approved'?'✅ 已核准':'❌ 已拒絕';
+          var otResultMsg='📋 加班申請審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a_ot.empName||'')+'\n日期：'+a_ot.date+'\n時間：'+a_ot.startTime+' ～ '+a_ot.endTime+'（'+a_ot.hours.toFixed(1)+'h）\n結果：'+otResultLabel+(note?'\n備註：'+note:'');
+          edgeCall('sendLine',{lineUserId:empOTNotify.lineUserId,message:otResultMsg},getAuthToken()).catch(function(){});
+        }
+      }
     });
 };
 
