@@ -3384,6 +3384,7 @@ function sbups(t,d,oc){
   return fetch(u,{method:'POST',headers:Object.assign({},H,{Prefer:'resolution=merge-duplicates,return=representation'}),body:JSON.stringify(d)})
     .then(function(r){if(!r.ok){console.error('[sbups] HTTP '+r.status+' on '+t);return r.text().then(function(t){console.error('[sbups] body:',t);return null;});}return r.json();}).catch(function(e){console.error('[sbups] fetch error:',e);return null;});
 }
+window.sbups=sbups;
 function sbupd(t,d,f){
   if(!f||Object.keys(f).length===0){console.error('[sbupd] 拒絕空 filter，防止全表更新 on '+t);return Promise.resolve(null);}
   var u=SB_URL+'/rest/v1/'+t,p=[];
