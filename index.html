@@ -1173,12 +1173,12 @@ function renderLeaveStatus(s){
         +'</div>'
         +(isCancelled?'':leaveStageBar(a))
         +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7;margin-top:6px">'
-        +'<div>原因：'+a.reason+'</div>'
-        +'<div>直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
-        +'<div>代理人：'+(a.proxy||'--')+'</div>'
-        +(a.attachName?'<div>&#x1F4CE; 附件：'+a.attachName+'</div>':'')
-        +(a.supNote?'<div style="color:var(--t3)">主管備註：'+a.supNote+'</div>':'')
-        +(a.hrNote?'<div style="color:var(--t3)">HR備註：'+a.hrNote+'</div>':'')
+        +'<div>原因：'+escapeHtml(a.reason||'')+'</div>'
+        +'<div>直屬主管：'+(supEmp?escapeHtml(supEmp.name):'--')+'</div>'
+        +'<div>代理人：'+escapeHtml(a.proxy||'--')+'</div>'
+        +(a.attachName?'<div>&#x1F4CE; 附件：'+escapeHtml(a.attachName)+'</div>':'')
+        +(a.supNote?'<div style="color:var(--t3)">主管備註：'+escapeHtml(a.supNote)+'</div>':'')
+        +(a.hrNote?'<div style="color:var(--t3)">HR備註：'+escapeHtml(a.hrNote)+'</div>':'')
         +'</div>'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
         +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
@@ -1202,10 +1202,10 @@ function renderLeaveStatus(s){
         +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
         +'</div>'
         +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7">'
-        +'<div>原因：'+a.reason+'</div>'
+        +'<div>原因：'+escapeHtml(a.reason||'')+'</div>'
         +(a.gps&&a.gps.lat?'<div>&#x1F4CD; 定位：'+a.gps.lat+', '+a.gps.lng+'（精度±'+a.gps.acc+'m）</div>':'<div style="color:var(--t3)">&#x1F4CD; 無定位紀錄</div>')
-        +(a.supNote?'<div>主管備註：'+a.supNote+'</div>':'')
-        +(a.hrNote?'<div>HR備註：'+a.hrNote+'</div>':'')
+        +(a.supNote?'<div>主管備註：'+escapeHtml(a.supNote)+'</div>':'')
+        +(a.hrNote?'<div>HR備註：'+escapeHtml(a.hrNote)+'</div>':'')
         +'</div>'
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
         +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
@@ -1671,12 +1671,12 @@ function renderApprove(s){
       var stage=a.status==='pending'?'直屬主管審核':'HR最終審核';
       var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
       html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:var(--pl);color:var(--pd)">'+a.empName[0]+'</div>'
+        +'<div class="lr-av" style="background:var(--pl);color:var(--pd)">'+escapeHtml(a.empName[0]||'?')+'</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+a.empName+' &#x2014; '+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
         +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
         +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stage+'</div>'
-        +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+a.attachName+'</div>':'')
+        +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+escapeHtml(a.attachName)+'</div>':'')
         +'</div>'
         +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\''+a.id+'\')">審核</button>'
         +'</div>';
@@ -1690,11 +1690,11 @@ function renderApprove(s){
     waiting.forEach(function(a){
       var supE=getEmpById(a.supId||'');
       html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:var(--yl);color:var(--yellow)">'+a.empName[0]+'</div>'
+        +'<div class="lr-av" style="background:var(--yl);color:var(--yellow)">'+escapeHtml(a.empName[0]||'?')+'</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+a.empName+' &#x2014; '+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
         +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+'</div>'
-        +'<div class="lr-sub" style="color:var(--t3)">待主管：'+(supE?supE.name:'--')+'</div>'
+        +'<div class="lr-sub" style="color:var(--t3)">待主管：'+(supE?escapeHtml(supE.name):'--')+'</div>'
         +'</div>'
         +'<span class="bgg bg-y">待主管</span>'
         +'</div>';
@@ -1711,12 +1711,12 @@ function renderApprove(s){
       var sc=a.status==='approved'?'var(--green)':'var(--pd)';
       var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
       html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+a.empName[0]+'</div>'
+        +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+escapeHtml(a.empName[0]||'?')+'</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+a.empName+' &#x2014; '+(LEAVE_LABEL[a.type]||a.type)+'</div>'
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
         +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
-        +(a.supNote?'<div class="lr-sub">主管：'+a.supNote+'</div>':'')
-        +(a.hrNote?'<div class="lr-sub">HR：'+a.hrNote+'</div>':'')
+        +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
+        +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
         +'</div>'
         +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
         +'</div>';
@@ -1744,7 +1744,7 @@ function renderApprove(s){
         html+='<div class="list-row">'
           +'<div class="lr-av" style="background:var(--ol);color:var(--orange)">&#x1F527;</div>'
           +'<div class="lr-info">'
-          +'<div class="lr-name">'+a.empName+' &#x2014; 補'+typeLabel+'</div>'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+typeLabel+'</div>'
           +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
           +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
           +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
@@ -1770,9 +1770,9 @@ function renderApprove(s){
       html+='<div class="list-row">'
         +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)">&#x23F0;</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+a.empName+' &#x2014; 加班申請</div>'
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 加班申請</div>'
         +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
-        +'<div class="lr-sub" style="color:var(--t3)">'+(a.reason||'--')+'</div>'
+        +'<div class="lr-sub" style="color:var(--t3)">'+escapeHtml(a.reason||'--')+'</div>'
         +'</div>'
         +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview(\''+a.id+'\')">審核</button>'
         +'</div>';
@@ -1788,9 +1788,9 @@ function renderApprove(s){
       html+='<div class="list-row">'
         +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x23F0;</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+a.empName+' — 加班</div>'
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' — 加班</div>'
         +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
-        +(a.supNote?'<div class="lr-sub">備註：'+a.supNote+'</div>':'')
+        +(a.supNote?'<div class="lr-sub">備註：'+escapeHtml(a.supNote)+'</div>':'')
         +'</div>'
         +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
         +'</div>';
@@ -2484,13 +2484,14 @@ function renderSettings(s){
 }
 
 function renderExtraLocs(cfg){
+  var esc=window.escapeHtml||function(s){return String(s||'');};
   var locs=cfg.extraLocations||[];
   if(!locs.length) return '<div style="font-size:12px;color:var(--t3);padding:8px 0">尚無其他地點</div>';
   return locs.map(function(l,i){
     return '<div style="display:flex;align-items:center;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">'
       +'<div style="flex:1">'
-      +'<div style="font-size:13px;font-weight:700">📍 '+eh(l.name)+'</div>'
-      +(l.address?'<div style="font-size:11px;color:var(--t3)">'+eh(l.address)+'</div>':'')
+      +'<div style="font-size:13px;font-weight:700">📍 '+esc(l.name)+'</div>'
+      +(l.address?'<div style="font-size:11px;color:var(--t3)">'+esc(l.address)+'</div>':'')
       +'<div style="font-size:11px;color:var(--t3)">座標：'+l.lat+', '+l.lng+' | 範圍：'+(l.rangeM||getCfg().rangeM)+'m</div>'
       +'</div>'
       +'<button onclick="deleteExtraLoc('+i+')" style="padding:5px 10px;border:1.5px solid #ffcccc;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:12px;cursor:pointer">刪除</button>'
@@ -3791,22 +3792,17 @@ window.changePassword=function(){
   var errEl=document.getElementById('pwError');
   if(newPw.length<6){errEl.textContent='新密碼至少需要6個字元';errEl.style.display='block';return;}
   if(newPw!==confirmPw){errEl.textContent='兩次密碼不一致';errEl.style.display='block';return;}
-  sha256(curPw).then(function(curHash){
-    var acc=(DB.accs||[]).find(function(a){return a.id===window.currentUser.id;});
-    if(!acc||acc.pw!==curHash){errEl.textContent='目前密碼錯誤';errEl.style.display='block';return;}
-    sha256(newPw).then(function(newHash){
-      sbupd('employees',{password_hash:newHash},{id:window.currentUser.id}).then(function(res){
-        if(!res){errEl.textContent='密碼更新失敗，請重試';errEl.style.display='block';return;}
-        return loadAllData();
-      }).then(function(){
-        errEl.style.display='none';
-        ['curPw','newPw','confirmPw'].forEach(function(id){document.getElementById(id).value='';});
-        toast('🔒','密碼修改成功！');
-      }).catch(function(err){
-        console.error('[changePassword] error:',err);
-        errEl.textContent='密碼更新失敗';errEl.style.display='block';
-      });
-    });
+  Promise.all([sha256(curPw),sha256(newPw)]).then(function(hashes){
+    var curHash=hashes[0],newHash=hashes[1];
+    var token=getAuthToken();
+    return edgeCall('changePassword',{currentHash:curHash,newHash:newHash},token);
+  }).then(function(){
+    errEl.style.display='none';
+    ['curPw','newPw','confirmPw'].forEach(function(id){document.getElementById(id).value='';});
+    toast('🔒','密碼修改成功！');
+  }).catch(function(e){
+    console.error('[changePassword] error:',e);
+    errEl.textContent=e.message||'密碼更新失敗，請重試';errEl.style.display='block';
   });
 };
 
@@ -4694,7 +4690,8 @@ window.printSalarySlip = function(empId, y, m) {
   win.document.write('<html><head><title>薪資單</title><style>body{font-family:"Noto Sans TC",sans-serif;max-width:620px;margin:30px auto;color:#333}h2{color:#5046e0;border-bottom:2px solid #5046e0;padding-bottom:8px}.row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #f0f0f0;font-size:13px}.total{font-size:18px;font-weight:800;color:#2eaa6e;padding:12px 0}.deduct{color:#e00}.section{background:#f8f8ff;border-radius:8px;padding:12px;margin:12px 0}.label{color:#666;font-size:12px}</style></head><body>');
   win.document.write('<h2>💰 薪資單</h2>');
   win.document.write('<p><strong>iROBOT MEDICINE 智能人醫</strong></p>');
-  win.document.write('<p>員工：<strong>'+emp.name+'</strong>（'+emp.id+'） | 部門：'+emp.dept+' | 月份：'+y+'年'+m+'月</p>');
+  var _e=function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');};
+  win.document.write('<p>員工：<strong>'+_e(emp.name)+'</strong>（'+_e(emp.id)+'） | 部門：'+_e(emp.dept)+' | 月份：'+y+'年'+m+'月</p>');
   win.document.write('<p class="label">應出勤：'+scheduledDays+'天 | 實際出勤：'+workDays+'天 | 請假：'+leaveDays+'天 | 曠職：'+absentDays+'天</p>');
   win.document.write('<div class="section">');
   win.document.write('<div class="row"><span>本月底薪</span><span>$'+baseSalary.toLocaleString()+'</span></div>');
