@@ -3625,7 +3625,7 @@ window.selectOffice=function(idx){
   if(gps&&gps.lat){
     var o=window.pendingOffice;
     var rangeM=o.rangeM||getCfg().rangeM;
-    var dist=haversine(gps.lat,gps.lng,o.lat,o.lng);
+    var dist=Math.round(haversine(gps.lat,gps.lng,o.lat,o.lng));
     var isOK=dist<=rangeM, isWarn=dist<=rangeM*2;
     var db=document.getElementById('distBadge');
     if(db) db.innerHTML='<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">📏 距'+o.name+' '+dist+'m '+(isOK?'✅ 範圍內':isWarn?'⚠️ 稍遠':'❌ 範圍外')+'</span>';
@@ -3672,7 +3672,11 @@ window.getGPS=function(){
   if(!navigator.geolocation){showGPSError('此裝置不支援定位功能');return;}
   try{
     navigator.geolocation.getCurrentPosition(
-      function(pos){try{onGPSSuccess(pos,cfg);}catch(e){console.warn('GPS success handler error:',e);}},
+      function(pos){
+        // 同步設定 window.currentGPS，讓 selectOffice 切換辦公室時能重新計算距離
+        window.currentGPS={lat:pos.coords.latitude,lng:pos.coords.longitude,acc:Math.round(pos.coords.accuracy)};
+        try{onGPSSuccess(pos,cfg);}catch(e){console.warn('GPS success handler error:',e);}
+      },
       function(err){try{onGPSError(err,cfg);}catch(e){console.warn('GPS error handler error:',e);}},
       {enableHighAccuracy:false,timeout:8000,maximumAge:30000}
     );
