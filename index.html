@@ -1611,7 +1611,10 @@ function renderGPSMap(s){
   const markerJS=markers.map(m=>{
     const icon=m.type==='company'?'🏢':m.type==='in'?'🟢':'🔵';
     const color=m.type==='company'?'#cc0000':m.type==='in'?'#22c55e':'#3b82f6';
-    return `(function(){var mk=L.marker([${m.lat},${m.lng}]).addTo(map);mk.bindTooltip('<b>${icon} ${m.label}</b>',{permanent:true,direction:'top',offset:[0,-8],className:'emp-tip'});mk.bindPopup('<b>${icon} ${m.label}</b><br><span style="font-size:11px;color:#666">${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</span>');})();`;
+    // 安全：m.label 嵌入 Blob HTML 的 <script> 字串前必須 escape，
+    // 防止惡意員工姓名（含 ' " \ 等字元）執行任意 JS（JS Injection）
+    const safeLabel=(m.label||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `(function(){var mk=L.marker([${m.lat},${m.lng}]).addTo(map);mk.bindTooltip('<b>${icon} ${safeLabel}</b>',{permanent:true,direction:'top',offset:[0,-8],className:'emp-tip'});mk.bindPopup('<b>${icon} ${safeLabel}</b><br><span style="font-size:11px;color:#666">${m.lat.toFixed(5)}, ${m.lng.toFixed(5)}</span>');})();`;
   }).join('\n');
   const tooltipCSS=`.emp-tip{background:#fff;border:1.5px solid #5046e0;border-radius:8px;padding:3px 8px;font-size:12px;font-weight:700;color:#222;box-shadow:0 2px 8px rgba(0,0,0,.15);white-space:nowrap}.emp-tip::before{display:none}`;
   const mapHTML=`<!DOCTYPE html><html><head><meta charset="UTF-8"><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"><\/script><style>*{margin:0;padding:0}#map{width:100%;height:100vh}${tooltipCSS}</style></head><body><div id="map"></div>\u003Cscript>const map=L.map('map').setView([${cfg.lat},${cfg.lng}],17);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OSM'}).addTo(map);L.circle([${cfg.lat},${cfg.lng}],{radius:${cfg.rangeM},color:'#5046e0',fillColor:'#5046e0',fillOpacity:0.08,weight:2,dashArray:'6'}).addTo(map);${markerJS}\u003C/script></body></html>`;
