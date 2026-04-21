@@ -4047,50 +4047,50 @@ window.openMakeupReview=function(id){
 };
 
 // ── Override doReview ─────────────────────────────
+// 改用 Edge Function（service_role）寫入，解決 anon key RLS 靜默無更新問題
 window.doReview=function(status){
   if(!window.reviewingId)return;
   var rid=window.reviewingId;
   var note=(document.getElementById('reviewNote')?document.getElementById('reviewNote').value:'')||'';
-  var now=new Date().toISOString();
+  var tok=getAuthToken();
 
   if(rid.startsWith('MAKEUP:')){
     var realId=rid.replace('MAKEUP:','');
     var a=getMakeupApps().find(function(x){return x.id===realId;});
     if(!a)return;
-    var upd={};
-    if(status==='rejected'){upd={status:'rejected',sup_note:a.supNote||note,hr_note:note,hr_reviewed_at:now};}
-    else if(a.status==='pending'){upd={status:'sup_approved',stage:'hr',sup_note:note,sup_reviewed_at:now};}
-    else if(a.status==='sup_approved'){
-      upd={status:'approved',stage:'done',hr_note:note,hr_reviewed_at:now};
-      var timeISO=new Date(a.date+'T'+a.punchTime+':00').toISOString();
-      var ex=getRecs().find(function(r){return r.date===a.date&&r.empId===a.empId;});
-      if(ex){sbupd('records',a.punchType==='in'?{time_in:timeISO,gps_in:Object.assign({},a.gps,{makeup:true})}:{time_out:timeISO,gps_out:Object.assign({},a.gps,{makeup:true})},{emp_id:a.empId,date:a.date});}
-      else{sbins('records',{emp_id:a.empId,date:a.date,time_in:a.punchType==='in'?timeISO:null,time_out:a.punchType==='out'?timeISO:null,gps_in:a.punchType==='in'?Object.assign({},a.gps,{makeup:true}):null,gps_out:a.punchType==='out'?Object.assign({},a.gps,{makeup:true}):null});}
-    }
-    sbupd('makeup_apps',upd,{id:realId}).then(function(){return loadAllData();}).then(function(){
+    // 預先判斷下一個狀態，供 toast 用
+    var nextStatus=status==='rejected'?'rejected':a.status==='pending'?'sup_approved':'approved';
+
+    edgeCall('reviewApp',{appType:'makeup',id:realId,verdict:status,note:note},tok)
+    .then(function(res){
+      return loadAllData().then(function(){return res;});
+    }).then(function(res){
       closeSheet('reviewSheet');
-      toast(status==='rejected'?'❌':'✅',status==='rejected'?'已拒絕補打卡':upd.status==='sup_approved'?'第1層核准！':'✅ 補打卡核准並寫入紀錄');
+      var ns=res&&res.newStatus?res.newStatus:nextStatus;
+      toast(status==='rejected'?'❌':'✅',
+        status==='rejected'?'已拒絕補打卡':
+        ns==='sup_approved'?'第1層核准！等待HR最終審核':'✅ 補打卡核准並寫入紀錄');
       renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
-      // 補打卡審核卡片也在 empTab('status')，需一併重新渲染
       if(typeof empTab==='function'){var _ea=document.querySelector('#empTabbar .tb-item.active');empTab(_ea?_ea.id.replace('etab-',''):'status');}
-      // LINE 通知申請人補打卡審核結果（一定要發）
+      // LINE 通知申請人補打卡審核結果
       var empToNotify=getEmpById(a.empId||'');
       if(empToNotify&&empToNotify.lineUserId){
         var typeLabel2=a.punchType==='in'?'上班打卡':'下班打卡';
-        var resultLabel=upd.status==='approved'?'✅ 已核准':upd.status==='rejected'?'❌ 已拒絕':'⏳ 主管已初審，待 HR 最終審核';
+        var resultLabel=ns==='approved'?'✅ 已核准':ns==='rejected'?'❌ 已拒絕':'⏳ 主管已初審，待 HR 最終審核';
         var lineMsg2='📋 補打卡審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+typeLabel2+'\n日期：'+a.date+' '+a.punchTime+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
-        edgeCall('sendLine',{lineUserId:empToNotify.lineUserId,message:lineMsg2},getAuthToken()).catch(function(){});
+        edgeCall('sendLine',{lineUserId:empToNotify.lineUserId,message:lineMsg2},tok).catch(function(){});
       }
+    }).catch(function(e){
+      toast('❌','審核失敗：'+(e&&e.message?e.message:'請重試'));
+      console.error('[doReview makeup]',e);
     });
     return;
   }
 
   var b=getApps().find(function(x){return x.id===rid;});
   if(!b)return;
-  var upd2={};
-  if(status==='rejected'){upd2={status:'rejected',sup_note:b.supNote||note,hr_note:note,sup_reviewed_at:b.supReviewedAt||now,hr_reviewed_at:now};}
-  else if(b.status==='pending'){
-    upd2={status:'sup_approved',stage:'hr',sup_note:note,sup_reviewed_at:now};
+  // 第1層核准時，嘗試開啟郵件通知 HR（在 edgeCall 前，保持在使用者點擊堆疊內）
+  if(status!=='rejected'&&b.status==='pending'){
     var hrAcc=(DB.accs||[]).find(function(x){return x.role==='admin';});
     var hrEmp=hrAcc?getEmpById(hrAcc.id):null;
     if(hrEmp&&hrEmp.email){
@@ -4098,24 +4098,32 @@ window.doReview=function(status){
       el.href='mailto:'+hrEmp.email+'?subject='+encodeURIComponent('[請假待HR審核] '+b.empName)+'&body='+encodeURIComponent(b.empName+' 的請假已通過主管審核，請進行最終審核。');
       el.style.display='none';document.body.appendChild(el);el.click();document.body.removeChild(el);
     }
-  }else if(b.status==='sup_approved'){upd2={status:'approved',stage:'done',hr_note:note,hr_reviewed_at:now};}
-  sbupd('leave_apps',upd2,{id:rid}).then(function(){return loadAllData();}).then(function(){
+  }
+  var nextStatus2=status==='rejected'?'rejected':b.status==='pending'?'sup_approved':'approved';
+
+  edgeCall('reviewApp',{appType:'leave',id:rid,verdict:status,note:note},tok)
+  .then(function(res){
+    return loadAllData().then(function(){return res;});
+  }).then(function(res){
     closeSheet('reviewSheet');
-    var msg=status==='rejected'?'已拒絕 '+b.empName+' 的申請':upd2.status==='sup_approved'?'第1層核准！已通知HR':'✅ 全數核准！';
+    var ns2=res&&res.newStatus?res.newStatus:nextStatus2;
+    var msg=status==='rejected'?'已拒絕 '+b.empName+' 的申請':ns2==='sup_approved'?'第1層核准！已通知HR':'✅ 全數核准！';
     toast(status==='rejected'?'❌':'✅',msg);
     renderApprove(document.getElementById('adminScroll'));updateAdminBadge();
-    // 補打卡/加班審核卡片也在 empTab('status')，需一併重新渲染
     if(typeof empTab==='function'){var _ea=document.querySelector('#empTabbar .tb-item.active');empTab(_ea?_ea.id.replace('etab-',''):'status');}
-    // LINE 通知申請人審核結果（審核結果一定要發，包含自審）
+    // LINE 通知申請人審核結果
     var LEAVE_LBL={annual:'特休',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假',maternity:'產假',paternity:'陪產假',other:'其他'};
     var empN=getEmpById(b.empId||'');
     if(empN&&empN.lineUserId){
-      var resultLabel=upd2.status==='approved'?'✅ 已核准':upd2.status==='rejected'?'❌ 已拒絕':upd2.status==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
+      var resultLabel=ns2==='approved'?'✅ 已核准':ns2==='rejected'?'❌ 已拒絕':ns2==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
       if(resultLabel){
         var lineMsg3='📋 請假審核結果\n━━━━━━━━━━━━━━\n申請人：'+(b.empName||'')+'\n假別：'+(LEAVE_LBL[b.type]||b.type)+'（'+b.days+' 天）\n期間：'+b.startDate+(b.startDate!==b.endDate?' ～ '+b.endDate:'')+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
-        edgeCall('sendLine',{lineUserId:empN.lineUserId,message:lineMsg3},getAuthToken()).catch(function(){});
+        edgeCall('sendLine',{lineUserId:empN.lineUserId,message:lineMsg3},tok).catch(function(){});
       }
     }
+  }).catch(function(e){
+    toast('❌','審核失敗：'+(e&&e.message?e.message:'請重試'));
+    console.error('[doReview leave]',e);
   });
 };
 
@@ -5031,13 +5039,14 @@ window.openOTReview=function(id){
   openSheet('otReviewSheet');
 };
 
-// 執行加班審核動作
+// 執行加班審核動作（改用 Edge Function，解決 anon key RLS 靜默無更新）
 window.doOTReview=function(status){
   var id=window._reviewingOTId;
   if(!id) return;
   var note=(document.getElementById('otReviewNote')?document.getElementById('otReviewNote').value:'')||'';
   var a_ot=(window.getOvertimeApps?window.getOvertimeApps():[]).find(function(x){return x.id===id;});
-  sbupd('overtime_apps',{status:status,sup_note:note,sup_reviewed_at:new Date().toISOString()},{id:id})
+  var tok=getAuthToken();
+  edgeCall('reviewApp',{appType:'overtime',id:id,verdict:status,note:note},tok)
     .then(function(){return loadAllData();})
     .then(function(){
       closeSheet('otReviewSheet');
@@ -5045,15 +5054,19 @@ window.doOTReview=function(status){
       toast(status==='approved'?'✅':'❌',status==='approved'?'加班申請已核准':'加班申請已拒絕');
       renderApprove(document.getElementById('adminScroll'));
       updateAdminBadge();
-      // LINE 通知申請人加班審核結果（一定要發）
+      if(typeof empTab==='function'){var _ea=document.querySelector('#empTabbar .tb-item.active');empTab(_ea?_ea.id.replace('etab-',''):'status');}
+      // LINE 通知申請人加班審核結果
       if(a_ot){
         var empOTNotify=getEmpById(a_ot.empId||'');
         if(empOTNotify&&empOTNotify.lineUserId){
           var otResultLabel=status==='approved'?'✅ 已核准':'❌ 已拒絕';
           var otResultMsg='📋 加班申請審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a_ot.empName||'')+'\n日期：'+a_ot.date+'\n時間：'+a_ot.startTime+' ～ '+a_ot.endTime+'（'+a_ot.hours.toFixed(1)+'h）\n結果：'+otResultLabel+(note?'\n備註：'+note:'');
-          edgeCall('sendLine',{lineUserId:empOTNotify.lineUserId,message:otResultMsg},getAuthToken()).catch(function(){});
+          edgeCall('sendLine',{lineUserId:empOTNotify.lineUserId,message:otResultMsg},tok).catch(function(){});
         }
       }
+    }).catch(function(e){
+      toast('❌','審核失敗：'+(e&&e.message?e.message:'請重試'));
+      console.error('[doOTReview]',e);
     });
 };
 
