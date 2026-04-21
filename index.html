@@ -3467,9 +3467,16 @@ function loadAllData(){
     DB.holidays={};
     holRows.forEach(function(h){DB.holidays[h.date]={name:h.name,year:h.year,id:h.id};});
     // 管理員：salary 已從 anon query 移除（REVOKE），改由 Edge Function 補入
-    if(window.currentUser && window.currentUser.role==='admin'){
-      var tok=getAuthToken();
-      if(tok){
+    // 注意：window.currentUser 在首次登入時尚未設定（loadAllData 在 currentUser 賦值前呼叫）
+    // 改由直接解析 JWT payload 判斷角色，避免漏讀薪資
+    var tok=getAuthToken();
+    if(tok){
+      var _isAdmin=false;
+      try{
+        var _pl=JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+        _isAdmin=(_pl.role==='admin');
+      }catch(_e){}
+      if(_isAdmin){
         return edgeCall('getSalaryData',{},tok).then(function(salRows){
           if(Array.isArray(salRows)){
             salRows.forEach(function(s){
