@@ -3433,30 +3433,29 @@ function toMkp(a){return{id:a.id,empId:a.emp_id,empName:a.emp_name||'',date:a.da
 function toOTA(a){return{id:a.id,empId:a.emp_id||'',empName:a.emp_name||'',date:a.date||'',startTime:a.start_time||'',endTime:a.end_time||'',hours:parseFloat(a.hours)||0,reason:a.reason||'',supId:a.sup_id||'',status:a.status||'pending',supNote:a.sup_note||'',supReviewedAt:a.sup_reviewed_at||'',appliedAt:a.applied_at||''};}
 
 function loadAllData(){
-  // 只抓最近 3 個月打卡記錄，防止資料量無限成長
-  var d3m=new Date(); d3m.setMonth(d3m.getMonth()-3);
-  var recFrom=d3m.toISOString().slice(0,10);
-  return Promise.all([
-    sbq('employees',{select:'id,name,dept,pos,role,status,email,color,supervisor_id,birth_date,hire_date,contract_type,gender,phone,emergency_contact_name,emergency_contact_phone,line_user_id,work_rule'}),
-    sbq('records',{select:'*',range:{date:{gte:recFrom}}}),
-    // attach_data 欄位不在此處抓取（可達 1MB+），審核時才 lazy load
-    sbq('leave_apps',{select:'id,emp_id,emp_name,type,start_date,end_date,days,reason,proxy,sup_id,attach_name,status,stage,sup_note,sup_reviewed_at,hr_note,hr_reviewed_at,applied_at',order:'applied_at.desc'}),
-    sbq('makeup_apps',{select:'*',order:'applied_at.desc'}),
-    sbq('leave_quota',{select:'*'}),
-    sbq('company_settings',{select:'*'}),
-    sbq('holidays',{select:'*',order:'date.asc'}).catch(function(){return [];}),
-    sbq('emp_leave_quota',{select:'*'}).catch(function(){return [];}),
-    sbq('overtime_apps',{select:'*',order:'applied_at.desc'}).catch(function(){return [];})
-  ]).then(function(res){
-    var emps=res[0]||[],recs=res[1]||[],leaves=res[2]||[],makeups=res[3]||[],qRows=res[4]||[],cfgRows=res[5]||[],holRows=res[6]||[],empQRows=res[7]||[],otRows=res[8]||[];
+  var tok=getAuthToken();
+  // 未登入時直接 return，避免無效的 Edge Function 呼叫
+  if(!tok) return Promise.resolve();
+  // 解析 JWT 確認未過期，過期則自動登出
+  try{
+    var _tp=JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    if(_tp.exp<=Math.floor(Date.now()/1000)){
+      setAuthToken(null);
+      if(window.currentUser){toast('⏰','登入已過期，請重新登入');setTimeout(function(){window.doLogout();},1500);}
+      return Promise.resolve();
+    }
+  }catch(_te){return Promise.resolve();}
+  // 所有資料統一由 Edge Function 取回（已驗證 JWT，service_role 讀取）
+  return edgeCall('loadAllData',{},tok).then(function(data){
+    var emps=data.emps||[],recs=data.recs||[],leaves=data.leaves||[],makeups=data.makeups||[];
+    var qRows=data.quota||[],cfgRows=data.cfg||[],holRows=data.hols||[],empQRows=data.empQuota||[],otRows=data.otas||[];
     DB.emps=emps.map(toEmp);
-    DB.accs=emps.map(function(e){return{id:e.id,role:e.role||'employee'};});  // pw 不存前端
+    DB.accs=emps.map(function(e){return{id:e.id,role:e.role||'employee'};});
     DB.recs=recs.map(toRec);
     DB.leaves=leaves.map(toLea);
     DB.makeups=makeups.map(toMkp);
     var q=qRows[0]||{};
     DB.quota={annual:q.annual||14,sick:q.sick||30,personal:q.personal||14,marriage:q.marriage||8,funeral:q.funeral||8,official:q.official||0,menstrual:q.menstrual!=null?q.menstrual:1,maternity:q.maternity!=null?q.maternity:56,paternity:q.paternity!=null?q.paternity:7,parental:q.parental||0,makeup:q.makeup||0};
-    // 個人假別額度（若無記錄則沿用全公司預設）
     DB.empQuota={};
     empQRows.forEach(function(r){DB.empQuota[r.emp_id]=r;});
     DB.otas=otRows.map(toOTA);
@@ -3466,28 +3465,12 @@ function loadAllData(){
     if(!window.pendingOffice)window.pendingOffice=window.OFFICES[0];
     DB.holidays={};
     holRows.forEach(function(h){DB.holidays[h.date]={name:h.name,year:h.year,id:h.id};});
-    // 管理員：salary 已從 anon query 移除（REVOKE），改由 Edge Function 補入
-    // 注意：window.currentUser 在首次登入時尚未設定（loadAllData 在 currentUser 賦值前呼叫）
-    // 改由直接解析 JWT payload 判斷角色，避免漏讀薪資
-    var tok=getAuthToken();
-    if(tok){
-      var _isAdmin=false;
-      try{
-        var _pl=JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-        // 過期 token 不呼叫（exp 已過）
-        var _now=Math.floor(Date.now()/1000);
-        _isAdmin=(_pl.role==='admin')&&(_pl.exp>_now);
-      }catch(_e){}
-      if(_isAdmin){
-        return edgeCall('getSalaryData',{},tok).then(function(salRows){
-          if(Array.isArray(salRows)){
-            salRows.forEach(function(s){
-              var e=DB.emps.find(function(x){return x.id===s.id;});
-              if(e)e.salary=Number(s.salary)||0;
-            });
-          }
-        }).catch(function(e){console.warn('[getSalaryData]',e);});
-      }
+  }).catch(function(e){
+    // Token 過期或驗證失敗時自動登出
+    if(e&&e.message&&(e.message.indexOf('401')!==-1||e.message.indexOf('過期')!==-1||e.message.indexOf('登入')!==-1)){
+      if(window.currentUser){toast('⏰','登入已過期，請重新登入');setTimeout(function(){window.doLogout();},1500);}
+    }else{
+      console.warn('[loadAllData]',e);
     }
   });
 }
@@ -4004,11 +3987,11 @@ window.openReview=async function(id){
   var a=getApps().find(function(x){return x.id===id;});
   if(!a)return;
   window.reviewingId=id;
-  // Lazy load attach_data（不在 loadAllData 抓，避免每次下載大檔案）
+  // Lazy load attach_data（透過 Edge Function，SELECT 已鎖定 service_role）
   if(a.attachName&&!a.attachData){
     try{
-      var rows=await sbq('leave_apps',{select:'attach_data',filter:{id:a.id}});
-      if(rows&&rows[0])a.attachData=rows[0].attach_data||'';
+      var attRes=await edgeCall('getAttachment',{id:a.id},getAuthToken());
+      if(attRes)a.attachData=attRes.attach_data||'';
     }catch(e){console.warn('[openReview] 附件載入失敗',e);}
   }
   var supEmp=getEmpById(a.supId||'');
