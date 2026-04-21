@@ -2516,23 +2516,25 @@ window.confirmAddLoc=function(){
   if(!name||!lat||!lng){toast('⚠️','請填寫地點名稱及經緯度');return;}
   if(!window._extraLocations) window._extraLocations=[];
   window._extraLocations.push({name:name,address:addr,lat:lat,lng:lng,rangeM:rangeM});
-  // Save immediately
-  sbups('company_settings',{id:1,extra_locations:window._extraLocations},'id')
+  // 改用 Edge Function（service_role + admin 檢查）
+  edgeCall('upsertCompanySettings',{data:{extra_locations:window._extraLocations}},getAuthToken())
     .then(function(){return loadAllData();})
     .then(function(){
       toast('✅','地點已新增');
       renderSettings(document.getElementById('adminScroll'));
-    });
+    })
+    .catch(function(e){toast('❌','新增失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 window.deleteExtraLoc=function(idx){
   if(!window._extraLocations) window._extraLocations=(getCfg().extraLocations||[]).slice();
   window._extraLocations.splice(idx,1);
-  sbups('company_settings',{id:1,extra_locations:window._extraLocations},'id')
+  edgeCall('upsertCompanySettings',{data:{extra_locations:window._extraLocations}},getAuthToken())
     .then(function(){return loadAllData();})
     .then(function(){
       toast('✅','地點已刪除');
       renderSettings(document.getElementById('adminScroll'));
-    });
+    })
+    .catch(function(e){toast('❌','刪除失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 function renderHolidaySettings(){
@@ -3720,17 +3722,18 @@ window.confirmPunch=function(){
   var officeName=(window.pendingOffice||window.OFFICES[0]).name;
   var gpsData=window.currentGPS?Object.assign({},window.currentGPS,{office:officeName}):null;
   if(action==='in'){
-    sbups('records',{emp_id:empId,date:dateStr,time_in:now.toISOString(),gps_in:gpsData},'emp_id,date')
-      .then(function(res){if(!res){toast('❌','打卡失敗，請重試');return;}return loadAllData();})
+    // 改用 Edge Function（service_role）寫入，解決 anon key RLS 擋寫入問題
+    edgeCall('clockPunch',{punchType:'in',date:dateStr,timeISO:now.toISOString(),gps:gpsData},getAuthToken())
+      .then(function(){return loadAllData();})
       .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓ '+officeName);empTab('clock');})
-      .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗');});
+      .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗：'+(err&&err.message?err.message:'請重試'));});
   }else{
     if(!existing||!existing.in){toast('⚠️','請先上班打卡');return;}
     var h=calcHours(existing.in,now.toISOString(),emp.workRule);
-    sbupd('records',{time_out:now.toISOString(),gps_out:window.currentGPS},{emp_id:empId,date:dateStr})
-      .then(function(res){if(!res){toast('❌','打卡失敗，請重試');return;}return loadAllData();})
+    edgeCall('clockPunch',{punchType:'out',date:dateStr,timeISO:now.toISOString(),gps:window.currentGPS},getAuthToken())
+      .then(function(){return loadAllData();})
       .then(function(){toast('🎉','下班打卡！工時 '+h.toFixed(1)+'h');empTab('clock');})
-      .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗');});
+      .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗：'+(err&&err.message?err.message:'請重試'));});
   }
 };
 
@@ -3790,7 +3793,9 @@ window.doAddEmp=function(){
   errEl.style.display='none';
   var colors=['#5046e0','#2f5fd4','#7340c8','#2eaa6e','#e07c08','#16a085'];
   sha256(pw).then(function(hash){
-    return sbins('employees',{id:newId,name:name,
+    // 改用 Edge Function（service_role + admin 檢查）
+    return edgeCall('addEmployee',{data:{
+      id:newId,name:name,
       dept:gv('ne_dept'),pos:gv('ne_pos'),
       salary:Number(gv('ne_sal'))||0,
       email:gv('ne_email'),work_rule:gv('ne_rule'),
@@ -3802,7 +3807,8 @@ window.doAddEmp=function(){
       contract_type:gv('ne_contract')||'full_time',
       gender:gv('ne_gender')||'',
       phone:gv('ne_phone')||'',
-      color:colors[(DB.emps||[]).length%colors.length],password_hash:hash});
+      color:colors[(DB.emps||[]).length%colors.length],password_hash:hash
+    }},getAuthToken());
   }).then(function(res){
     if(!res){errEl.textContent='⚠️ 新增失敗，請檢查網路連線或工號是否重複';errEl.style.display='block';return Promise.reject(new Error('insert failed'));}
     return loadAllData();
@@ -3840,20 +3846,27 @@ window.changePassword=function(){
 // ── Override saveSettings ─────────────────────────
 window.saveSettings=function(){
   var rg=document.getElementById('cfg_requireGPS')?document.getElementById('cfg_requireGPS').checked:true;
-  sbups('company_settings',{id:1,
+  // 改用 Edge Function（service_role + admin 檢查）
+  edgeCall('upsertCompanySettings',{data:{
     name:document.getElementById('cfg_name').value,address:document.getElementById('cfg_addr').value,
     lat:parseFloat(document.getElementById('cfg_lat').value),lng:parseFloat(document.getElementById('cfg_lng').value),
     range_m:parseInt(document.getElementById('cfg_range').value)||300,require_gps:rg,
-    site_url:(document.getElementById('cfg_siteurl')?document.getElementById('cfg_siteurl').value.trim():'')||null},'id')
-  .then(function(){return loadAllData();}).then(function(){toast('✅','公司設定已儲存');});
+    site_url:(document.getElementById('cfg_siteurl')?document.getElementById('cfg_siteurl').value.trim():'')||null
+  }},getAuthToken())
+  .then(function(){return loadAllData();})
+  .then(function(){toast('✅','公司設定已儲存');})
+  .catch(function(e){toast('❌','儲存失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // ── Override saveQuota ────────────────────────────
 window.saveQuota=function(){
   var keys=['annual','sick','personal','marriage','funeral','official','menstrual','maternity','paternity','parental','makeup'];
-  var row={id:1};
+  var row={};
   keys.forEach(function(k){row[k]=Number(document.getElementById('q_'+k)?document.getElementById('q_'+k).value:0)||0;});
-  sbups('leave_quota',row,'id').then(function(){return loadAllData();}).then(function(){toast('✅','假期額度已儲存');});
+  edgeCall('upsertLeaveQuota',{data:row},getAuthToken())
+    .then(function(){return loadAllData();})
+    .then(function(){toast('✅','假期額度已儲存');})
+    .catch(function(e){toast('❌','儲存失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // ── Override submitLeave ──────────────────────────
@@ -4295,15 +4308,18 @@ window.renderLeaveManagement=function(s){
 
 // 儲存全員預設額度（從假別管理頁面）
 window.saveGlobalQuotaFromLeave=function(){
-  var row={id:1};
+  var row={};
   LEAVE_TYPES.forEach(function(t){
     var el=document.getElementById('gq_'+t.key);
     row[t.key]=parseInt(el&&el.value)||0;
   });
-  sbups('leave_quota',row,'id').then(function(){return loadAllData();}).then(function(){
-    toast('✅','全員預設額度已儲存');
-    renderLeaveManagement(document.getElementById('adminScroll'));
-  });
+  edgeCall('upsertLeaveQuota',{data:row},getAuthToken())
+    .then(function(){return loadAllData();})
+    .then(function(){
+      toast('✅','全員預設額度已儲存');
+      renderLeaveManagement(document.getElementById('adminScroll'));
+    })
+    .catch(function(e){toast('❌','儲存失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // 開啟編輯個人假別額度 Sheet
@@ -4331,24 +4347,27 @@ window.openEmpQuotaEdit=function(empId){
 // 儲存個人假別額度
 window.saveEmpQuota=function(){
   if(!_editQuotaEmpId) return;
-  var row={emp_id:_editQuotaEmpId,updated_at:new Date().toISOString()};
+  var row={emp_id:_editQuotaEmpId};
   LEAVE_TYPES.forEach(function(t){
     var el=document.getElementById('eq_'+t.key);
     row[t.key]=parseInt(el&&el.value)||0;
   });
-  sbupsert('emp_leave_quota',row).then(function(){return loadAllData();}).then(function(){
-    closeSheet('quotaEditSheet');
-    toast('✅','假別額度已儲存');
-    var scr=document.getElementById('adminScroll');
-    if(window.renderLeaveBalance) window.renderLeaveBalance(scr);
-    else renderLeaveManagement(scr);
-  });
+  edgeCall('upsertEmpLeaveQuota',{data:row},getAuthToken())
+    .then(function(){return loadAllData();})
+    .then(function(){
+      closeSheet('quotaEditSheet');
+      toast('✅','假別額度已儲存');
+      var scr=document.getElementById('adminScroll');
+      if(window.renderLeaveBalance) window.renderLeaveBalance(scr);
+      else renderLeaveManagement(scr);
+    })
+    .catch(function(e){toast('❌','儲存失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // 清除個人設定，恢復全公司預設
 window.clearEmpQuota=function(){
   if(!_editQuotaEmpId) return;
-  sbdel('emp_leave_quota',{emp_id:_editQuotaEmpId}).then(function(){return loadAllData();}).then(function(){
+  edgeCall('deleteEmpLeaveQuota',{empId:_editQuotaEmpId},getAuthToken()).then(function(){return loadAllData();}).then(function(){
     closeSheet('quotaEditSheet');
     toast('✅','已清除個人設定，恢復全員預設');
     var scr=document.getElementById('adminScroll');
@@ -4805,44 +4824,40 @@ window.closePcModal=function(){
 }
 
 // ── Delete employee ───────────────────────────────
+// 改用 Edge Function（service_role + admin 檢查 + 防止自刪 + 連動刪子表）
 window.deleteEmp=function(empId){
   var emp=(DB.emps||[]).find(function(e){return e.id===empId;});
   var name=emp?emp.name:empId;
   if(!confirm('確定要刪除員工「'+name+'」（'+empId+'）？\n\n⚠️ 此操作無法復原，該員工所有資料將一併刪除。')){return;}
-  Promise.all([
-    sbdel('employees',{id:empId}),
-    sbdel('records',{emp_id:empId}),
-    sbdel('leave_apps',{emp_id:empId}),
-    sbdel('makeup_apps',{emp_id:empId})
-  ]).then(function(results){
-    if(!results[0]){toast('❌','刪除失敗，請重試');return;}
-    return loadAllData();
-  }).then(function(){
-    closePcModal();
-    closeSheet('empSheet');
-    toast('🗑️','員工「'+name+'」已刪除');
-    setTimeout(function(){adminTab('employees');},50);
-  }).catch(function(err){
-    console.error('[deleteEmp] error:',err);
-    toast('❌','刪除失敗：'+err.message);
-  });
+  edgeCall('deleteEmployee',{id:empId},getAuthToken())
+    .then(function(){return loadAllData();})
+    .then(function(){
+      closePcModal();
+      closeSheet('empSheet');
+      toast('🗑️','員工「'+name+'」已刪除');
+      setTimeout(function(){adminTab('employees');},50);
+    }).catch(function(err){
+      console.error('[deleteEmp] error:',err);
+      toast('❌','刪除失敗：'+(err&&err.message?err.message:'請重試'));
+    });
 };
 
-// ── 國定假日 CRUD ─────────────────────────────────
+// ── 國定假日 CRUD（改用 Edge Function）────────────
 window.saveHoliday=function(){
   var d=document.getElementById('hol_date').value;
   var n=(document.getElementById('hol_name').value||'').trim();
   if(!d||!n){toast('⚠️','請填寫日期與假日名稱');return;}
-  var yr=parseInt(d.split('-')[0]);
-  sbins('holidays',{date:d,name:n,year:yr}).then(function(){
-    toast('✅','假日已新增');return loadAllData();
-  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','新增失敗：'+(e&&e.message||e));});
+  edgeCall('upsertHoliday',{date:d,name:n},getAuthToken())
+    .then(function(){toast('✅','假日已新增');return loadAllData();})
+    .then(function(){adminTab('settings');})
+    .catch(function(e){toast('❌','新增失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 window.deleteHoliday=function(id){
   if(!confirm('確定刪除此假日？'))return;
-  sbdel('holidays',{id:id}).then(function(){
-    toast('✅','已刪除');return loadAllData();
-  }).then(function(){adminTab('settings');}).catch(function(e){toast('❌','刪除失敗：'+(e&&e.message||e));});
+  edgeCall('deleteHoliday',{id:id},getAuthToken())
+    .then(function(){toast('✅','已刪除');return loadAllData();})
+    .then(function(){adminTab('settings');})
+    .catch(function(e){toast('❌','刪除失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // ── Global edit helper ───────────────────────────
