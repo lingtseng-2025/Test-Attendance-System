@@ -3922,10 +3922,13 @@ window.submitLeave=function(){
         balSnap[k]=(q2[k]||0)-used;
       });
     }catch(e){console.warn('[submitLeave] balance snapshot error',e);}
-    sbins('leave_apps',{id:'LA'+Date.now(),emp_id:window.currentUser.id,emp_name:emp?emp.name:window.currentUser.id,
+    // 改用 Edge Function（service_role）寫入，解決 anon key RLS 擋寫入問題
+    edgeCall('submitApp',{appType:'leave',data:{
+      emp_name:emp?emp.name:window.currentUser.id,
       type:type,start_date:start,end_date:end,days:days,reason:reason,proxy:proxy,sup_id:supId,
-      attach_name:file?file.name:'',attach_data:attachData||'',status:'pending',stage:'sup',
-      balance_at_apply:balSnap,applied_at:new Date().toISOString()})
+      attach_name:file?file.name:'',attach_data:attachData||'',
+      balance_at_apply:balSnap
+    }},getAuthToken())
     .then(function(){return loadAllData();}).then(function(){
       closeSheet('leaveSheet');
       // LINE 通知主管（非同步，不影響主流程）
@@ -3961,23 +3964,25 @@ window.submitLeave=function(){
 // ── 取消送審 ──────────────────────────────────────
 window.cancelLeaveApp=function(id){
   if(!confirm('確定要取消這筆假期申請嗎？')) return;
-  sbupd('leave_apps',{status:'cancelled'},{id:id})
+  edgeCall('cancelApp',{appType:'leave',id:id},getAuthToken())
     .then(function(){return loadAllData();})
     .then(function(){
       toast('✅','申請已取消');
       empTab('status');
       updateEmpBadge();
-    });
+    })
+    .catch(function(e){toast('❌','取消失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 window.cancelMakeupApp=function(id){
   if(!confirm('確定要取消這筆補打卡申請嗎？')) return;
-  sbupd('makeup_apps',{status:'cancelled'},{id:id})
+  edgeCall('cancelApp',{appType:'makeup',id:id},getAuthToken())
     .then(function(){return loadAllData();})
     .then(function(){
       toast('✅','申請已取消');
       empTab('status');
       updateEmpBadge();
-    });
+    })
+    .catch(function(e){toast('❌','取消失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // ── Override openReview & openMakeupReview ────────
@@ -4168,10 +4173,12 @@ window.confirmMakeupGps=function(){
     didOpenMail=true;
   }
 
-  // ── 儲存申請至資料庫 ──
-  sbins('makeup_apps',{id:'MK'+Date.now(),emp_id:window.currentUser.id,emp_name:emp?emp.name:window.currentUser.id,
+  // ── 儲存申請至資料庫（改用 Edge Function，解決 anon key RLS 擋寫入）──
+  edgeCall('submitApp',{appType:'makeup',data:{
+    emp_name:emp?emp.name:window.currentUser.id,
     date:d.date,punch_type:d.type,punch_time:d.time,sup_id:d.supId,reason:d.reason,
-    gps:window.makeupGpsData,status:'pending',stage:'sup',applied_at:new Date().toISOString()})
+    gps:window.makeupGpsData
+  }},getAuthToken())
   .then(function(){return loadAllData();}).then(function(){
     closeSheet('makeupGpsSheet');
     window.makeupPendingData=null;window.makeupGpsData=null;
@@ -4959,14 +4966,12 @@ window.submitOvertime=function(){
     if(!confirm('⚠️ 申請後本月加班時數將超過 46 小時（勞基法第32條上限），確定要繼續送出？')) return;
   }
   var emp=window.currentUser.empData;
-  sbins('overtime_apps',{
-    id:'OT'+Date.now(),
-    emp_id:window.currentUser.id,
+  // 改用 Edge Function（service_role）寫入，解決 anon key RLS 擋寫入問題
+  edgeCall('submitApp',{appType:'overtime',data:{
     emp_name:emp?emp.name:window.currentUser.id,
     date:date,start_time:start,end_time:end,hours:hours,
-    reason:reason,sup_id:supId,status:'pending',
-    applied_at:new Date().toISOString()
-  }).then(function(){return loadAllData();}).then(function(){
+    reason:reason,sup_id:supId
+  }},getAuthToken()).then(function(){return loadAllData();}).then(function(){
     closeSheet('overtimeSheet');
     toast('✅','加班申請已送出！');
     empTab('overtime');
@@ -5004,9 +5009,10 @@ window.submitOvertime=function(){
 // 取消加班申請
 window.cancelOTApp=function(id){
   if(!confirm('確定要取消此加班申請嗎？')) return;
-  sbupd('overtime_apps',{status:'cancelled'},{id:id})
+  edgeCall('cancelApp',{appType:'overtime',id:id},getAuthToken())
     .then(function(){return loadAllData();})
-    .then(function(){toast('✅','加班申請已取消');empTab('overtime');updateEmpBadge();});
+    .then(function(){toast('✅','加班申請已取消');empTab('overtime');updateEmpBadge();})
+    .catch(function(e){toast('❌','取消失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
 // 主管審核加班申請（打開審核 sheet）
