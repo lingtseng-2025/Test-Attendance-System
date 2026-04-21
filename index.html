@@ -3437,7 +3437,7 @@ function loadAllData(){
   var d3m=new Date(); d3m.setMonth(d3m.getMonth()-3);
   var recFrom=d3m.toISOString().slice(0,10);
   return Promise.all([
-    sbq('employees',{select:'id,name,dept,pos,role,status,email,color,supervisor_id,salary,birth_date,hire_date,contract_type,gender,phone,emergency_contact_name,emergency_contact_phone,line_user_id,work_rule'}),
+    sbq('employees',{select:'id,name,dept,pos,role,status,email,color,supervisor_id,birth_date,hire_date,contract_type,gender,phone,emergency_contact_name,emergency_contact_phone,line_user_id,work_rule'}),
     sbq('records',{select:'*',range:{date:{gte:recFrom}}}),
     // attach_data 欄位不在此處抓取（可達 1MB+），審核時才 lazy load
     sbq('leave_apps',{select:'id,emp_id,emp_name,type,start_date,end_date,days,reason,proxy,sup_id,attach_name,status,stage,sup_note,sup_reviewed_at,hr_note,hr_reviewed_at,applied_at',order:'applied_at.desc'}),
@@ -3466,6 +3466,20 @@ function loadAllData(){
     if(!window.pendingOffice)window.pendingOffice=window.OFFICES[0];
     DB.holidays={};
     holRows.forEach(function(h){DB.holidays[h.date]={name:h.name,year:h.year,id:h.id};});
+    // 管理員：salary 已從 anon query 移除（REVOKE），改由 Edge Function 補入
+    if(window.currentUser && window.currentUser.role==='admin'){
+      var tok=getAuthToken();
+      if(tok){
+        return edgeCall('getSalaryData',{},tok).then(function(salRows){
+          if(Array.isArray(salRows)){
+            salRows.forEach(function(s){
+              var e=DB.emps.find(function(x){return x.id===s.id;});
+              if(e)e.salary=Number(s.salary)||0;
+            });
+          }
+        }).catch(function(e){console.warn('[getSalaryData]',e);});
+      }
+    }
   });
 }
 
@@ -3747,8 +3761,8 @@ window.saveEmp=function(empId){
     line_user_id:(document.getElementById('ee_line')?document.getElementById('ee_line').value.trim():'')||null};
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
-    return sbupd('employees',d,{id:empId}).then(function(res){
-      if(!res){toast('❌','儲存失敗，請檢查網路連線');return;}
+    // 使用 Edge Function updateEmployee（service_role），確保薪資等敏感欄位正確寫入
+    return edgeCall('updateEmployee',Object.assign({id:empId},d),getAuthToken()).then(function(){
       return loadAllData();
     }).then(function(){
       closePcModal();
