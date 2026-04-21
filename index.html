@@ -1078,7 +1078,7 @@ function renderEmpMonthly(s){
     if(leave){badge=`<span class="bgg bg-b">${LEAVE_LABEL[leave.type]||leave.type}</span>`;}
     else if(rec?.in&&rec?.out){badge=OT>0?`<span class="bgg bg-o">+${OT.toFixed(1)}h</span>`:`<span class="bgg bg-g">正常</span>`;}
     else if(rec?.in){badge=`<span class="bgg bg-y">未下班</span>`;}
-    else if(isHol){badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000;font-weight:600">${holName||'國定假日'}</span>`;}
+    else if(isHol){badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000;font-weight:600">${escapeHtml(holName)||'國定假日'}</span>`;}
     else if(isWeekend){badge=`<span class="bgg" style="background:#ffe0e0;color:#cc0000">休假</span>`;}
     else{badge=`<span class="bgg bg-gr">缺勤</span>`;}
     rows.push({ds,dow,d,rec,h,OT,badge,isDayOff,holName});
@@ -1098,7 +1098,7 @@ function renderEmpMonthly(s){
     <table>
       <thead><tr><th>日期</th><th>上班</th><th>下班</th><th>工時</th><th>狀態</th></tr></thead>
       <tbody>
-        ${rows.map(r=>{const red=r.isDayOff?'color:#cc0000;':'';const bg=r.isDayOff?'background:#fff8f8;':'';const dateLabel=r.d+'日('+WDAY[r.dow]+')'+(r.holName?'<span style="font-size:10px;margin-left:3px;color:#cc0000">'+r.holName+'</span>':'');return`<tr style="${bg}"><td style="${red}font-weight:${r.isDayOff?'600':'400'}">${dateLabel}</td><td style="${red}">${r.rec?.in?fmtTime(r.rec.in):'--'}</td><td style="${red}">${r.rec?.out?fmtTime(r.rec.out):'--'}</td><td style="${red}">${r.h>0?r.h.toFixed(1)+'h':'--'}</td><td>${r.badge}</td></tr>`;}).join('')}
+        ${rows.map(r=>{const red=r.isDayOff?'color:#cc0000;':'';const bg=r.isDayOff?'background:#fff8f8;':'';const dateLabel=r.d+'日('+WDAY[r.dow]+')'+(r.holName?'<span style="font-size:10px;margin-left:3px;color:#cc0000">'+escapeHtml(r.holName)+'</span>':'');return`<tr style="${bg}"><td style="${red}font-weight:${r.isDayOff?'600':'400'}">${dateLabel}</td><td style="${red}">${r.rec?.in?fmtTime(r.rec.in):'--'}</td><td style="${red}">${r.rec?.out?fmtTime(r.rec.out):'--'}</td><td style="${red}">${r.h>0?r.h.toFixed(1)+'h':'--'}</td><td>${r.badge}</td></tr>`;}).join('')}
         <tr style="font-weight:700"><td colspan="3" style="color:var(--t2)">月合計</td><td style="color:var(--pd)">${tH.toFixed(1)}h</td><td></td></tr>
       </tbody>
     </table>
@@ -1626,7 +1626,7 @@ function renderGPSMap(s){
       const emp=emps.find(e=>e.id===rec.empId);if(!emp)return'';
       const distIn=rec.gpsIn?haversine(rec.gpsIn.lat,rec.gpsIn.lng,cfg.lat,cfg.lng):null;
       const distOut=rec.gpsOut?haversine(rec.gpsOut.lat,rec.gpsOut.lng,cfg.lat,cfg.lng):null;
-      return `<div class="gps-rec"><div class="gr-header"><div class="gr-name">${emp.name}</div><span class="bgg" style="background:${emp.color}22;color:${emp.color}">${emp.dept}</span></div>${rec.gpsIn?`<div class="gr-row"><span>🟢 上班 ${fmtTime(rec.in)}</span><span class="bgg ${distIn<=cfg.rangeM?'bg-g':'bg-o'}">${distIn}m</span>${rec.gpsIn.simulated?'<span style="color:var(--t3);font-size:10px">(模擬)</span>':''}</div><div class="gr-coord">${rec.gpsIn.lat}, ${rec.gpsIn.lng}</div>`:''} ${rec.gpsOut?`<div class="gr-row" style="margin-top:4px"><span>🔵 下班 ${fmtTime(rec.out)}</span><span class="bgg ${distOut<=cfg.rangeM?'bg-g':'bg-o'}">${distOut}m</span></div><div class="gr-coord">${rec.gpsOut.lat}, ${rec.gpsOut.lng}</div>`:''}</div>`;
+      return `<div class="gps-rec"><div class="gr-header"><div class="gr-name">${escapeHtml(emp.name)}</div><span class="bgg" style="background:${emp.color}22;color:${emp.color}">${escapeHtml(emp.dept)}</span></div>${rec.gpsIn?`<div class="gr-row"><span>🟢 上班 ${fmtTime(rec.in)}</span><span class="bgg ${distIn<=cfg.rangeM?'bg-g':'bg-o'}">${distIn}m</span>${rec.gpsIn.simulated?'<span style="color:var(--t3);font-size:10px">(模擬)</span>':''}</div><div class="gr-coord">${rec.gpsIn.lat}, ${rec.gpsIn.lng}</div>`:''} ${rec.gpsOut?`<div class="gr-row" style="margin-top:4px"><span>🔵 下班 ${fmtTime(rec.out)}</span><span class="bgg ${distOut<=cfg.rangeM?'bg-g':'bg-o'}">${distOut}m</span></div><div class="gr-coord">${rec.gpsOut.lat}, ${rec.gpsOut.lng}</div>`:''}</div>`;
     }).join('');
 
   s.innerHTML=`
@@ -2008,15 +2008,15 @@ function renderEmployees(s){
     var acc=accounts.find(function(a){return a.id===emp.id;});
     var isAdmin=acc&&acc.role==='admin';
     var sup=getEmpById(emp.supervisorId||'');
-    return '<tr data-empid="'+emp.id+'">'
+    return '<tr data-empid="'+escapeHtml(emp.id)+'">'
       +'<td><div style="display:flex;align-items:center;gap:10px">'
-      +'<div style="width:34px;height:34px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+emp.name[0]+'</div>'
-      +'<div><div style="font-weight:700;font-size:14px">'+emp.name+'</div>'
-      +'<div style="font-size:11px;color:var(--t3)">'+(emp.email||'--')+'</div></div>'
+      +'<div style="width:34px;height:34px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0">'+escapeHtml(emp.name[0])+'</div>'
+      +'<div><div style="font-weight:700;font-size:14px">'+escapeHtml(emp.name)+'</div>'
+      +'<div style="font-size:11px;color:var(--t3)">'+(escapeHtml(emp.email)||'--')+'</div></div>'
       +'</div></td>'
-      +'<td><div style="font-size:13px">'+emp.dept+'</div><div style="font-size:11px;color:var(--t3)">'+emp.pos+'</div></td>'
-      +'<td style="font-family:monospace;font-size:13px;color:var(--t2)">'+emp.id+'</td>'
-      +'<td style="font-size:13px">'+(sup?sup.name:'--')+'</td>'
+      +'<td><div style="font-size:13px">'+escapeHtml(emp.dept)+'</div><div style="font-size:11px;color:var(--t3)">'+escapeHtml(emp.pos)+'</div></td>'
+      +'<td style="font-family:monospace;font-size:13px;color:var(--t2)">'+escapeHtml(emp.id)+'</td>'
+      +'<td style="font-size:13px">'+(sup?escapeHtml(sup.name):'--')+'</td>'
       +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--green)">'+(emp.salary>0?'$'+emp.salary.toLocaleString():'--')+'</td>'
       +'<td style="font-family:Nunito,sans-serif;font-weight:700;color:var(--pd)">'+(h>0?h.toFixed(1)+'h':'--')+'</td>'
       +'<td>'+(emp.status==='inactive'?'<span class="bgg bg-r">❌ 離職</span>':'<span class="bgg bg-g">✅ 在職</span>')+'</td>'
@@ -2386,7 +2386,7 @@ function loadReport(){
     const rowHtml=rows.map(r=>{
       const red=r.isDayOff?'color:#cc0000;':'';
       const bg=r.isDayOff?'background:#fff8f8;':'';
-      const dateLabel=r.d+'('+WDAY[r.dow]+')'+(r.holName?'<span style="font-size:10px;margin-left:3px;color:#cc0000">'+r.holName+'</span>':'');
+      const dateLabel=r.d+'('+WDAY[r.dow]+')'+(r.holName?'<span style="font-size:10px;margin-left:3px;color:#cc0000">'+escapeHtml(r.holName)+'</span>':'');
       return `<tr style="${bg}">
         <td style="${red}font-weight:${r.isDayOff?'600':'400'}">${dateLabel}</td>
         <td style="${red}">${r.rec?.in?fmtTime(r.rec.in):'--'}</td>
@@ -2396,7 +2396,7 @@ function loadReport(){
     }).join('');
     container.insertAdjacentHTML('beforeend',`
       <div style="margin-top:10px">
-        <div class="sec-title"><span>${emp.name} — ${y}/${m}</span></div>
+        <div class="sec-title"><span>${escapeHtml(emp.name)} — ${y}/${m}</span></div>
         <div class="ra" style="margin-top:8px">
           <button class="ra-btn ol" onclick="window.print()">🖨️ 列印</button>
           <button class="ra-btn so" onclick="exportExcel('${emp.id}',${y},${m})">📥 Excel</button>
@@ -2628,7 +2628,7 @@ function openPunch(action){
   document.getElementById('punchConfirmBtn').disabled=true;
   document.getElementById('punchConfirmBtn').textContent='確認打卡';
   const now=new Date();
-  document.getElementById('punchBody').innerHTML=`<div style="font-size:13px;color:var(--t2);line-height:1.9"><div>⏰ 時間：<strong>${now.toLocaleTimeString('zh-TW',{hour12:false})}</strong></div><div>👤 ${emp?.name||currentUser.id}</div><div>🏢 <span style="font-size:12px">${getCfg().address}</span></div></div>`;
+  document.getElementById('punchBody').innerHTML=`<div style="font-size:13px;color:var(--t2);line-height:1.9"><div>⏰ 時間：<strong>${now.toLocaleTimeString('zh-TW',{hour12:false})}</strong></div><div>👤 ${escapeHtml(emp?.name||currentUser.id)}</div><div>🏢 <span style="font-size:12px">${escapeHtml(getCfg().address)}</span></div></div>`;
   openSheet('punchSheet');
   getGPS();
 }
@@ -2901,6 +2901,7 @@ function submitLeave(){
   }
 
   if(file){
+    if(file.size>5*1024*1024){errEl.textContent='⚠️ 附件過大，請上傳 5 MB 以內的檔案';errEl.style.display='block';return;}
     var reader=new FileReader();
     reader.onload=function(e){saveAndNotify(e.target.result);};
     reader.onerror=function(){saveAndNotify('');};
@@ -3605,8 +3606,27 @@ window.doLogout=function(){
   document.body.classList.remove('admin-mobile-view');
   document.getElementById('loginId').value='';
   document.getElementById('loginPw').value='';
+  clearTimeout(window._idleTimer);
   showScreen('loginScreen');
 };
+
+// ── 閒置自動登出（30 分鐘無操作）─────────────────
+(function(){
+  var IDLE_MS = 30 * 60 * 1000; // 30 分鐘
+  function resetIdleTimer(){
+    if(!window.currentUser) return;
+    clearTimeout(window._idleTimer);
+    window._idleTimer = setTimeout(function(){
+      if(window.currentUser){
+        toast('⏰','閒置超過 30 分鐘，已自動登出');
+        setTimeout(function(){ window.doLogout(); }, 1500);
+      }
+    }, IDLE_MS);
+  }
+  ['mousemove','mousedown','keydown','touchstart','scroll','click'].forEach(function(evt){
+    document.addEventListener(evt, resetIdleTimer, {passive:true});
+  });
+})();
 
 // ══════════════════════════════════════════════════
 //  多辦公室支援
@@ -3631,7 +3651,7 @@ window.selectOffice=function(idx){
     var dist=Math.round(haversine(gps.lat,gps.lng,o.lat,o.lng));
     var isOK=dist<=rangeM, isWarn=dist<=rangeM*2;
     var db=document.getElementById('distBadge');
-    if(db) db.innerHTML='<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">📏 距'+o.name+' '+dist+'m '+(isOK?'✅ 範圍內':isWarn?'⚠️ 稍遠':'❌ 範圍外')+'</span>';
+    if(db) db.innerHTML='<span class="dist-badge '+(isOK?'dist-ok':isWarn?'dist-warn':'dist-far')+'">📏 距'+escapeHtml(o.name)+' '+dist+'m '+(isOK?'✅ 範圍內':isWarn?'⚠️ 稍遠':'❌ 範圍外')+'</span>';
     var cb=document.getElementById('punchConfirmBtn');
     if(cb){cb.disabled=false;cb.textContent=isOK?'✅ 確認打卡':'⚠️ 仍要打卡';}
   }
@@ -3727,9 +3747,7 @@ window.saveEmp=function(empId){
     line_user_id:(document.getElementById('ee_line')?document.getElementById('ee_line').value.trim():'')||null};
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
-    console.log('[saveEmp] calling sbupd id='+empId+' data='+JSON.stringify(d));
     return sbupd('employees',d,{id:empId}).then(function(res){
-      console.log('[saveEmp] sbupd result='+JSON.stringify(res));
       if(!res){toast('❌','儲存失敗，請檢查網路連線');return;}
       return loadAllData();
     }).then(function(){
@@ -3928,8 +3946,10 @@ window.submitLeave=function(){
       updateEmpBadge();
     });
   }
-  if(file){var r=new FileReader();r.onload=function(e){saveLeave(e.target.result);};r.onerror=function(){saveLeave('');};r.readAsDataURL(file);}
-  else saveLeave('');
+  if(file){
+    if(file.size>5*1024*1024){errEl.textContent='⚠️ 附件過大，請上傳 5 MB 以內的檔案';errEl.style.display='block';return;}
+    var r=new FileReader();r.onload=function(e){saveLeave(e.target.result);};r.onerror=function(){saveLeave('');};r.readAsDataURL(file);
+  } else saveLeave('');
 };
 
 // ── 取消送審 ──────────────────────────────────────
@@ -4338,7 +4358,7 @@ window.renderSalary = function(s) {
     + '<div style="flex:1;min-width:140px"><label style="font-size:11px;font-weight:700;color:var(--t3);display:block;margin-bottom:4px">員工</label>'
     + '<select id="salEmp" style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:var(--font);outline:none;background:#fff;-webkit-appearance:none;box-sizing:border-box">'
     + '<option value="all">全部員工</option>'
-    + emps.map(function(e){return '<option value="'+e.id+'">'+e.name+'</option>';}).join('')
+    + emps.map(function(e){return '<option value="'+escapeHtml(e.id)+'">'+escapeHtml(e.name)+'</option>';}).join('')
     + '</select></div>'
     + '</div>'
     + '<div style="margin-top:12px">'
@@ -4476,8 +4496,8 @@ window.calcSalary = function() {
     var totalOTh=(row.otHoursNormal+row.otHoursHoliday).toFixed(1);
     html += '<div class="card" style="border-left:4px solid '+emp.color+'">'
       + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--bg)">'
-      + '<div style="width:42px;height:42px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0">'+emp.name[0]+'</div>'
-      + '<div style="flex:1"><div style="font-size:15px;font-weight:700">'+emp.name+'</div><div style="font-size:11px;color:var(--t3)">'+emp.dept+' · '+emp.pos+'</div></div>'
+      + '<div style="width:42px;height:42px;border-radius:50%;background:'+emp.color+'22;color:'+emp.color+';display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:800;flex-shrink:0">'+escapeHtml(emp.name[0])+'</div>'
+      + '<div style="flex:1"><div style="font-size:15px;font-weight:700">'+escapeHtml(emp.name)+'</div><div style="font-size:11px;color:var(--t3)">'+escapeHtml(emp.dept)+' · '+escapeHtml(emp.pos)+'</div></div>'
       + '<div style="text-align:right"><div style="font-size:11px;color:var(--t3)">實領薪資</div><div style="font-family:Nunito,sans-serif;font-size:22px;font-weight:900;color:var(--green)">$'+Math.round(row.netPay).toLocaleString()+'</div></div>'
       + '</div>'
       // 出勤統計（5格）
