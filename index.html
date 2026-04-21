@@ -3474,7 +3474,9 @@ function loadAllData(){
       var _isAdmin=false;
       try{
         var _pl=JSON.parse(atob(tok.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
-        _isAdmin=(_pl.role==='admin');
+        // 過期 token 不呼叫（exp 已過）
+        var _now=Math.floor(Date.now()/1000);
+        _isAdmin=(_pl.role==='admin')&&(_pl.exp>_now);
       }catch(_e){}
       if(_isAdmin){
         return edgeCall('getSalaryData',{},tok).then(function(salRows){
