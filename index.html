@@ -1651,21 +1651,180 @@ function renderGPSMap(s){
 
 // ── Approve ────────────────────────────────────────
 let reviewingId=null;
+// ── 已完成申請 篩選 / 分頁 狀態（全域，跨 re-render 保留）──
+window._approveFilter = window._approveFilter || {year:'all', empId:'all', status:'all', name:''};
+window._approvePage   = window._approvePage   || {leave:20, makeup:20, ot:20};
+window._apfUpdate = function(key,val){
+  window._approveFilter[key]=val;
+  window._approvePage={leave:20,makeup:20,ot:20};
+  renderApprove(document.getElementById('adminScroll'));
+};
+window._apfReset = function(){
+  window._approveFilter={year:'all',empId:'all',status:'all',name:''};
+  window._approvePage={leave:20,makeup:20,ot:20};
+  renderApprove(document.getElementById('adminScroll'));
+};
+window._apfShowMore = function(type){
+  window._approvePage[type]+=20;
+  renderApprove(document.getElementById('adminScroll'));
+};
+window._apfSetName = function(v){
+  window._approveFilter.name=v;
+  clearTimeout(window._apfDbc);
+  window._apfDbc=setTimeout(function(){
+    window._approvePage={leave:20,makeup:20,ot:20};
+    renderApprove(document.getElementById('adminScroll'));
+    // 保留輸入框焦點與游標位置
+    setTimeout(function(){
+      var el=document.getElementById('apf_name');
+      if(el){el.focus();var val=el.value;el.selectionStart=el.selectionEnd=val.length;}
+    },0);
+  },300);
+};
+
 function renderApprove(s){
   const myId=currentUser.id;
   const isHR=currentUser.role==='admin';
   const apps=getApps().sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
-  // 待我審核：我是直屬主管且status=pending，或我是HR且status=sup_approved
   const myPending=apps.filter(function(a){
     if(a.status==='pending' && a.supId===myId) return true;
     if(a.status==='sup_approved' && isHR) return true;
     return false;
   });
-  const done=apps.filter(a=>a.status==='approved'||a.status==='rejected');
+  const doneLeave=apps.filter(a=>a.status==='approved'||a.status==='rejected');
   const waiting=apps.filter(a=>a.status==='pending'&&a.supId!==myId);
 
-  var html='<div class="pc-page-header" style="margin-bottom:20px"><div><div class="pc-page-title">📋 審核申請</div><div class="pc-page-sub">假期申請與補打卡審核管理</div></div></div>'
-    +'<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPending.length+'）</span></div>'
+  var mkps=getMakeupApps();
+  var myMakeup=mkps.filter(function(a){
+    if(a.status==='pending' && a.supId===myId) return true;
+    if(a.status==='sup_approved' && isHR) return true;
+    return false;
+  });
+  var doneMakeup=mkps.filter(function(a){return a.status==='approved'||a.status==='rejected';});
+
+  var otas=(window.getOvertimeApps?window.getOvertimeApps():[]);
+  var myOT=otas.filter(function(a){return a.status==='pending'&&a.supId===myId;});
+  var doneOT=otas.filter(function(a){return a.status==='approved'||a.status==='rejected';});
+
+  // ── 篩選邏輯 ──
+  function apfApply(items,dateField){
+    var f=window._approveFilter;
+    return items.filter(function(a){
+      if(f.year!=='all'){
+        var d=(a[dateField]||'').slice(0,4);
+        if(d!==f.year) return false;
+      }
+      if(f.empId!=='all' && a.empId!==f.empId) return false;
+      if(f.status!=='all' && a.status!==f.status) return false;
+      if(f.name){
+        var q=f.name.toLowerCase();
+        if((a.empName||'').toLowerCase().indexOf(q)===-1) return false;
+      }
+      return true;
+    });
+  }
+  var fLeave=apfApply(doneLeave,'startDate');
+  var fMakeup=apfApply(doneMakeup,'date');
+  var fOT=apfApply(doneOT,'date');
+
+  // ── 卡片 renderer ──
+  function renderLeaveCard(a){
+    var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+    var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+escapeHtml(a.empName[0]||'?')+'</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
+      +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
+      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
+      +'</div>'
+      +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>';
+  }
+  function renderMakeupCard(a){
+    var tl=a.punchType==='in'?'上班打卡':'下班打卡';
+    var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+    var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x1F527;</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+tl+'</div>'
+      +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
+      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
+      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
+      +'</div>'
+      +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>';
+  }
+  function renderOTCard(a){
+    var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+    var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x23F0;</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 加班</div>'
+      +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
+      +(a.supNote?'<div class="lr-sub">備註：'+escapeHtml(a.supNote)+'</div>':'')
+      +'</div>'
+      +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>';
+  }
+
+  // ── 分頁 ──
+  function apfPaged(type,items,render){
+    var ps=window._approvePage[type]||20;
+    var h='';
+    items.slice(0,ps).forEach(function(a){h+=render(a);});
+    if(items.length>ps){
+      h+='<div style="text-align:center;padding:12px 0">'
+        +'<button onclick="window._apfShowMore(\''+type+'\')" style="padding:8px 20px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer">&#x2B07; 顯示更多（還有 '+(items.length-ps)+' 筆）</button>'
+        +'</div>';
+    }
+    return h;
+  }
+
+  // ── 篩選列 ──
+  function apfBar(){
+    var f=window._approveFilter;
+    // 自所有類型取得出現過的年份
+    var ys={};
+    doneLeave.forEach(function(a){if(a.startDate)ys[a.startDate.slice(0,4)]=true;});
+    doneMakeup.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
+    doneOT.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
+    var years=Object.keys(ys).sort().reverse();
+    var emps=getEmps().slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','zh-TW');});
+    var hasFilter=f.year!=='all'||f.empId!=='all'||f.status!=='all'||f.name;
+    var selStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;cursor:pointer';
+    var inpStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;flex:1;min-width:140px';
+
+    return '<div class="sec-title fu"><span>&#x1F50D; 已完成申請篩選'+(hasFilter?'<span style="color:var(--pd);font-size:11px;margin-left:6px">（篩選中）</span>':'')+'</span></div>'
+      +'<div class="card fu" style="margin-bottom:12px;padding:12px">'
+      +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+      +'<select id="apf_year" onchange="window._apfUpdate(\'year\',this.value)" style="'+selStyle+'">'
+      +  '<option value="all"'+(f.year==='all'?' selected':'')+'>全部年份</option>'
+      +  years.map(function(y){return '<option value="'+y+'"'+(f.year===y?' selected':'')+'>'+y+' 年</option>';}).join('')
+      +'</select>'
+      +'<select id="apf_emp" onchange="window._apfUpdate(\'empId\',this.value)" style="'+selStyle+'">'
+      +  '<option value="all"'+(f.empId==='all'?' selected':'')+'>全部員工</option>'
+      +  emps.map(function(e){return '<option value="'+escapeHtml(e.id)+'"'+(f.empId===e.id?' selected':'')+'>'+escapeHtml(e.name)+'</option>';}).join('')
+      +'</select>'
+      +'<select id="apf_status" onchange="window._apfUpdate(\'status\',this.value)" style="'+selStyle+'">'
+      +  '<option value="all"'+(f.status==='all'?' selected':'')+'>全部狀態</option>'
+      +  '<option value="approved"'+(f.status==='approved'?' selected':'')+'>&#x2705; 已核准</option>'
+      +  '<option value="rejected"'+(f.status==='rejected'?' selected':'')+'>&#x274C; 已拒絕</option>'
+      +'</select>'
+      +'<input id="apf_name" type="text" value="'+escapeHtml(f.name)+'" placeholder="&#x1F50D; 姓名搜尋" oninput="window._apfSetName(this.value)" style="'+inpStyle+'">'
+      +(hasFilter?'<button onclick="window._apfReset()" style="padding:6px 12px;border:1px solid var(--pd);border-radius:6px;background:#fee;color:var(--pd);font-size:12px;font-weight:700;cursor:pointer">&#x1F504; 重置</button>':'')
+      +'</div>'
+      +'</div>';
+  }
+
+  // ═══ 組裝 HTML ═══
+  var html='<div class="pc-page-header" style="margin-bottom:20px"><div><div class="pc-page-title">📋 審核申請</div><div class="pc-page-sub">假期申請與補打卡審核管理</div></div></div>';
+
+  // ── 待審核區塊（請假） ──
+  html+='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPending.length+'）</span></div>'
     +'<div class="pc-section" style="margin-bottom:16px">';
   if(!myPending.length){
     html+='<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審申請</div>';
@@ -1705,65 +1864,31 @@ function renderApprove(s){
     html+='</div>';
   }
 
-  html+='<div class="sec-title fu fu2"><span>&#x1F4C1; 已完成（'+done.length+'）</span></div>'
-    +'<div class="card fu fu2">';
-  if(!done.length){
-    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">尚無紀錄</div>';
+  // ── 待審核區塊（補打卡） ──
+  html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x1F527; 補打卡審核（'+myMakeup.length+'）</span></div>'
+    +'<div class="card fu">';
+  if(!myMakeup.length){
+    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審</div>';
   } else {
-    done.forEach(function(a){
-      var sc=a.status==='approved'?'var(--green)':'var(--pd)';
-      var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    myMakeup.forEach(function(a){
+      var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+      var stageLabel=a.status==='pending'?'直屬主管審核':'HR最終審核';
+      var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
       html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+escapeHtml(a.empName[0]||'?')+'</div>'
+        +'<div class="lr-av" style="background:var(--ol);color:var(--orange)">&#x1F527;</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
-        +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
-        +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
-        +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+typeLabel+'</div>'
+        +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
+        +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
+        +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
         +'</div>'
-        +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\''+a.id+'\')">審核</button>'
         +'</div>';
     });
   }
   html+='</div>';
 
-  // ── 補打卡申請審核 ──
-  var myMakeup=getMakeupApps().filter(function(a){
-    if(a.status==='pending' && a.supId===myId) return true;
-    if(a.status==='sup_approved' && isHR) return true;
-    return false;
-  });
-  var doneMakeup=getMakeupApps().filter(function(a){return a.status==='approved'||a.status==='rejected';});
-  if(myMakeup.length||doneMakeup.length){
-    html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x1F527; 補打卡審核（'+myMakeup.length+'）</span></div>'
-      +'<div class="card fu">';
-    if(!myMakeup.length){
-      html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審</div>';
-    } else {
-      myMakeup.forEach(function(a){
-        var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
-        var stageLabel=a.status==='pending'?'直屬主管審核':'HR最終審核';
-        var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
-        html+='<div class="list-row">'
-          +'<div class="lr-av" style="background:var(--ol);color:var(--orange)">&#x1F527;</div>'
-          +'<div class="lr-info">'
-          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+typeLabel+'</div>'
-          +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
-          +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
-          +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
-          +'</div>'
-          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\''+a.id+'\')">審核</button>'
-          +'</div>';
-      });
-    }
-    html+='</div>';
-  }
-
-  // ── 加班申請審核 ──
-  var myOT=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){
-    return a.status==='pending'&&a.supId===myId;
-  });
-  var doneOT=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.status==='approved'||a.status==='rejected';});
+  // ── 待審核區塊（加班） ──
   html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x23F0; 加班申請（'+myOT.length+'）</span></div>'
     +'<div class="card fu">';
   if(!myOT.length){
@@ -1782,22 +1907,42 @@ function renderApprove(s){
     });
   }
   html+='</div>';
-  if(doneOT.length){
-    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F4C1; 已完成加班（'+doneOT.length+'）</span></div>'
+
+  // ═══ 已完成區塊（全部放在一起，共用篩選列） ═══
+  html+='<div style="margin-top:24px;padding-top:4px;border-top:2px solid var(--border)"></div>';
+  html+=apfBar();
+
+  // 已完成請假
+  html+='<div class="sec-title fu fu2"><span>&#x1F4C1; 已完成請假（'+fLeave.length+(fLeave.length!==doneLeave.length?' / 共 '+doneLeave.length:'')+'）</span></div>'
+    +'<div class="card fu fu2">';
+  if(!fLeave.length){
+    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">'+(doneLeave.length?'（無符合篩選條件的紀錄）':'尚無紀錄')+'</div>';
+  } else {
+    html+=apfPaged('leave',fLeave,renderLeaveCard);
+  }
+  html+='</div>';
+
+  // 已完成補打卡
+  if(doneMakeup.length){
+    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F4C1; 已完成補打卡（'+fMakeup.length+(fMakeup.length!==doneMakeup.length?' / 共 '+doneMakeup.length:'')+'）</span></div>'
       +'<div class="card fu fu2">';
-    doneOT.slice(0,10).forEach(function(a){
-      var sc=a.status==='approved'?'var(--green)':'var(--pd)';
-      var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
-      html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x23F0;</div>'
-        +'<div class="lr-info">'
-        +'<div class="lr-name">'+escapeHtml(a.empName)+' — 加班</div>'
-        +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
-        +(a.supNote?'<div class="lr-sub">備註：'+escapeHtml(a.supNote)+'</div>':'')
-        +'</div>'
-        +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
-        +'</div>';
-    });
+    if(!fMakeup.length){
+      html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">（無符合篩選條件的紀錄）</div>';
+    } else {
+      html+=apfPaged('makeup',fMakeup,renderMakeupCard);
+    }
+    html+='</div>';
+  }
+
+  // 已完成加班
+  if(doneOT.length){
+    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F4C1; 已完成加班（'+fOT.length+(fOT.length!==doneOT.length?' / 共 '+doneOT.length:'')+'）</span></div>'
+      +'<div class="card fu fu2">';
+    if(!fOT.length){
+      html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">（無符合篩選條件的紀錄）</div>';
+    } else {
+      html+=apfPaged('ot',fOT,renderOTCard);
+    }
     html+='</div>';
   }
 
