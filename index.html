@@ -1823,36 +1823,70 @@ function renderApprove(s){
   // ═══ 組裝 HTML ═══
   var html='<div class="pc-page-header" style="margin-bottom:20px"><div><div class="pc-page-title">📋 審核申請</div><div class="pc-page-sub">假期申請與補打卡審核管理</div></div></div>';
 
-  // ── 待審核區塊（請假） ──
-  html+='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPending.length+'）</span></div>'
+  // ── 統一「待我審核」（三種類型混合，依申請時間由新到舊排） ──
+  var myPendingAll=[];
+  myPending.forEach(function(a){myPendingAll.push({kind:'leave',item:a});});
+  myMakeup.forEach(function(a){myPendingAll.push({kind:'makeup',item:a});});
+  myOT.forEach(function(a){myPendingAll.push({kind:'ot',item:a});});
+  myPendingAll.sort(function(x,y){return (y.item.appliedAt||'').localeCompare(x.item.appliedAt||'');});
+
+  html+='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPendingAll.length+'）</span></div>'
     +'<div class="pc-section" style="margin-bottom:16px">';
-  if(!myPending.length){
+  if(!myPendingAll.length){
     html+='<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審申請</div>';
   } else {
-    myPending.forEach(function(a){
-      var stage=a.status==='pending'?'直屬主管審核':'HR最終審核';
-      var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
-      html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:var(--pl);color:var(--pd)">'+escapeHtml(a.empName[0]||'?')+'</div>'
-        +'<div class="lr-info">'
-        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
-        +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
-        +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stage+'</div>'
-        +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+escapeHtml(a.attachName)+'</div>':'')
-        +'</div>'
-        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\''+a.id+'\')">審核</button>'
-        +'</div>';
+    myPendingAll.forEach(function(entry){
+      var a=entry.item;
+      if(entry.kind==='leave'){
+        var stage=a.status==='pending'?'直屬主管審核':'HR最終審核';
+        var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:var(--pl);color:var(--pd)" title="請假">&#x1F334;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
+          +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+          +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stage+'</div>'
+          +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+escapeHtml(a.attachName)+'</div>':'')
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\''+a.id+'\')">審核</button>'
+          +'</div>';
+      } else if(entry.kind==='makeup'){
+        var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+        var stageLabel=a.status==='pending'?'直屬主管審核':'HR最終審核';
+        var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:var(--ol);color:var(--orange)" title="補打卡">&#x1F527;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+typeLabel+'</div>'
+          +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
+          +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
+          +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\''+a.id+'\')">審核</button>'
+          +'</div>';
+      } else if(entry.kind==='ot'){
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)" title="加班">&#x23F0;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 加班申請</div>'
+          +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
+          +'<div class="lr-sub" style="color:var(--t3)">'+escapeHtml(a.reason||'--')+'</div>'
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview(\''+a.id+'\')">審核</button>'
+          +'</div>';
+      }
     });
   }
   html+='</div>';
 
+  // ── 等待其他主管（僅請假有此概念，保留原設計） ──
   if(waiting.length){
     html+='<div class="sec-title fu fu1"><span>&#x1F552; 等待其他主管（'+waiting.length+'）</span></div>'
       +'<div class="card fu fu1">';
     waiting.forEach(function(a){
       var supE=getEmpById(a.supId||'');
       html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:var(--yl);color:var(--yellow)">'+escapeHtml(a.empName[0]||'?')+'</div>'
+        +'<div class="lr-av" style="background:var(--yl);color:var(--yellow)">&#x1F334;</div>'
         +'<div class="lr-info">'
         +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
         +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+'</div>'
@@ -1863,50 +1897,6 @@ function renderApprove(s){
     });
     html+='</div>';
   }
-
-  // ── 待審核區塊（補打卡） ──
-  html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x1F527; 補打卡審核（'+myMakeup.length+'）</span></div>'
-    +'<div class="card fu">';
-  if(!myMakeup.length){
-    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審</div>';
-  } else {
-    myMakeup.forEach(function(a){
-      var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
-      var stageLabel=a.status==='pending'?'直屬主管審核':'HR最終審核';
-      var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
-      html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:var(--ol);color:var(--orange)">&#x1F527;</div>'
-        +'<div class="lr-info">'
-        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+typeLabel+'</div>'
-        +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
-        +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
-        +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
-        +'</div>'
-        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\''+a.id+'\')">審核</button>'
-        +'</div>';
-    });
-  }
-  html+='</div>';
-
-  // ── 待審核區塊（加班） ──
-  html+='<div class="sec-title fu" style="margin-top:4px"><span>&#x23F0; 加班申請（'+myOT.length+'）</span></div>'
-    +'<div class="card fu">';
-  if(!myOT.length){
-    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審加班申請</div>';
-  } else {
-    myOT.forEach(function(a){
-      html+='<div class="list-row">'
-        +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)">&#x23F0;</div>'
-        +'<div class="lr-info">'
-        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 加班申請</div>'
-        +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
-        +'<div class="lr-sub" style="color:var(--t3)">'+escapeHtml(a.reason||'--')+'</div>'
-        +'</div>'
-        +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview(\''+a.id+'\')">審核</button>'
-        +'</div>';
-    });
-  }
-  html+='</div>';
 
   // ═══ 已完成區塊（全部放在一起，共用篩選列） ═══
   html+='<div style="margin-top:24px;padding-top:4px;border-top:2px solid var(--border)"></div>';
