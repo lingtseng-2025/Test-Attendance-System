@@ -1906,7 +1906,7 @@ function applyMakeupToRecord(a){
   var recs=getRecs();
   var existing=recs.find(function(r){return r.date===a.date&&r.empId===a.empId;});
   var emp=getEmpById(a.empId);
-  var timeISO=new Date(a.date+'T'+a.punchTime+':00').toISOString();
+  var timeISO=new Date(a.date+'T'+a.punchTime+':00+08:00').toISOString();
   if(existing){
     if(a.punchType==='in'&&!existing.in){
       existing.in=timeISO;
