@@ -1172,6 +1172,37 @@ function leaveStageBar(a){
     +'<span style="color:'+c[s2]+';font-weight:600">HR主管</span>'
     +'</div>';
 }
+// 渲染兩階段審核結果（第1層 直屬主管 / 第2層 HR），給請假、補打卡共用
+function renderStageResults(a, supName){
+  function stageBlock(label,status,reviewer,at,note){
+    var cfg={
+      approved:{c:'var(--green)',i:'✅',t:'已核准'},
+      rejected:{c:'var(--pd)',i:'❌',t:'已拒絕'},
+      pending: {c:'var(--yellow)',i:'⏳',t:'等待審核'},
+      skipped: {c:'#bbb',i:'—',t:'未進行'}
+    }[status];
+    var time=at?at.slice(0,16).replace('T',' '):'';
+    return '<div style="border-left:3px solid '+cfg.c+';padding:6px 10px;margin-top:4px;background:rgba(0,0,0,.02);border-radius:0 6px 6px 0">'
+      +'<div style="font-size:11px;font-weight:700;color:'+cfg.c+';margin-bottom:2px">'+cfg.i+' '+label+' — '+cfg.t+'</div>'
+      +((reviewer||time)&&status!=='skipped'?'<div style="font-size:11px;color:var(--t3)">'+(reviewer?'審核人：'+escapeHtml(reviewer):'')+(reviewer&&time?' · ':'')+time+'</div>':'')
+      +(note&&status!=='skipped'?'<div style="font-size:11px;color:var(--t2);margin-top:2px">備註：'+escapeHtml(note)+'</div>':'')
+      +'</div>';
+  }
+  // 根據 status + stage 推導兩階段結果
+  var s1,s2;
+  if(a.status==='pending'){s1='pending';s2='pending';}
+  else if(a.status==='sup_approved'){s1='approved';s2='pending';}
+  else if(a.status==='approved'){s1='approved';s2='approved';}
+  else if(a.status==='rejected'){
+    // stage='hr' 表示已通過第1層後才被第2層拒絕；stage='sup' 表示第1層就拒絕
+    if(a.stage==='hr'){s1='approved';s2='rejected';}
+    else{s1='rejected';s2='skipped';}
+  }
+  else return ''; // cancelled
+  return stageBlock('第1層 直屬主管',s1,supName||'',a.supReviewedAt,a.supNote)
+       + stageBlock('第2層 HR 最終審核',s2,s2==='skipped'||s2==='pending'?'':'HR',a.hrReviewedAt,a.hrNote);
+}
+
 function renderLeaveStatus(s){
   const apps=getApps().filter(a=>a.empId===currentUser.id).sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
   // 補打卡申請也在此頁顯示
@@ -1195,9 +1226,8 @@ function renderLeaveStatus(s){
         +'<div>直屬主管：'+(supEmp?escapeHtml(supEmp.name):'--')+'</div>'
         +'<div>代理人：'+escapeHtml(a.proxy||'--')+'</div>'
         +(a.attachName?'<div>&#x1F4CE; 附件：'+escapeHtml(a.attachName)+'</div>':'')
-        +(a.supNote?'<div style="color:var(--t3)">主管備註：'+escapeHtml(a.supNote)+'</div>':'')
-        +(a.hrNote?'<div style="color:var(--t3)">HR備註：'+escapeHtml(a.hrNote)+'</div>':'')
         +'</div>'
+        +(isCancelled?'':renderStageResults(a, supEmp?supEmp.name:''))
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
         +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
         +(a.status==='pending'?'<button onclick="window.cancelLeaveApp(\''+a.id+'\')" style="padding:4px 12px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:11px;font-weight:700;cursor:pointer">✕ 取消申請</button>':'')
@@ -1213,6 +1243,7 @@ function renderLeaveStatus(s){
       var sc=isCancelled?'#999':a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='sup_approved'?'var(--blue)':'var(--yellow)';
       var sl=isCancelled?'已取消':a.status==='approved'?'&#x2705; 已核准':a.status==='rejected'?'&#x274C; 已拒絕':a.status==='sup_approved'?'&#x1F4CB; HR審核中':'&#x23F3; 審核中';
       var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+      var mkSupEmp=getEmpById(a.supId||'');
       html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s'+(isCancelled?';opacity:.55':'')+';">'
         +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
         +'<div><div style="font-size:14px;font-weight:700">&#x1F527; 補打卡 — '+typeLabel+'</div>'
@@ -1221,10 +1252,10 @@ function renderLeaveStatus(s){
         +'</div>'
         +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7">'
         +'<div>原因：'+escapeHtml(a.reason||'')+'</div>'
+        +'<div>直屬主管：'+(mkSupEmp?escapeHtml(mkSupEmp.name):'--')+'</div>'
         +(a.gps&&a.gps.lat?'<div>&#x1F4CD; 定位：'+a.gps.lat+', '+a.gps.lng+'（精度±'+a.gps.acc+'m）</div>':'<div style="color:var(--t3)">&#x1F4CD; 無定位紀錄</div>')
-        +(a.supNote?'<div>主管備註：'+escapeHtml(a.supNote)+'</div>':'')
-        +(a.hrNote?'<div>HR備註：'+escapeHtml(a.hrNote)+'</div>':'')
         +'</div>'
+        +(isCancelled?'':renderStageResults(a, mkSupEmp?mkSupEmp.name:''))
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
         +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
         +(a.status==='pending'?'<button onclick="window.cancelMakeupApp(\''+a.id+'\')" style="padding:4px 12px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:11px;font-weight:700;cursor:pointer">✕ 取消申請</button>':'')
