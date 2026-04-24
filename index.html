@@ -485,6 +485,7 @@ body.admin-mode > #adminScreen{
     <div class="tb-item" id="etab-leave" onclick="empTab('leave')"><div class="tbi">🌴</div><span>申請假</span></div>
     <div class="tb-item" id="etab-status" onclick="empTab('status')"><div class="tbi">📋</div><span>假期狀態</span><span class="tb-badge" id="empLeaveBadge" style="display:none">0</span></div>
     <div class="tb-item" id="etab-overtime" onclick="empTab('overtime')"><div class="tbi">⏰</div><span>加班</span><span class="tb-badge" id="empOTBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-approve" onclick="empTab('approve')" style="display:none"><div class="tbi">✍️</div><span>待我審核</span><span class="tb-badge" id="empMgrApproveBadge" style="display:none">0</span></div>
     <div class="tb-item" id="etab-profile" onclick="empTab('profile')"><div class="tbi">👤</div><span>帳號</span></div>
   </div>
 </div>
@@ -796,7 +797,31 @@ function haversine(a,b,c,d){
   return Math.round(R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));
 }
 function fmtTime(iso){if(!iso)return '--';return new Date(iso).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})}
-function todayKey(){return new Date().toISOString().slice(0,10)}
+// 回傳 YYYY-MM-DD（本地時區，非 UTC），避免台灣凌晨時 toISOString 偏到前一天
+function getLocalDateString(d){
+  var t=d?new Date(d):new Date();
+  return t.getFullYear()+'-'+String(t.getMonth()+1).padStart(2,'0')+'-'+String(t.getDate()).padStart(2,'0');
+}
+function todayKey(){return getLocalDateString()}
+// 直屬主管欄位：自動綁定員工註冊的 supervisor_id（不給下拉選單，避免員工亂選）
+// inputId 是 hidden input 的 id，submit 函數會讀取該 id 的 value
+function renderBoundSupervisorField(empId,inputId){
+  var eh=(typeof window!=='undefined'&&window.escapeHtml)?window.escapeHtml:function(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');};
+  var emp=(typeof getEmpById==='function')?getEmpById(empId||''):null;
+  var supId=emp?(emp.supervisorId||''):'';
+  var sup=supId?((typeof getEmpById==='function')?getEmpById(supId):null):null;
+  var hasSup=!!sup;
+  var label=hasSup?(sup.name+(sup.dept?' / '+sup.dept:'')):'尚未設定直屬主管（請聯繫 HR）';
+  var color=hasSup?'var(--text)':'#c14b4b';
+  var hint=hasSup?'依員工資料自動綁定':'無法送出，請先設定';
+  return '<div class="fg"><label>直屬主管</label>'
+    +'<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;border:1.5px solid var(--border);border-radius:9px;background:#f8f7ff;color:'+color+';font-size:14px">'
+      +'<span>'+eh(label)+'</span>'
+      +'<span style="font-size:11px;color:#8f86b3;font-weight:600">'+eh(hint)+'</span>'
+    +'</div>'
+    +'<input type="hidden" id="'+eh(inputId)+'" value="'+eh(supId)+'">'
+    +'</div>';
+}
 function getTodayRec(empId){return getRecs().find(r=>r.date===todayKey()&&r.empId===empId)||null}
 function saveRec(rec){
   const rs=getRecs().filter(r=>!(r.date===rec.date&&r.empId===rec.empId));
@@ -812,33 +837,9 @@ function getMonthRecs(y,m,empId){
 var currentUser=null; // {id, role, empData}
 var clockIntervals=[];
 
+// [DEAD] 舊 localStorage 版 doLogin 已移除，實際邏輯在 Script 2 的 window.doLogin
 function doLogin(){
-  const id=document.getElementById('loginId').value.trim();
-  const pw=document.getElementById('loginPw').value;
-  if(!id||!pw){document.getElementById('loginError').classList.add('show');return;}
-  document.getElementById('loginError').classList.remove('show');
-  const btn=document.querySelector('.lf-btn');
-  if(btn){btn.textContent='登入中...';btn.disabled=true;}
-  // SHA-256 hash then load from Supabase
-  (window.sha256?window.sha256(pw):Promise.resolve(pw)).then(async function(hash){
-    if(window.loadAllData) await window.loadAllData();
-    const accs=getAccounts();
-    const acc=accs.find(a=>a.id===id&&a.pw===hash);
-    if(!acc){
-      document.getElementById('loginError').classList.add('show');
-      document.getElementById('loginPw').value='';
-      if(btn){btn.textContent='登入';btn.disabled=false;}
-      return;
-    }
-    document.getElementById('loginError').classList.remove('show');
-    const emp=getEmpById(acc.id);
-    currentUser={id:acc.id,role:acc.role,empData:emp};
-    if(acc.role==='admin'){
-      document.body.classList.add('admin-mode');
-      showScreen('adminScreen');startAdminSession();
-    }else{showScreen('empScreen');startEmpSession();}
-    if(btn){btn.textContent='登入';btn.disabled=false;}
-  });
+  if(typeof window.doLogin==='function' && window.doLogin!==doLogin) return window.doLogin.apply(this,arguments);
 }
 
 function doLogout(){
@@ -878,6 +879,9 @@ function startEmpSession(){
   document.getElementById('empDeptTop').textContent=emp.dept;
   document.getElementById('empAvColor').style.background=`${emp.color}33`;
   document.getElementById('empAvColor').style.color=emp.color;
+  // 角色為 manager 才顯示「待我審核」頁籤（employee 隱藏，admin 走另一個介面）
+  var approveTab=document.getElementById('etab-approve');
+  if(approveTab) approveTab.style.display=(currentUser.role==='manager')?'':'none';
   // clock
   function tick(){
     const el=document.getElementById('empClock');
@@ -903,6 +907,10 @@ function empTab(tab){
   else if(tab==='status') renderLeaveStatus(s);
   else if(tab==='quota') renderQuota(s);
   else if(tab==='overtime') renderOvertimeSection(s);
+  else if(tab==='approve'){
+    // 主管專用：重用 admin 的 renderApprove（後端 reviewApp 會根據 role 擋第 2 層）
+    if(typeof renderApprove==='function') renderApprove(s);
+  }
   else if(tab==='profile') renderEmpProfile(s);
   updateEmpBadge();
 }
@@ -918,6 +926,16 @@ function updateEmpBadge(){
   const otPending=(window.getOvertimeApps?window.getOvertimeApps():DB.otas||[]).filter(function(a){return a.empId===currentUser.id&&a.status==='pending';}).length;
   const ob=document.getElementById('empOTBadge');
   if(ob){ob.style.display=otPending?'inline':'none';ob.textContent=otPending;}
+  // Manager 主管審核 badge：計算 sup_id 指向自己的待審筆數（只 pending 階段）
+  if(currentUser.role==='manager'){
+    const myId=currentUser.id;
+    const lRev=getApps().filter(function(a){return a.status==='pending'&&a.supId===myId;}).length;
+    const mRev=getMakeupApps().filter(function(a){return a.status==='pending'&&a.supId===myId;}).length;
+    const oRev=(window.getOvertimeApps?window.getOvertimeApps():DB.otas||[]).filter(function(a){return a.status==='pending'&&a.supId===myId;}).length;
+    const total=lRev+mRev+oRev;
+    const mb=document.getElementById('empMgrApproveBadge');
+    if(mb){mb.style.display=total?'inline':'none';mb.textContent=total;}
+  }
 }
 
 // ── Employee Clock ─────────────────────────────────
@@ -1282,33 +1300,9 @@ function togglePwVis(id){
   el.type=el.type==='password'?'text':'password';
 }
 
+// [DEAD] 舊 localStorage 版已移除（還在比對明文密碼），實際邏輯在 Script 2 的 window.changePassword（SHA-256 + Edge Function）
 function changePassword(){
-  const curPw=document.getElementById('curPw').value;
-  const newPw=document.getElementById('newPw').value;
-  const confirmPw=document.getElementById('confirmPw').value;
-  const errEl=document.getElementById('pwError');
-  const accs=getAccounts();
-  const acc=accs.find(a=>a.id===currentUser.id);
-  if(!acc||acc.pw!==curPw){
-    errEl.textContent='目前密碼錯誤，請重新輸入';
-    errEl.style.display='block';return;
-  }
-  if(newPw.length<6){
-    errEl.textContent='新密碼至少需要 6 個字元';
-    errEl.style.display='block';return;
-  }
-  if(newPw!==confirmPw){
-    errEl.textContent='兩次密碼輸入不一致，請確認';
-    errEl.style.display='block';return;
-  }
-  errEl.style.display='none';
-  const idx=accs.findIndex(a=>a.id===currentUser.id);
-  accs[idx].pw=newPw;
-  LS.set('accounts',accs);
-  document.getElementById('curPw').value='';
-  document.getElementById('newPw').value='';
-  document.getElementById('confirmPw').value='';
-  toast('🔒','密碼修改成功！');
+  if(typeof window.changePassword==='function' && window.changePassword!==changePassword) return window.changePassword.apply(this,arguments);
 }
 
 // ══════════════════════════════════════════════════
@@ -1939,193 +1933,24 @@ function renderApprove(s){
   s.innerHTML=html;
 }
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.openMakeupReview
 function openMakeupReview(id){
-  var a=getMakeupApps().find(function(x){return x.id===id;});
-  if(!a) return;
-  reviewingId='MAKEUP:'+id;
-  var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
-  var isSup=a.status==='pending';
-  var stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
-  var stageColor=isSup?'var(--blue)':'var(--orange)';
-  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
-    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
-    +'<div>&#x1F527; 補'+typeLabel+'</div>'
-    +'<div>&#x1F4C5; '+a.date+' '+a.punchTime+'</div>'
-    +'<div>&#x1F4DD; '+a.reason+'</div>'
-    +(a.gps&&a.gps.lat?'<div>&#x1F4CD; 座標：'+a.gps.lat+', '+a.gps.lng+' （精度±'+a.gps.acc+'m）</div>':'<div style="color:var(--t3)">&#x1F4CD; 無定位紀錄</div>')
-    +'</div>'
-    +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
-  if(!isSup&&a.supNote){
-    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+a.supNote+'</div>';
-  }
-  body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
-  document.getElementById('reviewBody').innerHTML=body;
-  openSheet('reviewSheet');
+  if(typeof window.openMakeupReview==='function' && window.openMakeupReview!==openMakeupReview) return window.openMakeupReview.apply(this,arguments);
 }
 
+// [DEAD] 舊 localStorage 版已移除，含未驗證的 attachData 注入風險，實際邏輯在 Script 2 的 window.openReview
 function openReview(id){
-  const a=getApps().find(x=>x.id===id);if(!a)return;
-  reviewingId=id;
-  const supEmp=getEmpById(a.supId||'');
-  const isSup=a.status==='pending';
-  const stageLabel=isSup?'第1層：直屬主管審核':'第2層：HR主管最終審核';
-  const stageColor=isSup?'var(--blue)':'var(--orange)';
-  var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
-    +'<div>&#x1F464; <strong>'+a.empName+'</strong></div>'
-    +'<div>&#x1F4CC; '+(LEAVE_LABEL[a.type]||a.type)+(a.days?' · '+a.days+'天':'')+'</div>'
-    +'<div>&#x1F4C5; '+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+'</div>'
-    +'<div>&#x1F4DD; '+a.reason+'</div>'
-    +'<div>&#x1F91D; 代理：'+(a.proxy||'--')+'</div>'
-    +'<div>&#x1F464; 直屬主管：'+(supEmp?supEmp.name:'--')+'</div>'
-    +(a.attachName?'<div>&#x1F4CE; 附件：'+a.attachName+'</div>':'')
-    +'</div>'
-    +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
-  // 顯示附件預覽
-  if(a.attachData){
-    if(a.attachData.startsWith('data:image')){
-      body+='<div style="margin-bottom:12px"><img src="'+a.attachData+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
-    } else {
-      body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
-    }
-  }
-  // 若第2層，顯示第1層備註
-  if(!isSup && a.supNote){
-    body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+a.supNote+'</div>';
-  }
-  body+='<div class="fg"><label>審核備註（選填）</label><input id="reviewNote" placeholder="核准原因 / 拒絕原因..."></div>';
-  document.getElementById('reviewBody').innerHTML=body;
-  openSheet('reviewSheet');
+  if(typeof window.openReview==='function' && window.openReview!==openReview) return window.openReview.apply(this,arguments);
 }
 
+// [DEAD] 舊 localStorage 版已移除。補打卡審核統一由 Script 2 的 window.doReview 處理（依 reviewingId 前綴自動分流）
 function doMakeupReview(status){
-  var realId=reviewingId.replace('MAKEUP:','');
-  var apps=getMakeupApps();
-  var idx=apps.findIndex(function(a){return a.id===realId;});
-  if(idx===-1) return;
-  var note=document.getElementById('reviewNote')?document.getElementById('reviewNote').value||'':'';
-  var now=new Date().toISOString();
-  var a=apps[idx];
-  if(status==='rejected'){
-    a.status='rejected';
-    if(a.status==='pending'){a.supNote=note;a.supReviewedAt=now;}
-    else{a.hrNote=note;a.hrReviewedAt=now;}
-    a.supNote=a.supNote||note;
-    a.hrNote=a.stage==='hr'?note:a.hrNote;
-    a.status='rejected';
-  } else {
-    if(a.status==='pending'){
-      a.status='sup_approved';
-      a.stage='hr';
-      a.supNote=note;
-      a.supReviewedAt=now;
-    } else if(a.status==='sup_approved'){
-      // 最終核准，寫入打卡紀錄
-      a.status='approved';
-      a.stage='done';
-      a.hrNote=note;
-      a.hrReviewedAt=now;
-      applyMakeupToRecord(a);
-    }
-  }
-  apps[idx]=a;
-  LS.set('makeupApps',apps);
-  closeSheet('reviewSheet');
-  var msg=status==='rejected'?'已拒絕 '+a.empName+' 的補打卡':a.status==='sup_approved'?'第1層核准！已通知HR':'&#x2705; 補打卡已核准並寫入紀錄';
-  toast(status==='rejected'?'&#x274C;':'&#x2705;',msg);
-  renderApprove(document.getElementById('adminScroll'));
-  updateAdminBadge();
+  if(typeof window.doReview==='function') return window.doReview.apply(this,arguments);
 }
 
-function applyMakeupToRecord(a){
-  // 補打卡核准後，自動寫入/更新打卡紀錄
-  var recs=getRecs();
-  var existing=recs.find(function(r){return r.date===a.date&&r.empId===a.empId;});
-  var emp=getEmpById(a.empId);
-  var timeISO=new Date(a.date+'T'+a.punchTime+':00+08:00').toISOString();
-  if(existing){
-    if(a.punchType==='in'&&!existing.in){
-      existing.in=timeISO;
-      existing.gpsIn={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
-    } else if(a.punchType==='out'&&!existing.out){
-      existing.out=timeISO;
-      existing.gpsOut={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
-    }
-    LS.set('records',recs);
-  } else {
-    var newRec={date:a.date,empId:a.empId,in:null,out:null,gpsIn:null,gpsOut:null};
-    if(a.punchType==='in'){
-      newRec.in=timeISO;
-      newRec.gpsIn={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
-    } else {
-      newRec.out=timeISO;
-      newRec.gpsOut={lat:a.gps?a.gps.lat:null,lng:a.gps?a.gps.lng:null,acc:a.gps?a.gps.acc:null,makeup:true};
-    }
-    recs.push(newRec);
-    LS.set('records',recs);
-  }
-}
-
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.doReview（走 Edge Function reviewApp）
 function doReview(status){
-  if(!reviewingId) return;
-  // 補打卡審核
-  if(reviewingId.startsWith('MAKEUP:')){
-    doMakeupReview(status);
-    return;
-  }
-  const apps=getApps();
-  const idx=apps.findIndex(a=>a.id===reviewingId);
-  if(idx===-1) return;
-  const note=document.getElementById('reviewNote')?.value||'';
-  const now=new Date().toISOString();
-  const a=apps[idx];
-  const isHR=currentUser.role==='admin';
-
-  if(status==='rejected'){
-    // 任一層拒絕即結束
-    a.status='rejected';
-    a.stage=a.status==='pending'?'sup':'hr';
-    if(a.status==='pending'){a.supNote=note;a.supReviewedAt=now;}
-    else{a.hrNote=note;a.hrReviewedAt=now;}
-    a.stage=a.status==='sup_approved'||isHR?'hr':'sup';
-    a.supNote=a.supNote||note;
-    a.hrNote=isHR?note:a.hrNote;
-    a.status='rejected';
-  } else {
-    // 核准
-    if(a.status==='pending'){
-      // 第1層直屬主管核准 → 進入HR審核
-      a.status='sup_approved';
-      a.stage='hr';
-      a.supNote=note;
-      a.supReviewedAt=now;
-      // Email 通知HR
-      var hrEmps=getAccounts().filter(acc=>acc.role==='admin');
-      var hrEmpData=hrEmps.length?getEmpById(hrEmps[0].id):null;
-      var hrEmail=hrEmpData?hrEmpData.email:'';
-      if(hrEmail){
-        var subj=encodeURIComponent('[請假待HR審核] '+a.empName+' '+{annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'}[a.type]);
-        var body2=encodeURIComponent('HR主管您好：\n\n'+a.empName+' 的請假申請已通過直屬主管審核，請登入系統進行最終審核。\n假期：'+({annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'}[a.type]||a.type)+'\n期間：'+a.startDate+'\n主管備註：'+note);
-        el.href='mailto:'+hrEmail+'?subject='+subj+'&body='+body2;
-        el.style.display='none';
-        document.body.appendChild(el);
-        el.click();
-        document.body.removeChild(el);
-      }
-    } else if(a.status==='sup_approved'){
-      // 第2層HR核准 → 最終核准，自動扣假期
-      a.status='approved';
-      a.stage='done';
-      a.hrNote=note;
-      a.hrReviewedAt=now;
-    }
-  }
-  apps[idx]=a;
-  LS.set('leaveApps',apps);
-  closeSheet('reviewSheet');
-  var msg=status==='rejected'?'已拒絕 '+a.empName+' 的申請':a.status==='sup_approved'?'第1層核准！已通知HR審核':'&#x2705; 全數核准！假期已自動扣除';
-  toast(status==='rejected'?'&#x274C;':'&#x2705;',msg);
-  renderApprove(document.getElementById('adminScroll'));
-  updateAdminBadge();
+  if(typeof window.doReview==='function' && window.doReview!==doReview) return window.doReview.apply(this,arguments);
 }
 
 // ── Employees ──────────────────────────────────────
@@ -2189,9 +2014,19 @@ function renderEmployees(s){
 function openEditEmp(empId){
   const emp=getEmps().find(e=>e.id===empId);if(!emp)return;
   const acc=getAccounts().find(a=>a.id===empId);
-  const otherEmps=getEmps().filter(e=>e.id!==empId);
+  // 直屬主管只列出 role=manager 或 admin 的員工（普通員工不能當主管）
+  // 但若目前已指派的主管不是 manager/admin（例如舊資料），仍保留在清單中避免存檔時意外清空
+  const otherEmps=getEmps().filter(function(e){
+    if(e.id===empId) return false;
+    if(e.role==='manager'||e.role==='admin') return true;
+    if(emp.supervisorId && e.id===emp.supervisorId) return true; // 保留舊資料
+    return false;
+  });
   const supOptions='<option value="">-- 無 / 未設定 --</option>'
-    +otherEmps.map(e=>'<option value="'+e.id+'"'+(emp.supervisorId===e.id?' selected':'')+'>'+e.name+' ('+e.dept+')</option>').join('');
+    +otherEmps.map(function(e){
+      var flag=(e.role==='manager'||e.role==='admin')?'':' ⚠';
+      return '<option value="'+e.id+'"'+(emp.supervisorId===e.id?' selected':'')+'>'+e.name+' ('+e.dept+')'+flag+'</option>';
+    }).join('');
 
   var statusOptions=''
     +'<option value="active"'+(emp.status==='active'||!emp.status?' selected':'')+'>✅ 在職</option>'
@@ -2263,36 +2098,14 @@ function openEditEmp(empId){
 }
 
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.saveEmp（走 Edge Function updateEmployee）
 function saveEmp(empId){
-  const emps=getEmps();
-  const idx=emps.findIndex(e=>e.id===empId);if(idx===-1)return;
-  emps[idx].name=document.getElementById('ee_name').value;
-  emps[idx].dept=document.getElementById('ee_dept').value;
-  emps[idx].pos=document.getElementById('ee_pos').value;
-  emps[idx].salary=Number(document.getElementById('ee_sal').value)||0;
-  emps[idx].email=document.getElementById('ee_email').value;
-  emps[idx].workRule=document.getElementById('ee_rule').value;
-  emps[idx].supervisorId=document.getElementById('ee_sup')?document.getElementById('ee_sup').value||'':'';
-  if(document.getElementById('ee_status')) emps[idx].status=document.getElementById('ee_status').value;
-  LS.set('employees',emps);
-  // update account role & password
-  const accs=getAccounts();
-  const ai=accs.findIndex(a=>a.id===empId);
-  if(ai!==-1){
-    accs[ai].role=document.getElementById('ee_role').value;
-    const newPw=document.getElementById('ee_pw').value;
-    if(newPw) accs[ai].pw=newPw;
-    LS.set('accounts',accs);
-  }
-  closePcModal();
-  closeSheet('empSheet');
-  toast('✅',`${emps[idx].name} 資料已更新`);
-  renderEmployees(document.getElementById('adminScroll'));
+  if(typeof window.saveEmp==='function' && window.saveEmp!==saveEmp) return window.saveEmp.apply(this,arguments);
 }
 
 function openAddEmp(){
-  // 動態建立直屬主管選項
-  const existEmpsForSup=getEmps();
+  // 動態建立直屬主管選項（只列出 role=manager 或 admin 的員工）
+  const existEmpsForSup=getEmps().filter(e=>e.role==='manager'||e.role==='admin');
   const supOptHtml=existEmpsForSup.map(e=>'<option value="'+e.id+'">'+e.name+' ('+e.dept+')</option>').join('');
   document.getElementById('empSheetBody').innerHTML=`
     <div class="fg">
@@ -2371,52 +2184,9 @@ function openAddEmp(){
   }
 }
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.doAddEmp（走 Edge Function addEmployee）
 function doAddEmp(){
-  const newId=document.getElementById('ne_id').value.trim();
-  const name=document.getElementById('ne_name').value.trim();
-  const pw=document.getElementById('ne_pw').value.trim()||'1234';
-  const errEl=document.getElementById('addEmpError');
-
-  // 驗證
-  if(!newId){
-    errEl.textContent='⚠️ 請填寫員工工號（登入帳號）';
-    errEl.style.display='block'; return;
-  }
-  if(!name){
-    errEl.textContent='⚠️ 請填寫員工姓名';
-    errEl.style.display='block'; return;
-  }
-  if(pw.length<4){
-    errEl.textContent='⚠️ 密碼至少需要 4 個字元';
-    errEl.style.display='block'; return;
-  }
-  // 檢查工號是否重複
-  const existAccs=getAccounts();
-  const existEmps=getEmps();
-  if(existAccs.find(a=>a.id===newId)||existEmps.find(e=>e.id===newId)){
-    errEl.textContent='⚠️ 此工號已存在，請使用其他工號';
-    errEl.style.display='block'; return;
-  }
-  errEl.style.display='none';
-
-  const colors=['#5046e0','#2f5fd4','#7340c8','#2eaa6e','#e07c08','#16a085'];
-  const emp={
-    id:newId, name,
-    dept:document.getElementById('ne_dept').value,
-    pos:document.getElementById('ne_pos').value,
-    salary:Number(document.getElementById('ne_sal').value)||0,
-    email:document.getElementById('ne_email').value,
-    workRule:document.getElementById('ne_rule').value,
-    supervisorId:document.getElementById('ne_sup')?document.getElementById('ne_sup').value||'':'',
-    color:colors[existEmps.length%colors.length]
-  };
-  existEmps.push(emp);
-  LS.set('employees',existEmps);
-  existAccs.push({id:newId,pw,role:document.getElementById('ne_role').value});
-  LS.set('accounts',existAccs);
-  closeSheet('empSheet');
-  showNewEmpInfo(name,newId,pw);
-  renderEmployees(document.getElementById('adminScroll'));
+  if(typeof window.doAddEmp==='function' && window.doAddEmp!==doAddEmp) return window.doAddEmp.apply(this,arguments);
 }
 
 function showNewEmpInfo(name,id,pw){
@@ -2601,17 +2371,6 @@ function renderSettings(s){
       </div>
     </div>
   </div>
-  <div class="sec-title fu fu2"><span>⚙️ 全公司工時預設</span></div>
-  <div class="card fu fu2">
-    <div class="fg"><label>預設工時規則</label>
-      <select id="cfg_rule">
-        <option value="subtract" ${(LS.get('workRules')||{}).default==='subtract'?'selected':''}>直接相減</option>
-        <option value="deduct_lunch" ${(LS.get('workRules')||{}).default==='deduct_lunch'?'selected':''}>扣除午休 1 小時</option>
-        <option value="deduct_both" ${(LS.get('workRules')||{}).default==='deduct_both'?'selected':''}>扣除午休＋晚餐 2 小時</option>
-      </select>
-    </div>
-    <button class="save-btn" onclick="saveDefaultWorkRule()">💾 儲存</button>
-  </div>
   </div><div>
   <div class="sec-title fu fu3"><span>🎯 假期額度設定</span></div>
   <div class="card fu fu3">
@@ -2725,49 +2484,23 @@ function renderHolidaySettings(){
     +rows
     +'</div>';
 }
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.saveSettings（走 Edge Function upsertCompanySettings）
 function saveSettings(){
-  var requireGPS=document.getElementById('cfg_requireGPS')?document.getElementById('cfg_requireGPS').checked:true;
-  LS.set('companySettings',{
-    name:document.getElementById('cfg_name').value,
-    address:document.getElementById('cfg_addr').value,
-    lat:parseFloat(document.getElementById('cfg_lat').value),
-    lng:parseFloat(document.getElementById('cfg_lng').value),
-    rangeM:parseInt(document.getElementById('cfg_range').value)||300,
-    requireGPS:requireGPS
-  });
-  toast('✅','公司設定已儲存');
+  if(typeof window.saveSettings==='function' && window.saveSettings!==saveSettings) return window.saveSettings.apply(this,arguments);
 }
 function saveQuota(){
   const keys=['annual','sick','personal','marriage','funeral','official','menstrual','maternity','paternity','parental','makeup'];
   const q={};keys.forEach(k=>{q[k]=Number(document.getElementById('q_'+k)?.value)||0});
   LS.set('leaveQuota',q);toast('✅','假期額度已儲存');
 }
-function saveDefaultWorkRule(){
-  var val=document.getElementById('cfg_rule').value;
-  DB._defaultWorkRule=val;
-  toast('✅','預設工時規則已儲存');
-}
-
 // ══════════════════════════════════════════════════
 //  SHARED: GPS PUNCH
 // ══════════════════════════════════════════════════
 let pendingAction=null, currentGPS=null;
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.openPunch
 function openPunch(action){
-  pendingAction=action;
-  currentGPS=null;
-  const emp=currentUser.empData;
-  document.getElementById('punchTitle').textContent=action==='in'?'🌅 上班打卡確認':'🌇 下班打卡確認';
-  document.getElementById('gpsDot').className='gps-dot loading';
-  document.getElementById('gpsText').textContent='正在取得 GPS 位置...';
-  document.getElementById('gpsCoord').textContent='';
-  document.getElementById('distBadge').innerHTML='';
-  document.getElementById('punchConfirmBtn').disabled=true;
-  document.getElementById('punchConfirmBtn').textContent='確認打卡';
-  const now=new Date();
-  document.getElementById('punchBody').innerHTML=`<div style="font-size:13px;color:var(--t2);line-height:1.9"><div>⏰ 時間：<strong>${now.toLocaleTimeString('zh-TW',{hour12:false})}</strong></div><div>👤 ${escapeHtml(emp?.name||currentUser.id)}</div><div>🏢 <span style="font-size:12px">${escapeHtml(getCfg().address)}</span></div></div>`;
-  openSheet('punchSheet');
-  getGPS();
+  if(typeof window.openPunch==='function' && window.openPunch!==openPunch) return window.openPunch.apply(this,arguments);
 }
 
 // 安全取得 GPS DOM 元素（彈窗關閉後元素不存在，避免報錯）
@@ -2908,39 +2641,16 @@ function showGPSError(msg){
   }
 }
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.confirmPunch（走 Edge Function clockPunch）
 function confirmPunch(){
-  const now=new Date();
-  const empId=currentUser.id;
-  const emp=currentUser.empData;
-  const rec=getTodayRec(empId)||{date:todayKey(),empId,in:null,out:null,gpsIn:null,gpsOut:null};
-  if(pendingAction==='in'){
-    rec.in=now.toISOString(); rec.gpsIn=currentGPS;
-    toast('✅',`上班打卡 ${fmtTime(now.toISOString())} ✓`);
-  } else {
-    rec.out=now.toISOString(); rec.gpsOut=currentGPS;
-    const h=calcHours(rec.in,rec.out,emp.workRule);
-    toast('🎉',`下班打卡！工時 ${h.toFixed(1)}h`);
-  }
-  saveRec(rec);
-  closeSheet('punchSheet');
-  // refresh correct screen
-  if(currentUser.role==='admin'){
-    if(adminMode==='punch') renderAdminPunch(document.getElementById('adminScroll'));
-    else adminTab('dashboard');
-  } else {
-    empTab('clock');
-  }
+  if(typeof window.confirmPunch==='function' && window.confirmPunch!==confirmPunch) return window.confirmPunch.apply(this,arguments);
 }
 
 // ══════════════════════════════════════════════════
 //  LEAVE APPLY
 // ══════════════════════════════════════════════════
 function openLeaveSheet(){
-  const today=new Date().toISOString().slice(0,10);
-  const emp=currentUser.empData;
-  const emps=getEmps().filter(e=>e.id!==currentUser.id);
-    const defaultSup=emp?emp.supervisorId||'':'';
-  const supOptions=emps.map(e=>'<option value="'+e.id+'"'+(e.id===defaultSup?' selected':'')+'>'+e.name+' ('+e.dept+')</option>').join('');
+  const today=getLocalDateString(); // 本地日期，避免凌晨偏到前一天
   document.getElementById('leaveFormBody').innerHTML=
     '<div class="fg"><label>假期類型</label><select id="lType">'
     +'<option value="annual">&#x1F334; 特休假</option>'
@@ -2959,10 +2669,7 @@ function openLeaveSheet(){
     +'<div class="fg"><label>開始日期</label><input type="date" id="lStart" value="'+today+'"></div>'
     +'<div class="fg"><label>結束日期</label><input type="date" id="lEnd" value="'+today+'"></div>'
     +'</div>'
-    +'<div class="fg"><label>直屬主管</label><select id="lSup">'
-    +'<option value="">-- 請選擇主管 --</option>'
-    +supOptions
-    +'</select></div>'
+    +renderBoundSupervisorField(currentUser.id,'lSup') // 改用自動綁定的主管欄位
     +'<div class="fg"><label>代理人</label><input id="lProxy" placeholder="代理人姓名"></div>'
     +'<div class="fg"><label>請假原因</label><textarea id="lReason" placeholder="請說明原因..."></textarea></div>'
     +'<div class="fg"><label>附件（選填，如診斷書）</label>'
@@ -2973,79 +2680,9 @@ function openLeaveSheet(){
   openSheet('leaveSheet');
 }
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.submitLeave（走 Edge Function）
 function submitLeave(){
-  const type=document.getElementById('lType')?.value;
-  const start=document.getElementById('lStart')?.value;
-  const end=document.getElementById('lEnd')?.value;
-  const reason=document.getElementById('lReason')?.value.trim();
-  const proxy=document.getElementById('lProxy')?.value.trim()||'';
-  const supId=document.getElementById('lSup')?.value||'';
-  const errEl=document.getElementById('leaveFormErr');
-  if(!start||!end){errEl.textContent='⚠️ 請填寫日期';errEl.style.display='block';return;}
-  if(start>end){errEl.textContent='⚠️ 結束日期不能早於開始';errEl.style.display='block';return;}
-  if(!reason){errEl.textContent='⚠️ 請填寫請假原因';errEl.style.display='block';return;}
-  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
-  errEl.style.display='none';
-  const emp=currentUser.empData;
-  const fileInput=document.getElementById('lAttach');
-  const file=fileInput&&fileInput.files&&fileInput.files[0];
-
-  // 計算請假天數（排除週末）
-  var days=0,cur=new Date(start),endD=new Date(end);
-  while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
-
-  // 取得主管 email
-  const supEmp=getEmpById(supId);
-  const supEmail=supEmp?getEmps().find(e=>e.id===supId)?.email||'':'';
-
-  function saveAndNotify(attachData){
-    const apps=getApps();
-    const appId='LA'+Date.now();
-    apps.push({
-      id:appId,
-      empId:currentUser.id,
-      empName:emp?.name||currentUser.id,
-      type,startDate:start,endDate:end,days,
-      reason,proxy,supId,
-      attachName:file?file.name:'',
-      attachData:attachData||'',
-      // 2層審核: pending → sup_approved → approved / rejected
-      status:'pending',
-      stage:'sup', // 目前在哪一層: sup=直屬主管, hr=HR主管
-      supNote:'',supReviewedAt:'',
-      hrNote:'',hrReviewedAt:'',
-      appliedAt:new Date().toISOString()
-    });
-    LS.set('leaveApps',apps);
-    closeSheet('leaveSheet');
-    // Email 通知直屬主管（mailto）
-    var supName=supEmp?supEmp.name:'主管';
-    var subj=encodeURIComponent('[請假通知] '+emp.name+' 申請 '+days+'天 '+{annual:'特休假',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假'}[type]);
-    var body=encodeURIComponent('\u60a8\u597d\uff0c\n\n'+emp.name+' \u7533\u8acb\u88dc\u6253\u5361\uff0c\u8acb\u81f3\u7cfb\u7d71\u5be9\u6838\u3002\n\u65e5\u671f\uff1a'+d.date+'\n\u985e\u578b\uff1a'+typeLabel+'\u6253\u5361 '+d.time+'\n\u539f\u56e0\uff1a'+d.reason);
-    if(supEmail){
-      var mailLink='mailto:'+supEmail+'?subject='+subj+'&body='+body;
-      // 建立隱藏連結點擊
-      var a=document.createElement('a');
-      a.href=mailLink;
-      a.style.display='none';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }
-    toast('✅','假期申請已送出！Email 通知已發送給主管');
-    if(currentUser.role==='employee') empTab('status');
-    updateEmpBadge();
-  }
-
-  if(file){
-    if(file.size>5*1024*1024){errEl.textContent='⚠️ 附件過大，請上傳 5 MB 以內的檔案';errEl.style.display='block';return;}
-    var reader=new FileReader();
-    reader.onload=function(e){saveAndNotify(e.target.result);};
-    reader.onerror=function(){saveAndNotify('');};
-    reader.readAsDataURL(file);
-  } else {
-    saveAndNotify('');
-  }
+  if(typeof window.submitLeave==='function' && window.submitLeave!==submitLeave) return window.submitLeave.apply(this,arguments);
 }
 
 // ══════════════════════════════════════════════════
@@ -3055,12 +2692,7 @@ var makeupGpsData=null; // 儲存補打卡定位結果
 var makeupPendingData=null; // 暫存補打卡表單資料
 
 function openMakeupSheet(){
-  var today=new Date().toISOString().slice(0,10);
-  var emp=currentUser.empData;
-  var emps=getEmps().filter(function(e){return e.id!==currentUser.id;});
-  var defaultSupId=emp?emp.supervisorId||'':'';
-  var supOptions=emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===defaultSupId?' selected':'')+'>'+e.name+' ('+e.dept+')</option>';}).join('');
-
+  var today=getLocalDateString(); // 本地日期，避免凌晨偏到前一天
   document.getElementById('makeupFormBody').innerHTML=
     '<div style="background:var(--ol);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--orange);line-height:1.6">'
     +'&#x26A0;&#xFE0F; 補打卡需要<strong>現場定位驗證</strong>，系統將記錄您申請時的 GPS 座標，送出後需主管審核。'
@@ -3073,7 +2705,7 @@ function openMakeupSheet(){
     +'</select></div>'
     +'<div class="fg"><label>實際時間</label><input type="time" id="mk_time"></div>'
     +'</div>'
-    +'<div class="fg"><label>直屬主管</label><select id="mk_sup"><option value="">-- 請選擇主管 --</option>'+supOptions+'</select></div>'
+    +renderBoundSupervisorField(currentUser.id,'mk_sup') // 改用自動綁定的主管欄位
     +'<div class="fg"><label>補打卡原因</label><textarea id="mk_reason" placeholder="請說明忘記打卡的原因..."></textarea></div>'
     +'<div id="makeupFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:4px"></div>'
     +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--t2);line-height:1.6">'
@@ -3095,8 +2727,8 @@ function submitMakeup(){
   if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
   if(!reason){errEl.textContent='⚠️ 請填寫補打卡原因';errEl.style.display='block';return;}
 
-  // 檢查日期不能是未來
-  if(date>new Date().toISOString().slice(0,10)){
+  // 檢查日期不能是未來（用本地時區，避免凌晨時誤擋）
+  if(date>getLocalDateString()){
     errEl.textContent='⚠️ 補打卡日期不能是未來日期';errEl.style.display='block';return;
   }
   errEl.style.display='none';
@@ -3198,49 +2830,9 @@ function onMakeupGpsError(err,cfg){
   }
 }
 
+// [DEAD] 舊 localStorage 版已移除，實際邏輯在 Script 2 的 window.confirmMakeupGps（走 Edge Function）
 function confirmMakeupGps(){
-  if(!makeupPendingData) return;
-  var d=makeupPendingData;
-  var emp=currentUser.empData;
-  var apps=getMakeupApps();
-  var supEmp=getEmpById(d.supId);
-
-  apps.push({
-    id:'MK'+Date.now(),
-    empId:currentUser.id,
-    empName:emp?emp.name:currentUser.id,
-    date:d.date,
-    punchType:d.type,       // 'in' | 'out'
-    punchTime:d.time,       // 'HH:MM'
-    supId:d.supId,
-    reason:d.reason,
-    gps:makeupGpsData,
-    status:'pending',        // pending → approved / rejected
-    stage:'sup',
-    supNote:'',supReviewedAt:'',
-    hrNote:'',hrReviewedAt:'',
-    appliedAt:new Date().toISOString()
-  });
-  LS.set('makeupApps',apps);
-  closeSheet('makeupGpsSheet');
-  makeupPendingData=null;
-  makeupGpsData=null;
-
-  // Email 通知直屬主管
-  if(supEmp&&supEmp.email){
-    var typeLabel2=d.type==='in'?'上班':'下班';
-    var subj2=encodeURIComponent('[補打卡審核] '+emp.name+' '+d.date+' '+typeLabel2+'補打卡');
-    var body2=encodeURIComponent(emp.name+' 申請補打卡，請至系統審核。日期：'+d.date+' 類型：'+typeLabel2+'打卡 '+d.time+' 原因：'+d.reason);
-    var el2=document.createElement('a');
-    el2.href='mailto:'+supEmp.email+'?subject='+subj2+'&body='+body2;
-    el2.style.display='none';
-    document.body.appendChild(el2);
-    el2.click();
-    document.body.removeChild(el2);
-  }
-    toast('✅','補打卡申請已送出！等待主管審核');
-  if(currentUser.role==='employee') empTab('clock');
-  updateEmpBadge();
+  if(typeof window.confirmMakeupGps==='function' && window.confirmMakeupGps!==confirmMakeupGps) return window.confirmMakeupGps.apply(this,arguments);
 }
 
 
@@ -3640,7 +3232,6 @@ var _lsGet=function(k){
   if(k==='makeupApps')return DB.makeups;
   if(k==='leaveQuota')return DB.quota;
   if(k==='companySettings')return DB.cfg||{lat:25.0473,lng:121.5124,name:'iROBOT MEDICINE 智能人醫',address:'台北市大同區市民大道一段209號12樓',rangeM:300,requireGPS:true};
-  if(k==='workRules')return{default:DB._defaultWorkRule||'deduct_lunch'};
   return null;
 };
 // Patch the LS object that main script uses (works because objects are mutable)
@@ -4164,10 +3755,18 @@ window.openReview=async function(id){
     +'</div>'
     +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
   if(a.attachData){
-    if(a.attachData.startsWith('data:image'))
-      body+='<div style="margin-bottom:12px"><img src="'+a.attachData+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
-    else
-      body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
+    // 附件 scheme 白名單：只允許圖片、PDF、HTTPS，防止 javascript:/data:text/html 等 XSS
+    var ad=String(a.attachData);
+    var isImg=/^data:image\/[a-z+.-]+;/i.test(ad);
+    var isPdf=/^data:application\/pdf;/i.test(ad);
+    var isHttps=/^https:\/\//i.test(ad);
+    if(isImg){
+      body+='<div style="margin-bottom:12px"><img src="'+eh(ad)+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
+    } else if(isPdf||isHttps){
+      body+='<div style="margin-bottom:12px"><a href="'+eh(ad)+'" target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
+    } else {
+      body+='<div style="margin-bottom:12px;color:var(--pd);font-size:12px">&#x26A0; 附件格式不支援（僅允許圖片、PDF 或 HTTPS 連結）</div>';
+    }
   }
   if(!isSup&&a.supNote)
     body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+eh(a.supNote)+'</div>';
@@ -4233,6 +3832,17 @@ window.doReview=function(status){
         var lineMsg2='📋 補打卡審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+typeLabel2+'\n日期：'+a.date+' '+a.punchTime+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
         edgeCall('sendLine',{lineUserId:empToNotify.lineUserId,message:lineMsg2},tok).catch(function(){});
       }
+      // 第1層→第2層：LINE 通知所有 admin 該做 HR 最終審核
+      if(ns==='sup_approved'){
+        var typeLabel3=a.punchType==='in'?'上班打卡':'下班打卡';
+        var reviewerName=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.name:'';
+        var admins=(DB.emps||[]).filter(function(e){return e.role==='admin'&&e.lineUserId;});
+        admins.forEach(function(ad){
+          if(ad.id===(window.currentUser&&window.currentUser.id))return; // admin 自己不通知自己
+          var hrMsg='📋 補打卡待 HR 最終審核\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+typeLabel3+'\n日期：'+a.date+' '+a.punchTime+'\n初審主管：'+reviewerName+(note?'\n主管備註：'+note:'')+'\n\n請登入系統進行最終審核';
+          edgeCall('sendLine',{lineUserId:ad.lineUserId,message:hrMsg},tok).catch(function(){});
+        });
+      }
     }).catch(function(e){
       toast('❌','審核失敗：'+(e&&e.message?e.message:'請重試'));
       console.error('[doReview makeup]',e);
@@ -4273,6 +3883,16 @@ window.doReview=function(status){
         var lineMsg3='📋 請假審核結果\n━━━━━━━━━━━━━━\n申請人：'+(b.empName||'')+'\n假別：'+(LEAVE_LBL[b.type]||b.type)+'（'+b.days+' 天）\n期間：'+b.startDate+(b.startDate!==b.endDate?' ～ '+b.endDate:'')+'\n結果：'+resultLabel+(note?'\n備註：'+note:'');
         edgeCall('sendLine',{lineUserId:empN.lineUserId,message:lineMsg3},tok).catch(function(){});
       }
+    }
+    // 第1層→第2層：LINE 通知所有 admin 該做 HR 最終審核
+    if(ns2==='sup_approved'){
+      var reviewerName2=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.name:'';
+      var admins2=(DB.emps||[]).filter(function(e){return e.role==='admin'&&e.lineUserId;});
+      admins2.forEach(function(ad){
+        if(ad.id===(window.currentUser&&window.currentUser.id))return; // admin 自己不通知自己
+        var hrMsg2='📋 請假待 HR 最終審核\n━━━━━━━━━━━━━━\n申請人：'+(b.empName||'')+'\n假別：'+(LEAVE_LBL[b.type]||b.type)+'（'+b.days+' 天）\n期間：'+b.startDate+(b.startDate!==b.endDate?' ～ '+b.endDate:'')+'\n初審主管：'+reviewerName2+(note?'\n主管備註：'+note:'')+'\n\n請登入系統進行最終審核';
+        edgeCall('sendLine',{lineUserId:ad.lineUserId,message:hrMsg2},tok).catch(function(){});
+      });
     }
   }).catch(function(e){
     toast('❌','審核失敗：'+(e&&e.message?e.message:'請重試'));
@@ -5040,8 +4660,8 @@ window.renderOvertimeSection=function(s){
         +'<div class="lr-info">'
         +'<div class="lr-name">'+a.date+' '+a.startTime+'~'+a.endTime+'</div>'
         +'<div class="lr-sub" style="color:var(--orange);font-weight:700">'+a.hours.toFixed(1)+'h 加班</div>'
-        +'<div class="lr-sub">'+(a.reason||'--')+'</div>'
-        +(a.supNote?'<div class="lr-sub">主管備註：'+a.supNote+'</div>':'')
+        +'<div class="lr-sub">'+escapeHtml(a.reason||'--')+'</div>'
+        +(a.supNote?'<div class="lr-sub">主管備註：'+escapeHtml(a.supNote)+'</div>':'')
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
         +'<span class="bgg" style="background:'+stColor+'22;color:'+stColor+'">'+stLabel+'</span>'
@@ -5056,11 +4676,7 @@ window.renderOvertimeSection=function(s){
 
 // 開啟加班申請 sheet
 window.openOvertimeSheet=function(){
-  var today=new Date().toISOString().slice(0,10);
-  var emp=window.currentUser.empData;
-  var emps=window.getEmps().filter(function(e){return e.id!==window.currentUser.id;});
-  var defaultSup=emp?emp.supervisorId||'':'';
-  var supOptions=emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===defaultSup?' selected':'')+'>'+e.name+' ('+e.dept+')</option>';}).join('');
+  var today=(window.getLocalDateString?window.getLocalDateString():new Date().toISOString().slice(0,10)); // 本地日期
   document.getElementById('overtimeFormBody').innerHTML=
     '<div class="fg"><label>加班日期</label><input type="date" id="ot_date" value="'+today+'"></div>'
     +'<div class="fr2">'
@@ -5068,7 +4684,7 @@ window.openOvertimeSheet=function(){
     +'<div class="fg"><label>結束時間</label><input type="time" id="ot_end" value="20:00"></div>'
     +'</div>'
     +'<div class="fg" id="ot_hours_hint" style="background:var(--pl);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--pd)">預計加班時數：<strong id="ot_hours_val">2.0</strong> 小時</div>'
-    +'<div class="fg"><label>直屬主管</label><select id="ot_sup"><option value="">-- 請選擇主管 --</option>'+supOptions+'</select></div>'
+    +(window.renderBoundSupervisorField?window.renderBoundSupervisorField(window.currentUser.id,'ot_sup'):'<div class="fg"><label>直屬主管</label><input id="ot_sup" type="hidden" value=""></div>') // 改用自動綁定
     +'<div class="fg"><label>加班原因</label><textarea id="ot_reason" placeholder="請說明加班事由..." style="min-height:80px"></textarea></div>'
     +'<div id="otFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px"></div>';
   // 即時計算時數
@@ -5172,10 +4788,10 @@ window.openOTReview=function(id){
   window._reviewingOTId=id;
   var empEmp=window.getEmpById(a.empId||'');
   var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
-    +'<div>&#x1F464; <strong>'+(a.empName||'')+'</strong>'+(empEmp?' — '+empEmp.dept:'')+'</div>'
+    +'<div>&#x1F464; <strong>'+escapeHtml(a.empName||'')+'</strong>'+(empEmp?' — '+escapeHtml(empEmp.dept||''):'')+'</div>'
     +'<div>&#x1F4C5; '+a.date+'</div>'
     +'<div>&#x23F0; 加班時間：'+a.startTime+' ~ '+a.endTime+' （<strong style="color:var(--orange)">'+a.hours.toFixed(1)+'h</strong>）</div>'
-    +'<div>&#x1F4DD; 原因：'+(a.reason||'--')+'</div>'
+    +'<div>&#x1F4DD; 原因：'+escapeHtml(a.reason||'--')+'</div>'
     +'<div>&#x1F4E5; 申請時間：'+(a.appliedAt?a.appliedAt.slice(0,16):'')+'</div>'
     +'</div>';
   // 本月累計提示
@@ -5350,7 +4966,7 @@ window.exportEmployeesExcel=function(){
   // 設定欄寬
   ws['!cols']=[{wch:12},{wch:10},{wch:12},{wch:14},{wch:8},{wch:6},{wch:10},{wch:22},{wch:14},{wch:5},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:12},{wch:14},{wch:16}];
   XLSX.utils.book_append_sheet(wb,ws,'員工資料');
-  var fn='員工資料_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  var fn='員工資料_'+(window.getLocalDateString?window.getLocalDateString():new Date().toISOString().slice(0,10))+'.xlsx';
   XLSX.writeFile(wb,fn);
   toast('📥','員工資料已匯出：'+fn);
 };
@@ -5378,7 +4994,7 @@ window.exportLeaveBalanceExcel=function(){
   var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
   ws['!cols']=[{wch:12},{wch:10},{wch:12}].concat(KEYS.map(function(){return {wch:9};})).concat(KEYS.map(function(){return {wch:9};})).concat([{wch:18}]);
   XLSX.utils.book_append_sheet(wb,ws,'假別餘額');
-  var fn='假別餘額_'+new Date().toISOString().slice(0,10)+'.xlsx';
+  var fn='假別餘額_'+(window.getLocalDateString?window.getLocalDateString():new Date().toISOString().slice(0,10))+'.xlsx';
   XLSX.writeFile(wb,fn);
   toast('📥','假別餘額已匯出：'+fn);
 };
