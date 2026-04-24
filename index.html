@@ -3480,6 +3480,19 @@ window.saveEmp=function(empId){
     emergency_contact_name:document.getElementById('ee_ename')?document.getElementById('ee_ename').value:'',
     emergency_contact_phone:document.getElementById('ee_ephone')?document.getElementById('ee_ephone').value:'',
     line_user_id:(document.getElementById('ee_line')?document.getElementById('ee_line').value.trim():'')||null};
+
+  // 降級偵測：如果把 manager/admin 降為 employee，檢查是否有下屬
+  var currentEmp=(DB.emps||[]).find(function(e){return e.id===empId;});
+  var wasSupRole=currentEmp&&(currentEmp.role==='manager'||currentEmp.role==='admin');
+  var nowIsEmployee=d.role==='employee';
+  if(wasSupRole&&nowIsEmployee){
+    var subs=(DB.emps||[]).filter(function(e){return e.supervisorId===empId;});
+    if(subs.length>0){
+      var names=subs.map(function(e){return e.name;}).join('、');
+      if(!confirm('⚠️ 降級警告\n\n'+currentEmp.name+' 目前是 '+subs.length+' 位員工的直屬主管：\n'+names+'\n\n降級後這些員工送的申請將無人能審核（卡住）。\n\n確定要繼續降級嗎？建議先把這些員工的直屬主管改成別人。')) return;
+    }
+  }
+
   var doSave=function(hash){
     if(hash)d.password_hash=hash;
     // 使用 Edge Function updateEmployee（service_role），確保薪資等敏感欄位正確寫入
@@ -4583,6 +4596,12 @@ window.closePcModal=function(){
 window.deleteEmp=function(empId){
   var emp=(DB.emps||[]).find(function(e){return e.id===empId;});
   var name=emp?emp.name:empId;
+  // 偵測是否為其他人的直屬主管，避免下屬申請卡住
+  var subs=(DB.emps||[]).filter(function(e){return e.supervisorId===empId;});
+  if(subs.length>0){
+    var subNames=subs.map(function(e){return e.name;}).join('、');
+    if(!confirm('⚠️ 主管刪除警告\n\n'+name+' 目前是 '+subs.length+' 位員工的直屬主管：\n'+subNames+'\n\n刪除後這些員工送的申請將無人能審核（卡住）。\n\n確定要繼續刪除嗎？建議先把這些員工的直屬主管改成別人。')) return;
+  }
   if(!confirm('確定要刪除員工「'+name+'」（'+empId+'）？\n\n⚠️ 此操作無法復原，該員工所有資料將一併刪除。')){return;}
   edgeCall('deleteEmployee',{id:empId},getAuthToken())
     .then(function(){return loadAllData();})
