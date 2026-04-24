@@ -69,24 +69,24 @@ body.admin-mode #empScreen{display:none}
 .lf-demo-btn:hover{border-color:var(--pink);color:var(--pd);background:var(--pl)}
 
 /* ───────────────── SHARED NAV ───────────────── */
-.topnav{background:#fff;padding:10px 18px 12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;border-bottom:1px solid #f0ecff}
-.tn-left{display:flex;align-items:center;gap:11px}
-.tn-av{width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0;box-shadow:0 6px 14px rgba(80,70,224,.12)}
-.tn-name{font-size:16px;font-weight:900;line-height:1.15;color:#27213f}
-.tn-role{font-size:11px;color:#7f78a7;opacity:1;display:flex;align-items:center;gap:4px}
-.tn-right{display:flex;align-items:center;gap:10px}
-.tn-time{font-family:'Nunito','Noto Sans TC',sans-serif;font-size:17px;font-weight:900;color:#2f2849;min-width:48px}
-.tn-logout{background:#f6f3ff;border:none;border-radius:12px;padding:8px 12px;font-size:11px;font-weight:800;color:#6f48ff;cursor:pointer;font-family:'Noto Sans TC',sans-serif}
+.topnav{background:var(--sb);padding:11px 16px 13px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;box-shadow:0 2px 8px rgba(91,77,232,.1)}
+.tn-left{display:flex;align-items:center;gap:9px}
+.tn-av{width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0}
+.tn-name{font-size:13px;font-weight:700;line-height:1.2;color:#565657}
+.tn-role{font-size:10px;color:var(--t2);opacity:.85;display:flex;align-items:center;gap:4px}
+.tn-right{display:flex;align-items:center;gap:8px}
+.tn-time{font-family:'Nunito','Noto Sans TC',sans-serif;font-size:16px;font-weight:900;color:var(--pd)}
+.tn-logout{background:rgba(61,45,184,.12);border:none;border-radius:20px;padding:5px 11px;font-size:11px;font-weight:700;color:var(--pd);cursor:pointer;font-family:'Noto Sans TC',sans-serif}
 
 /* ───────────────── SCROLL AREA ───────────────── */
 .scroll{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:12px 12px calc(76px + env(safe-area-inset-bottom,0));display:flex;flex-direction:column;gap:12px}
 .scroll::-webkit-scrollbar{display:none}
 
 /* ───────────────── TABBAR ───────────────── */
-.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border-top:1px solid #ece6ff;display:flex;padding:8px 8px calc(8px + env(safe-area-inset-bottom,0));z-index:50;box-shadow:0 -10px 24px rgba(91,77,232,.09)}
-.tb-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:7px 4px 6px;cursor:pointer;color:#a19abc;font-size:10px;font-weight:800;gap:4px;position:relative;transition:color .15s,background .15s;border-radius:16px}
-.tb-item.active{color:#7a4dff;background:#f3eeff}
-.tb-item .tbi{font-size:22px;line-height:1}
+.tabbar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:#fff;border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom,0);z-index:50;box-shadow:0 -4px 16px rgba(91,77,232,.1)}
+.tb-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 4px 7px;cursor:pointer;color:var(--t3);font-size:9px;font-weight:700;gap:3px;position:relative;transition:color .15s}
+.tb-item.active{color:var(--pd)}
+.tb-item .tbi{font-size:20px;line-height:1}
 .tb-badge{position:absolute;top:5px;right:calc(50% - 18px);background:var(--pink);color:#fff;font-size:9px;font-weight:900;padding:1px 5px;border-radius:20px;min-width:16px;text-align:center}
 
 /* ───────────────── CARDS & COMMON ───────────────── */
@@ -375,143 +375,6 @@ body.admin-mode.admin-mobile-view [style*="background:var(--grad)"][style*="bord
 /* Action buttons in forms */
 body.admin-mode.admin-mobile-view .pc-section button[style*="padding:10px"],
 body.admin-mode.admin-mobile-view .card button[style*="padding:10px"]{padding:9px 20px!important;font-size:13px!important;width:100%!important;margin-top:0!important}
-/* Employee Home refresh */
-.eh-shell{display:flex;flex-direction:column;gap:14px}
-.eh-panel{background:#fff;border-radius:24px;padding:16px;box-shadow:0 8px 24px rgba(80,70,224,.10);border:1px solid #f1edff}
-.eh-section-title{display:flex;align-items:center;justify-content:space-between;font-size:15px;font-weight:900;color:#2a2343;margin-bottom:12px}
-.eh-section-link{font-size:11px;font-weight:800;color:#9b87ff}
-.eh-status-card{background:linear-gradient(145deg,#7e69ff 0%,#944dff 56%,#774fff 100%);border-radius:24px;padding:16px 16px 15px;color:#fff;box-shadow:0 18px 34px rgba(111,83,255,.30);position:relative;overflow:hidden}
-.eh-status-card:before,.eh-status-card:after{content:'';position:absolute;border-radius:50%;background:rgba(255,255,255,.10)}
-.eh-status-card:before{width:160px;height:160px;right:-48px;top:-60px}
-.eh-status-card:after{width:120px;height:120px;left:-36px;bottom:-56px}
-.eh-status-top,.eh-status-actions,.eh-section-title,.eh-qa-grid,.eh-reminder-list,.eh-activity-list{position:relative;z-index:1}
-.eh-status-top{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:14px}
-.eh-badge{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.18);font-size:12px;font-weight:800}
-.eh-status-time{font-family:'Nunito','Noto Sans TC',sans-serif;font-size:32px;font-weight:900;line-height:1;margin:10px 0 4px}
-.eh-status-sub{font-size:13px;opacity:.95}
-.eh-status-meta{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;opacity:.92}
-.eh-chip{display:inline-flex;align-items:center;gap:5px;padding:7px 10px;border-radius:999px;background:rgba(255,255,255,.16);font-size:11px;font-weight:700}
-.eh-status-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
-.eh-main-btn{height:54px;border-radius:16px;border:none;font-family:'Nunito','Noto Sans TC',sans-serif;font-size:16px;font-weight:900;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:transform .16s,opacity .16s}
-.eh-main-btn:active{transform:scale(.98)}
-.eh-main-btn.primary{background:#fff;color:#7047ff;box-shadow:0 8px 20px rgba(255,255,255,.2)}
-.eh-main-btn.secondary{background:rgba(255,255,255,.18);color:#fff;border:1.5px solid rgba(255,255,255,.32)}
-.eh-main-btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
-.eh-reminder-list{display:flex;flex-direction:column;gap:10px}
-.eh-reminder-item{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;border-radius:16px;background:#f8f6ff;border:1px solid #eee9ff}
-.eh-reminder-item.warn{background:#fff7eb;border-color:#ffe2ac}
-.eh-reminder-item.ok{background:#eefbf4;border-color:#caeed7}
-.eh-reminder-ico{width:30px;height:30px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;background:#ede8ff;color:#6c47ff}
-.eh-reminder-item.warn .eh-reminder-ico{background:#fff1cf;color:#d17b00}
-.eh-reminder-item.ok .eh-reminder-ico{background:#daf5e6;color:#1d9a61}
-.eh-reminder-copy{font-size:13px;font-weight:700;color:var(--text);line-height:1.45}
-.eh-reminder-sub{font-size:11px;color:var(--t3);margin-top:2px}
-.eh-qa-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.eh-qa-card{background:#fff;border-radius:18px;padding:14px 8px 12px;box-shadow:0 6px 18px rgba(80,70,224,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;text-align:center;cursor:pointer;border:1px solid #f2eeff;min-height:102px}
-.eh-qa-card:active{transform:scale(.98)}
-.eh-qa-icon{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:22px}
-.eh-qa-icon.leave{background:#fff0d4;color:#dd9200}
-.eh-qa-icon.makeup{background:#efe8ff;color:#774eff}
-.eh-qa-icon.ot{background:#ece9ff;color:#6a4cff}
-.eh-qa-icon.quota{background:#fff4da;color:#de8f00}
-.eh-qa-title{font-size:13px;font-weight:800;color:var(--text)}
-.eh-qa-sub{font-size:10px;color:var(--t3);line-height:1.35}
-.eh-activity-list{display:flex;flex-direction:column;gap:10px}
-.eh-activity-item{display:flex;align-items:center;gap:10px;padding:12px;border-radius:16px;background:#fff;border:1px solid #f1edff;box-shadow:0 4px 12px rgba(80,70,224,.05)}
-.eh-activity-icon{width:38px;height:38px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
-.eh-activity-icon.in{background:#ecfbf1;color:#1f9a61}
-.eh-activity-icon.out{background:#fff5e5;color:#dd8a00}
-.eh-activity-icon.pending{background:#efeaff;color:#7248ff}
-.eh-activity-copy{flex:1;min-width:0}
-.eh-activity-title{font-size:13px;font-weight:800;color:var(--text);margin-bottom:2px}
-.eh-activity-sub{font-size:11px;color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.eh-activity-time{font-size:11px;font-weight:700;color:var(--t3);flex-shrink:0}
-/* Employee apply refresh */
-.app-sheet{display:flex;flex-direction:column;gap:14px}
-.app-sheet-header{padding:2px 2px 0}
-.app-sheet-title{font-size:13px;font-weight:900;color:#2b2442;margin-bottom:10px}
-.app-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:#f7f5ff;border:1px solid #ece8ff;border-radius:16px;padding:5px}
-.app-tab{height:42px;border:none;border-radius:12px;background:transparent;font-size:14px;font-weight:800;color:#8e88aa;cursor:pointer}
-.app-tab.active{background:linear-gradient(135deg,#7e5cff,#904fff);color:#fff;box-shadow:0 10px 20px rgba(126,92,255,.28)}
-.app-quota-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;background:#f3ebff;color:#7b4dff;font-size:12px;font-weight:800;margin-top:10px;align-self:flex-end}
-.app-form-card{background:#fff;border-radius:22px;padding:16px;box-shadow:0 10px 26px rgba(80,70,224,.10);border:1px solid #f1edff}
-.app-field{margin-bottom:14px}
-.app-field:last-child{margin-bottom:0}
-.app-label{display:block;font-size:12px;font-weight:800;color:#6d678f;margin-bottom:7px}
-.app-input,.app-select,.app-textarea{width:100%;padding:13px 14px;border:1.5px solid #e7e2ff;border-radius:14px;background:#fff;font-size:14px;font-family:var(--font);color:#342d4e;outline:none}
-.app-input:focus,.app-select:focus,.app-textarea:focus{border-color:#8b63ff;box-shadow:0 0 0 4px rgba(139,99,255,.10)}
-.app-textarea{min-height:108px;resize:none}
-.app-row-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.app-inline-hint{font-size:11px;color:var(--t3);margin-top:5px}
-.app-file-box{display:flex;align-items:center;gap:10px;padding:12px 13px;border:1.5px dashed #d8cffd;border-radius:14px;background:#faf8ff}
-.app-file-trigger{padding:9px 12px;border:none;border-radius:10px;background:#ede8ff;color:#6f48ff;font-size:12px;font-weight:800;cursor:pointer}
-.app-file-meta{font-size:11px;color:var(--t3)}
-.app-footer-gap{height:10px}
-/* Admin review refresh */
-.rv-shell{display:flex;flex-direction:column;gap:20px}
-.rv-page-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:4px}
-.rv-page-title{font-size:32px;font-weight:900;color:#251f45}
-.rv-page-sub{font-size:13px;color:#8b85a8;margin-top:4px}
-.rv-topbar{display:flex;align-items:center;gap:12px}
-.rv-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.rv-kpi{background:#fff;border-radius:22px;padding:18px;box-shadow:0 10px 28px rgba(80,70,224,.10);display:flex;align-items:flex-start;gap:14px;border:1px solid #f1edff}
-.rv-kpi-ico{width:46px;height:46px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:21px;flex-shrink:0}
-.rv-kpi-ico.purple{background:#eee7ff;color:#764dff}
-.rv-kpi-ico.orange{background:#fff1df;color:#ef8b00}
-.rv-kpi-ico.green{background:#e8f8ef;color:#21a466}
-.rv-kpi-label{font-size:12px;font-weight:800;color:#8a84ad;margin-bottom:6px}
-.rv-kpi-val{font-family:'Nunito','Noto Sans TC',sans-serif;font-size:34px;font-weight:900;color:#251f45;line-height:1}
-.rv-kpi-sub{font-size:11px;color:#ff7d7d;margin-top:5px}
-.rv-panel{background:#fff;border-radius:24px;padding:18px 20px;box-shadow:0 12px 34px rgba(80,70,224,.10);border:1px solid #f1edff}
-.rv-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
-.rv-panel-title{font-size:24px;font-weight:900;color:#251f45}
-.rv-filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.rv-select,.rv-search{height:42px;border:1.5px solid #e6e1ff;border-radius:13px;background:#fbfaff;padding:0 14px;font-size:13px;color:#5a5476;font-family:var(--font);outline:none}
-.rv-search{min-width:240px}
-.rv-table-wrap{overflow:auto;border:1px solid #f1edff;border-radius:18px}
-.rv-table{width:100%;border-collapse:separate;border-spacing:0}
-.rv-table thead th{padding:12px 10px;background:#faf9ff;color:#8a84ad;font-size:12px;font-weight:800;border-bottom:1px solid #efeaff;white-space:nowrap}
-.rv-table tbody td{padding:15px 10px;border-bottom:1px solid #f2eeff;font-size:13px;vertical-align:middle}
-.rv-table tbody tr:hover td{background:#fcfbff}
-.rv-person{display:flex;align-items:center;gap:10px;min-width:170px}
-.rv-person-av{width:38px;height:38px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0}
-.rv-person-name{font-size:14px;font-weight:800;color:#241e42}
-.rv-person-sub{font-size:11px;color:#8a84ad;margin-top:2px}
-.rv-type-pill{display:inline-flex;align-items:center;justify-content:center;padding:5px 10px;border-radius:999px;font-size:11px;font-weight:800}
-.rv-type-pill.leave{background:#efe7ff;color:#764dff}
-.rv-type-pill.makeup{background:#fff1df;color:#ef8b00}
-.rv-type-pill.ot{background:#e8f8ef;color:#1a9d64}
-.rv-status-pill{display:inline-flex;align-items:center;justify-content:center;padding:6px 11px;border-radius:999px;font-size:11px;font-weight:800}
-.rv-status-pill.pending{background:#fff3db;color:#d58b00}
-.rv-status-pill.sup{background:#ece9ff;color:#6f4bff}
-.rv-supervisor{display:flex;align-items:center;gap:8px}
-.rv-supervisor small{display:block;font-size:10px;color:#8a84ad}
-.rv-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px}
-.rv-btn{height:36px;padding:0 13px;border-radius:11px;font-size:12px;font-weight:800;cursor:pointer;font-family:var(--font)}
-.rv-btn.view{background:#fff;border:1.5px solid #ddd5ff;color:#7248ff}
-.rv-btn.reject{background:#fff0f0;border:1px solid #ffd2d2;color:#ef5d5d}
-.rv-btn.approve{background:linear-gradient(135deg,#7f5bff,#944dff);border:none;color:#fff;box-shadow:0 8px 18px rgba(127,91,255,.25)}
-.rv-empty{padding:40px 16px;text-align:center;color:var(--t3);font-size:14px}
-#leaveSheet .sheet,#makeupSheet .sheet,#overtimeSheet .sheet{background:#fcfbff}
-#leaveSheet .sh-hd,#makeupSheet .sh-hd,#overtimeSheet .sh-hd{padding:14px 18px 10px}
-#leaveSheet .sh-title,#makeupSheet .sh-title,#overtimeSheet .sh-title{font-size:18px}
-#leaveSheet .sh-body,#makeupSheet .sh-body,#overtimeSheet .sh-body{padding:8px 16px 6px}
-#leaveSheet .sh-btns,#makeupSheet .sh-btns,#overtimeSheet .sh-btns{display:grid;grid-template-columns:1fr;padding:10px 16px 14px}
-#leaveSheet .sh-btns .cancel,#makeupSheet .sh-btns .cancel,#overtimeSheet .sh-btns .cancel{display:none}
-#leaveSheet .sh-btns .confirm,#makeupSheet .sh-btns .confirm,#overtimeSheet .sh-btns .confirm{height:56px;border-radius:18px;font-size:18px;background:linear-gradient(135deg,#7e5cff,#924fff);box-shadow:0 14px 28px rgba(126,92,255,.34)}
-@media (max-width:480px){
-  .eh-qa-grid{grid-template-columns:repeat(2,1fr)}
-  .app-row-2{grid-template-columns:1fr}
-}
-@media (max-width:1200px){
-  .rv-kpis{grid-template-columns:repeat(2,1fr)}
-  .rv-page-header,.rv-panel-head{flex-direction:column;align-items:flex-start}
-}
-@media (max-width:860px){
-  .rv-kpis{grid-template-columns:1fr}
-  .rv-filters{width:100%}
-  .rv-search{min-width:0;width:100%}
-}
 /* ── PC Modal ── */
 .pc-modal-overlay{position:fixed;inset:0;background:rgba(40,30,100,.45);z-index:200;display:none;align-items:center;justify-content:center;backdrop-filter:blur(3px)}
 .pc-modal-overlay.show{display:flex}
@@ -933,16 +796,7 @@ function haversine(a,b,c,d){
   return Math.round(R*2*Math.atan2(Math.sqrt(x),Math.sqrt(1-x)));
 }
 function fmtTime(iso){if(!iso)return '--';return new Date(iso).toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',hour12:false})}
-function getLocalDateString(dateLike){
-  var d=dateLike?new Date(dateLike):new Date();
-  return [
-    d.getFullYear(),
-    String(d.getMonth()+1).padStart(2,'0'),
-    String(d.getDate()).padStart(2,'0')
-  ].join('-');
-}
-window.getLocalDateString=getLocalDateString;
-function todayKey(){return getLocalDateString()}
+function todayKey(){return new Date().toISOString().slice(0,10)}
 function getTodayRec(empId){return getRecs().find(r=>r.date===todayKey()&&r.empId===empId)||null}
 function saveRec(rec){
   const rs=getRecs().filter(r=>!(r.date===rec.date&&r.empId===rec.empId));
@@ -959,7 +813,6 @@ var currentUser=null; // {id, role, empData}
 var clockIntervals=[];
 
 function doLogin(){
-  if(window.doLogin&&window.doLogin!==doLogin)return window.doLogin();
   const id=document.getElementById('loginId').value.trim();
   const pw=document.getElementById('loginPw').value;
   if(!id||!pw){document.getElementById('loginError').classList.add('show');return;}
@@ -989,7 +842,6 @@ function doLogin(){
 }
 
 function doLogout(){
-  if(window.doLogout&&window.doLogout!==doLogout)return window.doLogout();
   clockIntervals.forEach(clearInterval);
   clockIntervals=[];
   currentUser=null;
@@ -1004,7 +856,7 @@ function toggleEye(){
   inp.type=inp.type==='password'?'text':'password';
 }
 
-document.getElementById('loginPw').addEventListener('keydown',e=>{if(e.key==='Enter')(window.doLogin||doLogin)()});
+document.getElementById('loginPw').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin()});
 
 // ══════════════════════════════════════════════════
 //  SCREENS
@@ -1079,89 +931,22 @@ function renderEmpClock(s){
   const now=new Date();
   const mRecs=getMonthRecs(now.getFullYear(),now.getMonth(),currentUser.id).filter(r=>r.in);
   const mOT=getMonthRecs(now.getFullYear(),now.getMonth(),currentUser.id).reduce((a,r)=>a+Math.max(0,calcHours(r.in,r.out,emp.workRule)-8),0);
-  const reminders=getEmpHomeReminders(currentUser.id,inT,outT,mOT);
-  const statusLabel=outT?'已下班':inT?'已上班':'尚未打卡';
-  const statusMeta=outT?'今日工時 '+hours.toFixed(1)+'h':inT?'今日工時 '+hours.toFixed(1)+'h':'今日工時 0.0h';
-  const officeName=(function(){
-    if(rec&&rec.gpsIn&&rec.gpsIn.office)return rec.gpsIn.office;
-    if(rec&&rec.gpsOut&&rec.gpsOut.office)return rec.gpsOut.office;
-    var cfg=getCfg();
-    return cfg&&cfg.name?cfg.name:'台北總公司';
-  })();
-  const statusClock=outT?fmtTime(outT):inT?fmtTime(inT):new Date().toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-  const statusLine=outT?fmtTime(inT)+' 上班已打卡':inT?fmtTime(inT)+' 上班已打卡':'今天尚未上班打卡';
-  const quickActions=[
-    {icon:'🗓️',cls:'leave',title:'請假申請',sub:'請假 / 附件',onclick:"openLeaveSheet()"},
-    {icon:'🕘',cls:'makeup',title:'補打卡',sub:'補上班或下班',onclick:"openMakeupSheet()"},
-    {icon:'💼',cls:'ot',title:'加班申請',sub:'填寫時段原因',onclick:"openOvertimeSheet()"},
-    {icon:'📋',cls:'quota',title:'我的申請',sub:'假期與進度',onclick:"empTab('status')"}
-  ];
 
-  s.innerHTML='<div class="eh-shell">'
-    +'<div class="eh-status-card fu">'
-      +'<div class="eh-status-top">'
-        +'<div>'
-          +'<div class="eh-status-meta" style="margin-bottom:6px;opacity:.82">'+escapeHtml(statusLine)+'</div>'
-          +'<div class="eh-badge"><span class="sdot '+(outT?'s-out':inT?'s-in':'s-none')+'"></span>'+statusLabel+'</div>'
-          +'<div class="eh-status-time" id="punchClock">'+statusClock+'</div>'
-          +'<div class="eh-status-sub">'+statusMeta+'</div>'
-        +'</div>'
-        +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:8px">'
-          +'<div class="eh-chip">📍 '+escapeHtml(officeName)+'</div>'
-          +'<div class="eh-status-meta">上班打卡 '+escapeHtml(fmtTime(inT))+'</div>'
-        +'</div>'
-      +'</div>'
-      +'<div id="punchDate" class="eh-status-meta" style="margin-bottom:6px">'+now.getFullYear()+'/'+String(now.getMonth()+1).padStart(2,'0')+'/'+String(now.getDate()).padStart(2,'0')+'</div>'
-      +'<div id="punchLabel" class="eh-status-meta">今日工時</div>'
-      +'<div class="eh-status-actions">'
-        +'<button class="eh-main-btn primary'+(inT?'':' pulse')+'" onclick="openPunch(\'in\')"'+(inT?' disabled':'')+'>↪ 上班打卡</button>'
-        +'<button class="eh-main-btn secondary" onclick="openPunch(\'out\')"'+((!inT||outT)?' disabled':'')+'>↩ 下班打卡</button>'
-      +'</div>'
-    +'</div>'
-    +'<div class="eh-panel fu fu1">'
-      +'<div class="eh-section-title"><span>今日提醒</span></div>'
-      +'<div class="eh-reminder-list">'+renderEmpHomeReminders(reminders)+'</div>'
-    +'</div>'
-    +'<div class="eh-panel fu fu2">'
-      +'<div class="eh-section-title"><span>快速功能</span><span class="eh-section-link">全部功能</span></div>'
-      +'<div class="eh-qa-grid">'+quickActions.map(function(a){
-        return '<div class="eh-qa-card" onclick="'+a.onclick+'">'
-          +'<div class="eh-qa-icon '+a.cls+'">'+a.icon+'</div>'
-          +'<div class="eh-qa-title">'+a.title+'</div>'
-          +'<div class="eh-qa-sub">'+a.sub+'</div>'
-          +'</div>';
-      }).join('')+'</div>'
-    +'</div>'
-    +'<div class="eh-panel fu fu3">'
-      +'<div class="eh-section-title"><span>最近活動</span><span class="eh-section-link" onclick="empTab(\'monthly\')">查看全部</span></div>'
-      +'<div class="eh-activity-list" id="recentRowsContainer"></div>'
-    +'</div>'
-  +'</div>';
+  s.innerHTML=[
+    buildPunchCard(inT,outT,hours,OT,emp),
+    buildInfoGrid(inT,outT,mRecs.length,mOT),
+    '<div class="sec-title fu fu2"><span>&#x1F4CB; 最近打卡</span></div>',
+    '<div class="card fu fu2" id="recentRowsContainer"></div>',
+    '<div class="sec-title fu fu3"><span>&#x1F527; 補打卡申請</span></div>',
+    '<div class="card fu fu3" onclick="openMakeupSheet()" style="cursor:pointer;display:flex;align-items:center;gap:12px;border:1.5px dashed var(--border)">',
+    '<div style="width:40px;height:40px;border-radius:12px;background:var(--ol);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">&#x1F527;</div>',
+    '<div><div style="font-size:13px;font-weight:700">忘記打卡？申請補打卡</div>',
+    '<div style="font-size:11px;color:var(--t3);margin-top:2px">需定位驗證 + 主管審核</div></div>',
+    '<div style="margin-left:auto;color:var(--t3);font-size:18px">›</div></div>'
+  ].join('');
 
-  document.getElementById('recentRowsContainer').innerHTML=recentRows(emp,5,true);
+  document.getElementById('recentRowsContainer').innerHTML=recentRows(emp,5);
   startPunchClock(inT,outT,emp.workRule);
-}
-
-function getEmpHomeReminders(empId,inT,outT,mOT){
-  var items=[];
-  var leaves=getApps().filter(function(a){return a.empId===empId&&(a.status==='pending'||a.status==='sup_approved');}).length;
-  var makeup=getMakeupApps().filter(function(a){return a.empId===empId&&(a.status==='pending'||a.status==='sup_approved');}).length;
-  var ot=(window.getOvertimeApps?window.getOvertimeApps():[]).filter(function(a){return a.empId===empId&&a.status==='pending';}).length;
-  if(!inT) items.push({cls:'warn',icon:'⏰',title:'今天尚未上班打卡',sub:'請記得於進公司後完成打卡'});
-  else if(!outT) items.push({cls:'ok',icon:'✅',title:'今日已完成上班打卡',sub:'下班前記得補下班打卡'});
-  var pendingTotal=leaves+makeup+ot;
-  if(pendingTotal>0) items.push({cls:'warn',icon:'🔔',title:'你有 '+pendingTotal+' 筆待審核申請中',sub:'可到我的申請查看目前進度'});
-  if(mOT>0) items.push({cls:'ok',icon:'🕒',title:'本月加班累計 '+mOT.toFixed(1)+'h',sub:mOT>36?'已接近月度時數提醒':'可於加班申請頁查看詳細時數'});
-  if(!items.length) items.push({cls:'ok',icon:'✓',title:'今天沒有待處理事項',sub:'出勤與申請狀態目前正常'});
-  return items.slice(0,3);
-}
-function renderEmpHomeReminders(items){
-  return items.map(function(item){
-    return '<div class="eh-reminder-item '+(item.cls||'')+'">'
-      +'<div class="eh-reminder-ico">'+item.icon+'</div>'
-      +'<div><div class="eh-reminder-copy">'+escapeHtml(item.title)+'</div><div class="eh-reminder-sub">'+escapeHtml(item.sub||'')+'</div></div>'
-      +'</div>';
-  }).join('');
 }
 
 
@@ -1215,13 +1000,12 @@ function startPunchClock(inT,outT,rule){
     var n=new Date();
     if(!inT){
       el.textContent=n.toLocaleTimeString('zh-TW',{hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
-      if(dl) dl.textContent='今天尚未上班打卡';
-      if(ll) ll.textContent=n.getFullYear()+'年'+(n.getMonth()+1)+'月'+n.getDate()+'日（週'+WDAY[n.getDay()]+'）';
+      if(dl) dl.textContent=n.getFullYear()+'年'+(n.getMonth()+1)+'月'+n.getDate()+'日（週'+WDAY[n.getDay()]+'）';
     } else if(inT&&!outT){
       var h=calcHours(inT,n.toISOString(),rule);
       el.textContent=h.toFixed(1)+' h';
-      if(dl) dl.textContent=fmtTime(inT)+' 上班已打卡';
-      if(ll) ll.textContent='今日工時';
+      if(dl) dl.textContent='上班中 · 持續計時...';
+      if(ll) ll.textContent='上班中工時';
     }
   };
   tickPunch();
@@ -1233,24 +1017,9 @@ function startPunchClock(inT,outT,rule){
 }
 
 
-function recentRows(emp,limit,homeMode){
+function recentRows(emp,limit){
   const recs=getRecs().filter(r=>r.empId===emp.id).sort((a,b)=>b.date.localeCompare(a.date)).slice(0,limit);
   if(!recs.length) return '<div style="text-align:center;padding:18px;color:var(--t3);font-size:13px">尚無打卡紀錄</div>';
-  if(homeMode){
-    return recs.map(function(r){
-      var hasOut=!!r.out;
-      var iconCls=hasOut?'out':'in';
-      var icon=hasOut?'↩':'✓';
-      var title=(hasOut?fmtTime(r.out)+' 下班打卡':fmtTime(r.in)+' 上班打卡');
-      var sub=getLocalDateString(r.date).slice(5).replace('-','/')+(hasOut?' 已完成今日出勤':' 今日已完成上班打卡');
-      var time=String(r.date||'').slice(5).replace('-','/');
-      return '<div class="eh-activity-item">'
-        +'<div class="eh-activity-icon '+iconCls+'">'+icon+'</div>'
-        +'<div class="eh-activity-copy"><div class="eh-activity-title">'+escapeHtml(title)+'</div><div class="eh-activity-sub">'+escapeHtml(sub)+'</div></div>'
-        +'<div class="eh-activity-time">'+escapeHtml(time)+'</div>'
-        +'</div>';
-    }).join('');
-  }
   return recs.map(r=>{
     const d=new Date(r.date);
     const h=calcHours(r.in,r.out,emp.workRule), OT=Math.max(0,h-8);
@@ -1532,7 +1301,6 @@ function changePassword(){
     errEl.textContent='兩次密碼輸入不一致，請確認';
     errEl.style.display='block';return;
   }
-  if(!supEmp){errEl.textContent='?? ?曆??圈??撖拇銝餌恣嚗???豢?';errEl.style.display='block';return;}
   errEl.style.display='none';
   const idx=accs.findIndex(a=>a.id===currentUser.id);
   accs[idx].pw=newPw;
@@ -1917,153 +1685,261 @@ window._apfSetName = function(v){
 function renderApprove(s){
   const myId=currentUser.id;
   const isHR=currentUser.role==='admin';
-  const esc=window.escapeHtml||function(v){return String(v||'');};
-  window._approveView=window._approveView||{type:'all',date:'',q:''};
-  const state=window._approveView;
-  const emps=getEmps();
-  const accounts=getAccounts();
-  const today=todayKey();
-  const leaves=getApps();
-  const makeups=getMakeupApps();
-  const ots=(window.getOvertimeApps?window.getOvertimeApps():[]);
-  const reviewRows=[];
-  leaves.forEach(function(a){
-    if((a.status==='pending'&&a.supId===myId)||(a.status==='sup_approved'&&isHR)){
-      reviewRows.push({
-        kind:'leave',
-        id:a.id,
-        empId:a.empId,
-        empName:a.empName||'--',
-        avatar:(a.empName||'?')[0]||'?',
-        dept:(getEmpById(a.empId||'')||{}).dept||'未分配部門',
-        title:LEAVE_LABEL[a.type]||a.type||'請假',
-        reason:a.reason||'--',
-        dateLabel:(a.startDate||'')+(a.startDate!==a.endDate?' ~ '+(a.endDate||''):''),
-        rangeLabel:a.days?(a.days+' 天'):'--',
-        supervisor:getEmpById(a.supId||''),
-        status:a.status,
-        appliedAt:a.appliedAt||'',
-        openFn:"openReview('"+esc(a.id)+"')"
-      });
-    }
+  const apps=getApps().sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
+  const myPending=apps.filter(function(a){
+    if(a.status==='pending' && a.supId===myId) return true;
+    if(a.status==='sup_approved' && isHR) return true;
+    return false;
   });
-  makeups.forEach(function(a){
-    if((a.status==='pending'&&a.supId===myId)||(a.status==='sup_approved'&&isHR)){
-      reviewRows.push({
-        kind:'makeup',
-        id:a.id,
-        empId:a.empId,
-        empName:a.empName||'--',
-        avatar:(a.empName||'?')[0]||'?',
-        dept:(getEmpById(a.empId||'')||{}).dept||'未分配部門',
-        title:'補'+(a.punchType==='in'?'上班打卡':'下班打卡'),
-        reason:a.reason||'--',
-        dateLabel:a.date||'',
-        rangeLabel:a.punchTime||'--',
-        supervisor:getEmpById(a.supId||''),
-        status:a.status,
-        appliedAt:a.appliedAt||'',
-        openFn:"openMakeupReview('"+esc(a.id)+"')"
-      });
-    }
+  const doneLeave=apps.filter(a=>a.status==='approved'||a.status==='rejected');
+  const waiting=apps.filter(a=>a.status==='pending'&&a.supId!==myId);
+
+  var mkps=getMakeupApps();
+  var myMakeup=mkps.filter(function(a){
+    if(a.status==='pending' && a.supId===myId) return true;
+    if(a.status==='sup_approved' && isHR) return true;
+    return false;
   });
-  ots.forEach(function(a){
-    if(a.status==='pending'&&(a.supId===myId||isHR)){
-      reviewRows.push({
-        kind:'ot',
-        id:a.id,
-        empId:a.empId,
-        empName:a.empName||'--',
-        avatar:(a.empName||'?')[0]||'?',
-        dept:(getEmpById(a.empId||'')||{}).dept||'未分配部門',
-        title:'加班申請',
-        reason:a.reason||'--',
-        dateLabel:a.date||'',
-        rangeLabel:(a.startTime||'--')+' - '+(a.endTime||'--')+(a.hours?(' ('+a.hours.toFixed(1)+' 小時)'):''),
-        supervisor:getEmpById(a.supId||''),
-        status:a.status,
-        appliedAt:a.appliedAt||'',
-        openFn:"openOTReview('"+esc(a.id)+"')"
-      });
-    }
-  });
-  reviewRows.sort(function(a,b){return (b.appliedAt||'').localeCompare(a.appliedAt||'');});
-  const filtered=reviewRows.filter(function(row){
-    if(state.type!=='all'&&row.kind!==state.type)return false;
-    if(state.date&&row.dateLabel.indexOf(state.date)===-1)return false;
-    if(state.q){
-      var q=state.q.toLowerCase();
-      if((row.empName||'').toLowerCase().indexOf(q)===-1&&(row.reason||'').toLowerCase().indexOf(q)===-1)return false;
-    }
-    return true;
-  });
-  const leavePending=reviewRows.filter(function(r){return r.kind==='leave';}).length;
-  const makeupPending=reviewRows.filter(function(r){return r.kind==='makeup';}).length;
-  const otPending=reviewRows.filter(function(r){return r.kind==='ot';}).length;
-  const todayLeaves=leaves.filter(function(a){return a.status==='approved'&&today>=a.startDate&&today<=a.endDate;}).length;
-  function setApproveView(key,val){window._approveView[key]=val;renderApprove(document.getElementById('adminScroll'));}
-  window._setApproveView=setApproveView;
-  function pill(kind){
-    if(kind==='leave')return '<span class="rv-type-pill leave">請假</span>';
-    if(kind==='makeup')return '<span class="rv-type-pill makeup">補打卡</span>';
-    return '<span class="rv-type-pill ot">加班</span>';
+  var doneMakeup=mkps.filter(function(a){return a.status==='approved'||a.status==='rejected';});
+
+  var otas=(window.getOvertimeApps?window.getOvertimeApps():[]);
+  var myOT=otas.filter(function(a){return a.status==='pending'&&a.supId===myId;});
+  var doneOT=otas.filter(function(a){return a.status==='approved'||a.status==='rejected';});
+
+  // ── 篩選邏輯 ──
+  function apfApply(items,dateField){
+    var f=window._approveFilter;
+    return items.filter(function(a){
+      if(f.year!=='all'){
+        var d=(a[dateField]||'').slice(0,4);
+        if(d!==f.year) return false;
+      }
+      if(f.empId!=='all' && a.empId!==f.empId) return false;
+      if(f.status!=='all' && a.status!==f.status) return false;
+      if(f.name){
+        var q=f.name.toLowerCase();
+        if((a.empName||'').toLowerCase().indexOf(q)===-1) return false;
+      }
+      return true;
+    });
   }
-  function statusPill(status){
-    return '<span class="rv-status-pill '+(status==='sup_approved'?'sup':'pending')+'">'+(status==='sup_approved'?'待 HR':'待審核')+'</span>';
-  }
-  function actionButtons(row){
-    return '<div class="rv-actions">'
-      +'<button class="rv-btn view" onclick="'+row.openFn+'">查看</button>'
-      +'<button class="rv-btn reject" onclick="window.quickReviewAction(\''+row.kind+'\',\''+esc(row.id)+'\',\'rejected\')">拒絕</button>'
-      +'<button class="rv-btn approve" onclick="window.quickReviewAction(\''+row.kind+'\',\''+esc(row.id)+'\',\'approved\')">核准</button>'
+  var fLeave=apfApply(doneLeave,'startDate');
+  var fMakeup=apfApply(doneMakeup,'date');
+  var fOT=apfApply(doneOT,'date');
+
+  // ── 卡片 renderer ──
+  function renderLeaveCard(a){
+    var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+    var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+escapeHtml(a.empName[0]||'?')+'</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
+      +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
+      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
+      +'</div>'
+      +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
       +'</div>';
   }
-  s.innerHTML='<div class="rv-shell">'
-    +'<div class="rv-page-header">'
-      +'<div><div class="rv-page-title">審核中心</div><div class="rv-page-sub">集中處理待審請假、補打卡與加班申請</div></div>'
-      +'<div class="rv-topbar"><span class="eh-chip" style="background:#fff;color:#6f48ff;border:1px solid #ece8ff">📅 '+today.replace(/-/g,'/')+'</span></div>'
-    +'</div>'
-    +'<div class="rv-kpis">'
-      +'<div class="rv-kpi"><div class="rv-kpi-ico purple">📋</div><div><div class="rv-kpi-label">待審核</div><div class="rv-kpi-val">'+reviewRows.length+'</div><div class="rv-kpi-sub">目前待處理總數</div></div></div>'
-      +'<div class="rv-kpi"><div class="rv-kpi-ico orange">🗓️</div><div><div class="rv-kpi-label">今日請假</div><div class="rv-kpi-val">'+todayLeaves+'</div><div class="rv-kpi-sub">今日已核准請假</div></div></div>'
-      +'<div class="rv-kpi"><div class="rv-kpi-ico green">🕘</div><div><div class="rv-kpi-label">補打卡待審</div><div class="rv-kpi-val">'+makeupPending+'</div><div class="rv-kpi-sub" style="color:#5ebf7d">目前待審補打卡</div></div></div>'
-      +'<div class="rv-kpi"><div class="rv-kpi-ico purple">👥</div><div><div class="rv-kpi-label">加班待審</div><div class="rv-kpi-val">'+otPending+'</div><div class="rv-kpi-sub">目前待審加班申請</div></div></div>'
-    +'</div>'
-    +'<div class="rv-panel">'
-      +'<div class="rv-panel-head"><div class="rv-panel-title">申請列表</div>'
-        +'<div class="rv-filters">'
-          +'<select class="rv-select" onchange="window._setApproveView(\'type\',this.value)"><option value="all"'+(state.type==='all'?' selected':'')+'>全部類型</option><option value="leave"'+(state.type==='leave'?' selected':'')+'>請假</option><option value="makeup"'+(state.type==='makeup'?' selected':'')+'>補打卡</option><option value="ot"'+(state.type==='ot'?' selected':'')+'>加班</option></select>'
-          +'<input class="rv-select" type="date" value="'+esc(state.date)+'" onchange="window._setApproveView(\'date\',this.value)">'
-          +'<input class="rv-search" value="'+esc(state.q)+'" oninput="window._setApproveView(\'q\',this.value)" placeholder="搜尋員工 / 原因">'
+  function renderMakeupCard(a){
+    var tl=a.punchType==='in'?'上班打卡':'下班打卡';
+    var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+    var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x1F527;</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+tl+'</div>'
+      +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
+      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
+      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
+      +'</div>'
+      +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>';
+  }
+  function renderOTCard(a){
+    var sc=a.status==='approved'?'var(--green)':'var(--pd)';
+    var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x23F0;</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 加班</div>'
+      +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
+      +(a.supNote?'<div class="lr-sub">備註：'+escapeHtml(a.supNote)+'</div>':'')
+      +'</div>'
+      +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>';
+  }
+
+  // ── 分頁 ──
+  function apfPaged(type,items,render){
+    var ps=window._approvePage[type]||20;
+    var h='';
+    items.slice(0,ps).forEach(function(a){h+=render(a);});
+    if(items.length>ps){
+      h+='<div style="text-align:center;padding:12px 0">'
+        +'<button onclick="window._apfShowMore(\''+type+'\')" style="padding:8px 20px;border:1px solid var(--border);border-radius:8px;background:#fff;color:var(--t1);font-size:12px;font-weight:700;cursor:pointer">&#x2B07; 顯示更多（還有 '+(items.length-ps)+' 筆）</button>'
+        +'</div>';
+    }
+    return h;
+  }
+
+  // ── 篩選列 ──
+  function apfBar(){
+    var f=window._approveFilter;
+    // 自所有類型取得出現過的年份
+    var ys={};
+    doneLeave.forEach(function(a){if(a.startDate)ys[a.startDate.slice(0,4)]=true;});
+    doneMakeup.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
+    doneOT.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
+    var years=Object.keys(ys).sort().reverse();
+    var emps=getEmps().slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','zh-TW');});
+    var hasFilter=f.year!=='all'||f.empId!=='all'||f.status!=='all'||f.name;
+    var selStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;cursor:pointer';
+    var inpStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;flex:1;min-width:140px';
+
+    return '<div class="sec-title fu"><span>&#x1F50D; 已完成申請篩選'+(hasFilter?'<span style="color:var(--pd);font-size:11px;margin-left:6px">（篩選中）</span>':'')+'</span></div>'
+      +'<div class="card fu" style="margin-bottom:12px;padding:12px">'
+      +'<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">'
+      +'<select id="apf_year" onchange="window._apfUpdate(\'year\',this.value)" style="'+selStyle+'">'
+      +  '<option value="all"'+(f.year==='all'?' selected':'')+'>全部年份</option>'
+      +  years.map(function(y){return '<option value="'+y+'"'+(f.year===y?' selected':'')+'>'+y+' 年</option>';}).join('')
+      +'</select>'
+      +'<select id="apf_emp" onchange="window._apfUpdate(\'empId\',this.value)" style="'+selStyle+'">'
+      +  '<option value="all"'+(f.empId==='all'?' selected':'')+'>全部員工</option>'
+      +  emps.map(function(e){return '<option value="'+escapeHtml(e.id)+'"'+(f.empId===e.id?' selected':'')+'>'+escapeHtml(e.name)+'</option>';}).join('')
+      +'</select>'
+      +'<select id="apf_status" onchange="window._apfUpdate(\'status\',this.value)" style="'+selStyle+'">'
+      +  '<option value="all"'+(f.status==='all'?' selected':'')+'>全部狀態</option>'
+      +  '<option value="approved"'+(f.status==='approved'?' selected':'')+'>&#x2705; 已核准</option>'
+      +  '<option value="rejected"'+(f.status==='rejected'?' selected':'')+'>&#x274C; 已拒絕</option>'
+      +'</select>'
+      +'<input id="apf_name" type="text" value="'+escapeHtml(f.name)+'" placeholder="&#x1F50D; 姓名搜尋" oninput="window._apfSetName(this.value)" style="'+inpStyle+'">'
+      +(hasFilter?'<button onclick="window._apfReset()" style="padding:6px 12px;border:1px solid var(--pd);border-radius:6px;background:#fee;color:var(--pd);font-size:12px;font-weight:700;cursor:pointer">&#x1F504; 重置</button>':'')
+      +'</div>'
+      +'</div>';
+  }
+
+  // ═══ 組裝 HTML ═══
+  var html='<div class="pc-page-header" style="margin-bottom:20px"><div><div class="pc-page-title">📋 審核申請</div><div class="pc-page-sub">假期申請與補打卡審核管理</div></div></div>';
+
+  // ── 統一「待我審核」（三種類型混合，依申請時間由新到舊排） ──
+  var myPendingAll=[];
+  myPending.forEach(function(a){myPendingAll.push({kind:'leave',item:a});});
+  myMakeup.forEach(function(a){myPendingAll.push({kind:'makeup',item:a});});
+  myOT.forEach(function(a){myPendingAll.push({kind:'ot',item:a});});
+  myPendingAll.sort(function(x,y){return (y.item.appliedAt||'').localeCompare(x.item.appliedAt||'');});
+
+  html+='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPendingAll.length+'）</span></div>'
+    +'<div class="pc-section" style="margin-bottom:16px">';
+  if(!myPendingAll.length){
+    html+='<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審申請</div>';
+  } else {
+    myPendingAll.forEach(function(entry){
+      var a=entry.item;
+      if(entry.kind==='leave'){
+        var stage=a.status==='pending'?'直屬主管審核':'HR最終審核';
+        var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:var(--pl);color:var(--pd)" title="請假">&#x1F334;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
+          +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
+          +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stage+'</div>'
+          +(a.attachName?'<div class="lr-sub">&#x1F4CE; '+escapeHtml(a.attachName)+'</div>':'')
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openReview(\''+a.id+'\')">審核</button>'
+          +'</div>';
+      } else if(entry.kind==='makeup'){
+        var typeLabel=a.punchType==='in'?'上班打卡':'下班打卡';
+        var stageLabel=a.status==='pending'?'直屬主管審核':'HR最終審核';
+        var stageColor=a.status==='pending'?'var(--blue)':'var(--orange)';
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:var(--ol);color:var(--orange)" title="補打卡">&#x1F527;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+typeLabel+'</div>'
+          +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
+          +'<div class="lr-sub" style="color:'+stageColor+';font-weight:600">'+stageLabel+'</div>'
+          +(a.gps&&a.gps.lat?'<div class="lr-sub">&#x1F4CD; '+a.gps.lat+', '+a.gps.lng+'</div>':'<div class="lr-sub" style="color:var(--t3)">&#x1F4CD; 無定位</div>')
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openMakeupReview(\''+a.id+'\')">審核</button>'
+          +'</div>';
+      } else if(entry.kind==='ot'){
+        html+='<div class="list-row">'
+          +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)" title="加班">&#x23F0;</div>'
+          +'<div class="lr-info">'
+          +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 加班申請</div>'
+          +'<div class="lr-sub">'+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)</div>'
+          +'<div class="lr-sub" style="color:var(--t3)">'+escapeHtml(a.reason||'--')+'</div>'
+          +'</div>'
+          +'<button style="padding:4px 10px;border-radius:8px;border:none;background:var(--gl);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap" onclick="openOTReview(\''+a.id+'\')">審核</button>'
+          +'</div>';
+      }
+    });
+  }
+  html+='</div>';
+
+  // ── 等待其他主管（僅請假有此概念，保留原設計） ──
+  if(waiting.length){
+    html+='<div class="sec-title fu fu1"><span>&#x1F552; 等待其他主管（'+waiting.length+'）</span></div>'
+      +'<div class="card fu fu1">';
+    waiting.forEach(function(a){
+      var supE=getEmpById(a.supId||'');
+      html+='<div class="list-row">'
+        +'<div class="lr-av" style="background:var(--yl);color:var(--yellow)">&#x1F334;</div>'
+        +'<div class="lr-info">'
+        +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
+        +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+'</div>'
+        +'<div class="lr-sub" style="color:var(--t3)">待主管：'+(supE?escapeHtml(supE.name):'--')+'</div>'
         +'</div>'
-      +'</div>'
-      +'<div class="rv-table-wrap">'
-        +(filtered.length
-          ?'<table class="rv-table"><thead><tr><th>申請人 / 類型</th><th>原因</th><th>申請日期</th><th>申請時段</th><th>審核主管</th><th>狀態</th><th style="text-align:right">操作</th></tr></thead><tbody>'
-            +filtered.map(function(row){
-              var sup=row.supervisor;
-              var acc=sup?(accounts.find(function(a){return a.id===sup.id;})||{}):{};
-              return '<tr>'
-                +'<td><div class="rv-person"><div class="rv-person-av" style="background:'+(row.kind==='leave'?'#efe7ff;color:#764dff':row.kind==='makeup'?'#fff1df;color:#ef8b00':'#e8f8ef;color:#1a9d64')+'">'+esc(row.avatar)+'</div><div><div class="rv-person-name">'+esc(row.empName)+'</div><div class="rv-person-sub">'+pill(row.kind)+' '+esc(row.dept)+'</div></div></div></td>'
-                +'<td style="min-width:220px;color:#5f587a;line-height:1.5">'+esc(row.reason)+'</td>'
-                +'<td>'+esc(row.dateLabel)+'</td>'
-                +'<td>'+esc(row.rangeLabel)+'</td>'
-                +'<td><div class="rv-supervisor"><div class="rv-person-av" style="width:32px;height:32px;border-radius:12px;background:#f3efff;color:#6f48ff;font-size:13px">'+esc((sup&&sup.name?sup.name[0]:'?'))+'</div><div><div style="font-size:12px;font-weight:800;color:#302a52">'+esc(sup?sup.name:'未設定主管')+'</div><small>'+(acc.role==='admin'?'管理員':'經理')+'</small></div></div></td>'
-                +'<td>'+statusPill(row.status)+'</td>'
-                +'<td style="text-align:right">'+actionButtons(row)+'</td>'
-              +'</tr>';
-            }).join('')
-            +'</tbody></table>'
-          :'<div class="rv-empty">目前沒有符合條件的待審申請</div>')
-      +'</div>'
-    +'</div>'
-  +'</div>';
+        +'<span class="bgg bg-y">待主管</span>'
+        +'</div>';
+    });
+    html+='</div>';
+  }
+
+  // ═══ 已完成區塊（全部放在一起，共用篩選列） ═══
+  html+='<div style="margin-top:24px;padding-top:4px;border-top:2px solid var(--border)"></div>';
+  html+=apfBar();
+
+  // 已完成請假
+  html+='<div class="sec-title fu fu2"><span>&#x1F4C1; 已完成請假（'+fLeave.length+(fLeave.length!==doneLeave.length?' / 共 '+doneLeave.length:'')+'）</span></div>'
+    +'<div class="card fu fu2">';
+  if(!fLeave.length){
+    html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">'+(doneLeave.length?'（無符合篩選條件的紀錄）':'尚無紀錄')+'</div>';
+  } else {
+    html+=apfPaged('leave',fLeave,renderLeaveCard);
+  }
+  html+='</div>';
+
+  // 已完成補打卡
+  if(doneMakeup.length){
+    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F4C1; 已完成補打卡（'+fMakeup.length+(fMakeup.length!==doneMakeup.length?' / 共 '+doneMakeup.length:'')+'）</span></div>'
+      +'<div class="card fu fu2">';
+    if(!fMakeup.length){
+      html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">（無符合篩選條件的紀錄）</div>';
+    } else {
+      html+=apfPaged('makeup',fMakeup,renderMakeupCard);
+    }
+    html+='</div>';
+  }
+
+  // 已完成加班
+  if(doneOT.length){
+    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F4C1; 已完成加班（'+fOT.length+(fOT.length!==doneOT.length?' / 共 '+doneOT.length:'')+'）</span></div>'
+      +'<div class="card fu fu2">';
+    if(!fOT.length){
+      html+='<div style="text-align:center;padding:12px;color:var(--t3);font-size:13px">（無符合篩選條件的紀錄）</div>';
+    } else {
+      html+=apfPaged('ot',fOT,renderOTCard);
+    }
+    html+='</div>';
+  }
+
+  s.innerHTML=html;
 }
 
 function openMakeupReview(id){
-  if(window.openMakeupReview&&window.openMakeupReview!==openMakeupReview){
-    return window.openMakeupReview(id);
-  }
   var a=getMakeupApps().find(function(x){return x.id===id;});
   if(!a) return;
   reviewingId='MAKEUP:'+id;
@@ -2088,9 +1964,6 @@ function openMakeupReview(id){
 }
 
 function openReview(id){
-  if(window.openReview&&window.openReview!==openReview){
-    return window.openReview(id);
-  }
   const a=getApps().find(x=>x.id===id);if(!a)return;
   reviewingId=id;
   const supEmp=getEmpById(a.supId||'');
@@ -2108,15 +1981,12 @@ function openReview(id){
     +'</div>'
     +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
   // 顯示附件預覽
-  var safeAttachUrl=window.getSafeAttachmentUrl?window.getSafeAttachmentUrl(a.attachData):'';
-  if(safeAttachUrl){
-    if(safeAttachUrl.indexOf('data:image')===0){
-      body+='<div style="margin-bottom:12px"><img src="'+safeAttachUrl+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
+  if(a.attachData){
+    if(a.attachData.startsWith('data:image')){
+      body+='<div style="margin-bottom:12px"><img src="'+a.attachData+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
     } else {
-      body+='<div style="margin-bottom:12px"><a href="'+safeAttachUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
+      body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
     }
-  } else if(a.attachName&&a.attachData){
-    body+='<div style="margin-bottom:12px;color:var(--pd);font-size:12px">⚠️ 附件格式不受信任，已阻擋預覽</div>';
   }
   // 若第2層，顯示第1層備註
   if(!isSup && a.supNote){
@@ -2196,9 +2066,6 @@ function applyMakeupToRecord(a){
 }
 
 function doReview(status){
-  if(window.doReview&&window.doReview!==doReview){
-    return window.doReview(status);
-  }
   if(!reviewingId) return;
   // 補打卡審核
   if(reviewingId.startsWith('MAKEUP:')){
@@ -3069,36 +2936,40 @@ function confirmPunch(){
 //  LEAVE APPLY
 // ══════════════════════════════════════════════════
 function openLeaveSheet(){
-  const today=getTodayInputValue();
+  const today=new Date().toISOString().slice(0,10);
   const emp=currentUser.empData;
+  const emps=getEmps().filter(e=>e.id!==currentUser.id);
+    const defaultSup=emp?emp.supervisorId||'':'';
+  const supOptions=emps.map(e=>'<option value="'+e.id+'"'+(e.id===defaultSup?' selected':'')+'>'+e.name+' ('+e.dept+')</option>').join('');
   document.getElementById('leaveFormBody').innerHTML=
-    '<div class="app-sheet">'
-    +renderApplyTabs('leave')
-    +'<div class="app-quota-chip">👜 特休剩餘 '+((window.getEmpQuota?window.getEmpQuota(currentUser.id):window.getQuota()).annual||0)+' 天</div>'
-    +'<div class="app-form-card">'
-      +'<div class="app-field"><label class="app-label">假別</label><select class="app-select" id="lType">'
-        +'<option value="annual">特休</option>'
-        +'<option value="sick">病假</option>'
-        +'<option value="personal">事假</option>'
-        +'<option value="marriage">婚假</option>'
-        +'<option value="funeral">喪假</option>'
-        +'<option value="official">公假</option>'
-        +'<option value="menstrual">生理假</option>'
-        +'<option value="maternity">產假</option>'
-        +'<option value="paternity">陪產假</option>'
-        +'<option value="parental">育嬰留停</option>'
-        +'<option value="makeup">補休</option>'
-      +'</select></div>'
-      +'<div class="app-row-2">'
-        +'<div class="app-field"><label class="app-label">開始日期</label><input class="app-input" type="date" id="lStart" value="'+today+'"></div>'
-        +'<div class="app-field"><label class="app-label">結束日期</label><input class="app-input" type="date" id="lEnd" value="'+today+'"></div>'
-      +'</div>'
-      +renderBoundSupervisorField(currentUser.id,'lSup')
-      +'<div class="app-field"><label class="app-label">代理人（選填）</label><input class="app-input" id="lProxy" placeholder="請輸入代理人姓名"></div>'
-      +'<div class="app-field"><label class="app-label">原因</label><textarea class="app-textarea" id="lReason" placeholder="家人身體不適，需陪同就醫。"></textarea></div>'
-      +'<div class="app-field"><label class="app-label">附件（選填）</label><div class="app-file-box"><input type="file" id="lAttach" accept="image/*,.pdf" style="flex:1;font-size:12px"><div class="app-file-meta">支援 jpg、png、pdf（10MB 內）</div></div></div>'
-      +'<div id="leaveFormErr" style="display:none;background:#fff0f0;color:#d54f4f;font-size:12px;font-weight:700;padding:10px 12px;border-radius:12px;margin-top:4px"></div>'
-    +'</div><div class="app-footer-gap"></div></div>';
+    '<div class="fg"><label>假期類型</label><select id="lType">'
+    +'<option value="annual">&#x1F334; 特休假</option>'
+    +'<option value="sick">&#x1F912; 病假</option>'
+    +'<option value="personal">&#x1F389; 事假</option>'
+    +'<option value="marriage">&#x1F490; 婚假</option>'
+    +'<option value="funeral">&#x1F622; 喪假</option>'
+    +'<option value="official">&#x1F3DB; 公假</option>'
+    +'<option value="menstrual">&#x1F338; 生理假</option>'
+    +'<option value="maternity">&#x1F931; 產假</option>'
+    +'<option value="paternity">&#x1F476; 陪產假</option>'
+    +'<option value="parental">&#x1F331; 育嬰留職停薪</option>'
+    +'<option value="makeup">&#x1F504; 補休</option>'
+    +'</select></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>開始日期</label><input type="date" id="lStart" value="'+today+'"></div>'
+    +'<div class="fg"><label>結束日期</label><input type="date" id="lEnd" value="'+today+'"></div>'
+    +'</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="lSup">'
+    +'<option value="">-- 請選擇主管 --</option>'
+    +supOptions
+    +'</select></div>'
+    +'<div class="fg"><label>代理人</label><input id="lProxy" placeholder="代理人姓名"></div>'
+    +'<div class="fg"><label>請假原因</label><textarea id="lReason" placeholder="請說明原因..."></textarea></div>'
+    +'<div class="fg"><label>附件（選填，如診斷書）</label>'
+    +'<input type="file" id="lAttach" accept="image/*,.pdf" style="font-size:13px;padding:8px">'
+    +'<div style="font-size:10px;color:var(--t3);margin-top:4px">支援圖片或 PDF，檔案將儲存於本機</div>'
+    +'</div>'
+    +'<div id="leaveFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:4px"></div>';
   openSheet('leaveSheet');
 }
 
@@ -3108,8 +2979,7 @@ function submitLeave(){
   const end=document.getElementById('lEnd')?.value;
   const reason=document.getElementById('lReason')?.value.trim();
   const proxy=document.getElementById('lProxy')?.value.trim()||'';
-  const supEmp=getBoundSupervisor(currentUser.id);
-  const supId=supEmp?supEmp.id:'';
+  const supId=document.getElementById('lSup')?.value||'';
   const errEl=document.getElementById('leaveFormErr');
   if(!start||!end){errEl.textContent='⚠️ 請填寫日期';errEl.style.display='block';return;}
   if(start>end){errEl.textContent='⚠️ 結束日期不能早於開始';errEl.style.display='block';return;}
@@ -3125,6 +2995,7 @@ function submitLeave(){
   while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
 
   // 取得主管 email
+  const supEmp=getEmpById(supId);
   const supEmail=supEmp?getEmps().find(e=>e.id===supId)?.email||'':'';
 
   function saveAndNotify(attachData){
@@ -3184,23 +3055,30 @@ var makeupGpsData=null; // 儲存補打卡定位結果
 var makeupPendingData=null; // 暫存補打卡表單資料
 
 function openMakeupSheet(){
-  var today=getTodayInputValue();
+  var today=new Date().toISOString().slice(0,10);
   var emp=currentUser.empData;
+  var emps=getEmps().filter(function(e){return e.id!==currentUser.id;});
+  var defaultSupId=emp?emp.supervisorId||'':'';
+  var supOptions=emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===defaultSupId?' selected':'')+'>'+e.name+' ('+e.dept+')</option>';}).join('');
 
   document.getElementById('makeupFormBody').innerHTML=
-    '<div class="app-sheet">'
-    +renderApplyTabs('makeup')
-    +'<div class="app-form-card">'
-      +'<div class="app-field"><label class="app-label">補打卡日期</label><input class="app-input" type="date" id="mk_date" value="'+today+'"></div>'
-      +'<div class="app-row-2">'
-        +'<div class="app-field"><label class="app-label">類型</label><select class="app-select" id="mk_type"><option value="in">上班打卡</option><option value="out">下班打卡</option></select></div>'
-        +'<div class="app-field"><label class="app-label">實際時間</label><input class="app-input" type="time" id="mk_time"></div>'
-      +'</div>'
-      +renderBoundSupervisorField(currentUser.id,'mk_sup')
-      +'<div class="app-field"><label class="app-label">原因</label><textarea class="app-textarea" id="mk_reason" placeholder="手機沒電，未能即時打卡。"></textarea></div>'
-      +'<div class="app-field"><div class="app-file-box"><div style="font-size:18px">📍</div><div><div style="font-size:12px;font-weight:800;color:var(--text)">送出後需定位驗證</div><div class="app-file-meta">系統將記錄申請時 GPS 座標，送出後由主管審核。</div></div></div></div>'
-      +'<div id="makeupFormErr" style="display:none;background:#fff0f0;color:#d54f4f;font-size:12px;font-weight:700;padding:10px 12px;border-radius:12px;margin-top:4px"></div>'
-    +'</div><div class="app-footer-gap"></div></div>';
+    '<div style="background:var(--ol);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--orange);line-height:1.6">'
+    +'&#x26A0;&#xFE0F; 補打卡需要<strong>現場定位驗證</strong>，系統將記錄您申請時的 GPS 座標，送出後需主管審核。'
+    +'</div>'
+    +'<div class="fg"><label>補打卡日期</label><input type="date" id="mk_date" value="'+today+'"></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>類型</label><select id="mk_type">'
+    +'<option value="in">&#x1F446; 上班打卡</option>'
+    +'<option value="out">&#x1F44B; 下班打卡</option>'
+    +'</select></div>'
+    +'<div class="fg"><label>實際時間</label><input type="time" id="mk_time"></div>'
+    +'</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="mk_sup"><option value="">-- 請選擇主管 --</option>'+supOptions+'</select></div>'
+    +'<div class="fg"><label>補打卡原因</label><textarea id="mk_reason" placeholder="請說明忘記打卡的原因..."></textarea></div>'
+    +'<div id="makeupFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:4px"></div>'
+    +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--t2);line-height:1.6">'
+    +'&#x1F4CD; 點「送出申請」後，系統會先進行 <strong>GPS 定位驗證</strong>，驗證成功才會送出申請。'
+    +'</div>';
   openSheet('makeupSheet');
 }
 
@@ -3208,23 +3086,20 @@ function submitMakeup(){
   var date=document.getElementById('mk_date')&&document.getElementById('mk_date').value;
   var type=document.getElementById('mk_type')&&document.getElementById('mk_type').value;
   var time=document.getElementById('mk_time')&&document.getElementById('mk_time').value;
-  var supEmp=getBoundSupervisor(currentUser.id);
-  var supId=supEmp&&supEmp.id;
+  var supId=document.getElementById('mk_sup')&&document.getElementById('mk_sup').value;
   var reason=document.getElementById('mk_reason')&&document.getElementById('mk_reason').value.trim();
   var errEl=document.getElementById('makeupFormErr');
 
-  if(!date){setFormError(errEl,'⚠️ 請填寫補打卡日期');return;}
-  if(!time){setFormError(errEl,'⚠️ 請填寫實際打卡時間');return;}
-  if(!supId){setFormError(errEl,'⚠️ 請選擇直屬主管');return;}
-  if(!supEmp){setFormError(errEl,'⚠️ 找不到選取的審核主管，請重新選擇');return;}
-  if(!reason){setFormError(errEl,'⚠️ 請填寫補打卡原因');return;}
+  if(!date){errEl.textContent='⚠️ 請填寫補打卡日期';errEl.style.display='block';return;}
+  if(!time){errEl.textContent='⚠️ 請填寫實際打卡時間';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫補打卡原因';errEl.style.display='block';return;}
 
   // 檢查日期不能是未來
-  if(date>getTodayInputValue()){
-    setFormError(errEl,'⚠️ 補打卡日期不能是未來日期');return;
+  if(date>new Date().toISOString().slice(0,10)){
+    errEl.textContent='⚠️ 補打卡日期不能是未來日期';errEl.style.display='block';return;
   }
-  if(!supEmp){setFormError(errEl,'?? ?曆??圈??撖拇銝餌恣嚗???豢?');return;}
-  setFormError(errEl,'');
+  errEl.style.display='none';
 
   // 儲存表單資料，進入 GPS 驗證流程
   makeupPendingData={date:date,type:type,time:time,supId:supId,reason:reason};
@@ -3684,78 +3559,6 @@ function escapeHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;');
 }
 window.escapeHtml=escapeHtml;
-function getSafeAttachmentUrl(raw){
-  if(!raw)return '';
-  var v=String(raw).trim();
-  if(v.indexOf('data:image/')===0)return v;
-  if(v.indexOf('data:application/pdf')===0)return v;
-  if(v.indexOf('blob:')===0)return v;
-  return '';
-}
-window.getSafeAttachmentUrl=getSafeAttachmentUrl;
-function escapeAttr(s){return escapeHtml(s).replace(/`/g,'&#x60;');}
-window.escapeAttr=escapeAttr;
-function getActiveEmployees(excludeId){
-  return (window.getEmps?window.getEmps():getEmps()).filter(function(e){
-    return e.id!==excludeId&&e.status!=='inactive';
-  });
-}
-function buildSupervisorOptions(selectedId,excludeId){
-  var esc=window.escapeHtml||function(s){return String(s||'');};
-  return getActiveEmployees(excludeId).map(function(e){
-    return '<option value="'+esc(e.id)+'"'+(e.id===selectedId?' selected':'')+'>'+esc(e.name)+' ('+esc(e.dept||'未分配部門')+')</option>';
-  }).join('');
-}
-function getBoundSupervisor(empId){
-  var emp=getEmpById(empId||'');
-  if(!emp||!emp.supervisorId) return null;
-  return getEmpById(emp.supervisorId)||null;
-}
-function renderBoundSupervisorField(empId,inputId){
-  var sup=getBoundSupervisor(empId);
-  var label=sup?(sup.name+(sup.dept?' / '+sup.dept:'')):'尚未設定主管';
-  return '<div class="app-field"><label class="app-label">審核主管</label>'
-    +'<div class="app-input" style="display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f8f7ff;color:'+(sup?'var(--text)':'#c14b4b')+'">'
-      +'<span>'+escapeHtml(label)+'</span>'
-      +'<span style="font-size:12px;color:#8f86b3;font-weight:700">'+(sup?'依員工資料綁定':'請先於員工資料設定')+'</span>'
-    +'</div>'
-    +'<input type="hidden" id="'+escapeAttr(inputId)+'" value="'+escapeAttr(sup?sup.id:'')+'">'
-  +'</div>';
-}
-function setFormError(el,message){
-  if(!el)return;
-  if(message){
-    el.textContent=message;
-    el.style.display='block';
-  }else{
-    el.textContent='';
-    el.style.display='none';
-  }
-}
-function getTodayInputValue(){return getLocalDateString();}
-function renderApplyTabs(activeKey){
-  var tabs=[
-    {key:'leave',label:'請假',fn:'openLeaveSheet()'},
-    {key:'makeup',label:'補打卡',fn:'openMakeupSheet()'},
-    {key:'ot',label:'加班',fn:'openOvertimeSheet()'}
-  ];
-  return '<div class="app-sheet-header"><div class="app-sheet-title">申請表單</div><div class="app-tabs">'
-    +tabs.map(function(tab){
-      return '<button class="app-tab'+(tab.key===activeKey?' active':'')+'" onclick="'+tab.fn+'">'+tab.label+'</button>';
-    }).join('')
-    +'</div></div>';
-}
-window.quickReviewAction=function(kind,id,status){
-  var label=status==='approved'?'核准':'拒絕';
-  if(!confirm('確定要直接'+label+'這筆申請嗎？')) return;
-  if(kind==='ot'){
-    window._reviewingOTId=id;
-    window.doOTReview(status);
-    return;
-  }
-  window.reviewingId=kind==='makeup'?'MAKEUP:'+id:id;
-  window.doReview(status);
-};
 
 // ── In-memory cache ───────────────────────────────
 var DB={emps:[],accs:[],recs:[],leaves:[],makeups:[],holidays:{},quota:{annual:14,sick:30,personal:14,marriage:8,funeral:8,official:0},cfg:null};
@@ -4212,18 +4015,17 @@ window.submitLeave=function(){
   proxy=proxy.trim();
   var supId=(document.getElementById('lSup')?document.getElementById('lSup').value:'')||'';
   var errEl=document.getElementById('leaveFormErr');
-  if(!start||!end){setFormError(errEl,'⚠️ 請填寫日期');return;}
-  if(start>end){setFormError(errEl,'⚠️ 結束日期不能早於開始');return;}
-  if(!reason){setFormError(errEl,'⚠️ 請填寫原因');return;}
-  if(!supId){setFormError(errEl,'⚠️ 請選擇直屬主管');return;}
-  setFormError(errEl,'');
+  if(!start||!end){errEl.textContent='⚠️ 請填寫日期';errEl.style.display='block';return;}
+  if(start>end){errEl.textContent='⚠️ 結束日期不能早於開始';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫原因';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  errEl.style.display='none';
   var emp=window.currentUser.empData;
   var fileInput=document.getElementById('lAttach');
   var file=fileInput&&fileInput.files&&fileInput.files[0];
   var days=0,cur=new Date(start),endD=new Date(end);
   while(cur<=endD){if(cur.getDay()!==0&&cur.getDay()!==6)days++;cur.setDate(cur.getDate()+1);}
   var supEmp=getEmpById(supId);
-  if(!supEmp){setFormError(errEl,'⚠️ 找不到選取的審核主管，請重新選擇');return;}
 
   // ── 開啟郵件（同步，在點擊事件堆疊內執行，瀏覽器才不會封鎖）──
   var didOpenMail=false;
@@ -4302,7 +4104,7 @@ window.submitLeave=function(){
     });
   }
   if(file){
-    if(file.size>5*1024*1024){setFormError(errEl,'⚠️ 附件過大，請上傳 5 MB 以內的檔案');return;}
+    if(file.size>5*1024*1024){errEl.textContent='⚠️ 附件過大，請上傳 5 MB 以內的檔案';errEl.style.display='block';return;}
     var r=new FileReader();r.onload=function(e){saveLeave(e.target.result);};r.onerror=function(){saveLeave('');};r.readAsDataURL(file);
   } else saveLeave('');
 };
@@ -4351,7 +4153,6 @@ window.openReview=async function(id){
   var stageColor=isSup?'var(--blue)':'var(--orange)';
   // escapeHtml 保護：防止員工姓名/原因等使用者輸入造成 XSS
   var eh=window.escapeHtml||function(s){return String(s||'');};
-  var safeAttachUrl=window.getSafeAttachmentUrl?window.getSafeAttachmentUrl(a.attachData):'';
   var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
     +'<div>&#x1F464; <strong>'+eh(a.empName)+'</strong></div>'
     +'<div>&#x1F4CC; '+eh(a.type)+(a.days?' · '+a.days+'天':'')+'</div>'
@@ -4362,13 +4163,11 @@ window.openReview=async function(id){
     +(a.attachName?'<div>&#x1F4CE; 附件：'+eh(a.attachName)+'</div>':'')
     +'</div>'
     +'<div style="background:'+stageColor+'22;border-radius:9px;padding:8px 12px;font-size:12px;font-weight:700;color:'+stageColor+';margin-bottom:12px">'+stageLabel+'</div>';
-  if(safeAttachUrl){
-    if(safeAttachUrl.indexOf('data:image')===0)
-      body+='<div style="margin-bottom:12px"><img src="'+safeAttachUrl+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
+  if(a.attachData){
+    if(a.attachData.startsWith('data:image'))
+      body+='<div style="margin-bottom:12px"><img src="'+a.attachData+'" style="width:100%;border-radius:10px;max-height:180px;object-fit:cover"></div>';
     else
-      body+='<div style="margin-bottom:12px"><a href="'+safeAttachUrl+'" target="_blank" rel="noopener noreferrer" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
-  } else if(a.attachName&&a.attachData){
-    body+='<div style="margin-bottom:12px;color:var(--pd);font-size:12px">⚠️ 附件格式不受信任，已阻擋預覽</div>';
+      body+='<div style="margin-bottom:12px"><a href="'+a.attachData+'" target="_blank" style="color:var(--blue);font-size:13px">&#x1F4C4; 查看附件</a></div>';
   }
   if(!isSup&&a.supNote)
     body+='<div style="background:var(--gl);border-radius:9px;padding:8px 12px;font-size:12px;margin-bottom:10px">&#x1F5D2; 直屬主管備註：'+eh(a.supNote)+'</div>';
@@ -5239,10 +5038,10 @@ window.renderOvertimeSection=function(s){
       html+='<div class="list-row">'
         +'<div class="lr-av" style="background:#fff3e0;color:var(--orange)">⏰</div>'
         +'<div class="lr-info">'
-        +'<div class="lr-name">'+escapeHtml(a.date)+' '+escapeHtml(a.startTime)+'~'+escapeHtml(a.endTime)+'</div>'
+        +'<div class="lr-name">'+a.date+' '+a.startTime+'~'+a.endTime+'</div>'
         +'<div class="lr-sub" style="color:var(--orange);font-weight:700">'+a.hours.toFixed(1)+'h 加班</div>'
-        +'<div class="lr-sub">'+escapeHtml(a.reason||'--')+'</div>'
-        +(a.supNote?'<div class="lr-sub">主管備註：'+escapeHtml(a.supNote)+'</div>':'')
+        +'<div class="lr-sub">'+(a.reason||'--')+'</div>'
+        +(a.supNote?'<div class="lr-sub">主管備註：'+a.supNote+'</div>':'')
         +'</div>'
         +'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px">'
         +'<span class="bgg" style="background:'+stColor+'22;color:'+stColor+'">'+stLabel+'</span>'
@@ -5257,22 +5056,21 @@ window.renderOvertimeSection=function(s){
 
 // 開啟加班申請 sheet
 window.openOvertimeSheet=function(){
-  var today=getTodayInputValue();
+  var today=new Date().toISOString().slice(0,10);
   var emp=window.currentUser.empData;
+  var emps=window.getEmps().filter(function(e){return e.id!==window.currentUser.id;});
+  var defaultSup=emp?emp.supervisorId||'':'';
+  var supOptions=emps.map(function(e){return '<option value="'+e.id+'"'+(e.id===defaultSup?' selected':'')+'>'+e.name+' ('+e.dept+')</option>';}).join('');
   document.getElementById('overtimeFormBody').innerHTML=
-    '<div class="app-sheet">'
-    +renderApplyTabs('ot')
-    +'<div class="app-form-card">'
-      +'<div class="app-field"><label class="app-label">加班日期</label><input class="app-input" type="date" id="ot_date" value="'+today+'"></div>'
-      +'<div class="app-row-2">'
-        +'<div class="app-field"><label class="app-label">開始時間</label><input class="app-input" type="time" id="ot_start" value="18:00"></div>'
-        +'<div class="app-field"><label class="app-label">結束時間</label><input class="app-input" type="time" id="ot_end" value="20:00"></div>'
-      +'</div>'
-      +'<div class="app-field"><div id="ot_hours_hint" style="background:#f4eeff;border-radius:14px;padding:10px 12px;font-size:12px;color:#7d57ff;font-weight:800">預計加班時數：<strong id="ot_hours_val">2.0</strong> 小時</div></div>'
-      +renderBoundSupervisorField(window.currentUser.id,'ot_sup')
-      +'<div class="app-field"><label class="app-label">加班原因</label><textarea class="app-textarea" id="ot_reason" placeholder="專案趕工，需整理提案簡報。"></textarea></div>'
-      +'<div id="otFormErr" style="display:none;background:#fff0f0;color:#d54f4f;font-size:12px;font-weight:700;padding:10px 12px;border-radius:12px"></div>'
-    +'</div><div class="app-footer-gap"></div></div>';
+    '<div class="fg"><label>加班日期</label><input type="date" id="ot_date" value="'+today+'"></div>'
+    +'<div class="fr2">'
+    +'<div class="fg"><label>開始時間</label><input type="time" id="ot_start" value="18:00"></div>'
+    +'<div class="fg"><label>結束時間</label><input type="time" id="ot_end" value="20:00"></div>'
+    +'</div>'
+    +'<div class="fg" id="ot_hours_hint" style="background:var(--pl);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--pd)">預計加班時數：<strong id="ot_hours_val">2.0</strong> 小時</div>'
+    +'<div class="fg"><label>直屬主管</label><select id="ot_sup"><option value="">-- 請選擇主管 --</option>'+supOptions+'</select></div>'
+    +'<div class="fg"><label>加班原因</label><textarea id="ot_reason" placeholder="請說明加班事由..." style="min-height:80px"></textarea></div>'
+    +'<div id="otFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px"></div>';
   // 即時計算時數
   setTimeout(function(){
     function calcOtHours(){
@@ -5296,17 +5094,15 @@ window.submitOvertime=function(){
   var date=document.getElementById('ot_date')?document.getElementById('ot_date').value:'';
   var start=document.getElementById('ot_start')?document.getElementById('ot_start').value:'';
   var end=document.getElementById('ot_end')?document.getElementById('ot_end').value:'';
-  var supEmp=getBoundSupervisor(window.currentUser.id);
-  var supId=supEmp&&supEmp.id||'';
+  var supId=(document.getElementById('ot_sup')?document.getElementById('ot_sup').value:'')||'';
   var reason=(document.getElementById('ot_reason')?document.getElementById('ot_reason').value:'').trim();
   var errEl=document.getElementById('otFormErr');
-  if(!date){setFormError(errEl,'⚠️ 請選擇日期');return;}
-  if(!start||!end){setFormError(errEl,'⚠️ 請填寫時間');return;}
-  if(start>=end){setFormError(errEl,'⚠️ 結束時間必須晚於開始時間');return;}
-  if(!supId){setFormError(errEl,'⚠️ 請選擇直屬主管');return;}
-  if(!reason){setFormError(errEl,'⚠️ 請填寫加班原因');return;}
-  if(!getEmpById(supId)){setFormError(errEl,'⚠️ 找不到選取的審核主管，請重新選擇');return;}
-  setFormError(errEl,'');
+  if(!date){errEl.textContent='⚠️ 請選擇日期';errEl.style.display='block';return;}
+  if(!start||!end){errEl.textContent='⚠️ 請填寫時間';errEl.style.display='block';return;}
+  if(start>=end){errEl.textContent='⚠️ 結束時間必須晚於開始時間';errEl.style.display='block';return;}
+  if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
+  if(!reason){errEl.textContent='⚠️ 請填寫加班原因';errEl.style.display='block';return;}
+  errEl.style.display='none';
   // 計算時數（分鐘差 / 60）
   var sm=start.split(':'),em=end.split(':');
   var mins=(parseInt(em[0])*60+parseInt(em[1]))-(parseInt(sm[0])*60+parseInt(sm[1]));
@@ -5331,6 +5127,7 @@ window.submitOvertime=function(){
     empTab('overtime');
     updateEmpBadge();
     // 通知主管（LINE + Email）
+    var supEmp=window.getEmpById(supId);
     if(supEmp){
       var myLineIdOT=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.lineUserId||'':'';
       // LINE 通知主管（非自我通知才發）
@@ -5374,13 +5171,12 @@ window.openOTReview=function(id){
   if(!a) return;
   window._reviewingOTId=id;
   var empEmp=window.getEmpById(a.empId||'');
-  var eh=window.escapeHtml||function(s){return String(s||'');};
   var body='<div style="background:var(--bg);border-radius:12px;padding:13px;font-size:13px;line-height:1.9;margin-bottom:10px">'
-    +'<div>&#x1F464; <strong>'+eh(a.empName||'')+'</strong>'+(empEmp?' — '+eh(empEmp.dept):'')+'</div>'
-    +'<div>&#x1F4C5; '+eh(a.date)+'</div>'
-    +'<div>&#x23F0; 加班時間：'+eh(a.startTime)+' ~ '+eh(a.endTime)+' （<strong style="color:var(--orange)">'+a.hours.toFixed(1)+'h</strong>）</div>'
-    +'<div>&#x1F4DD; 原因：'+eh(a.reason||'--')+'</div>'
-    +'<div>&#x1F4E5; 申請時間：'+eh(a.appliedAt?a.appliedAt.slice(0,16):'')+'</div>'
+    +'<div>&#x1F464; <strong>'+(a.empName||'')+'</strong>'+(empEmp?' — '+empEmp.dept:'')+'</div>'
+    +'<div>&#x1F4C5; '+a.date+'</div>'
+    +'<div>&#x23F0; 加班時間：'+a.startTime+' ~ '+a.endTime+' （<strong style="color:var(--orange)">'+a.hours.toFixed(1)+'h</strong>）</div>'
+    +'<div>&#x1F4DD; 原因：'+(a.reason||'--')+'</div>'
+    +'<div>&#x1F4E5; 申請時間：'+(a.appliedAt?a.appliedAt.slice(0,16):'')+'</div>'
     +'</div>';
   // 本月累計提示
   var ym=a.date?a.date.slice(0,7):'';
@@ -5554,7 +5350,7 @@ window.exportEmployeesExcel=function(){
   // 設定欄寬
   ws['!cols']=[{wch:12},{wch:10},{wch:12},{wch:14},{wch:8},{wch:6},{wch:10},{wch:22},{wch:14},{wch:5},{wch:12},{wch:12},{wch:8},{wch:12},{wch:10},{wch:12},{wch:14},{wch:16}];
   XLSX.utils.book_append_sheet(wb,ws,'員工資料');
-  var fn='員工資料_'+getTodayInputValue()+'.xlsx';
+  var fn='員工資料_'+new Date().toISOString().slice(0,10)+'.xlsx';
   XLSX.writeFile(wb,fn);
   toast('📥','員工資料已匯出：'+fn);
 };
@@ -5582,35 +5378,10 @@ window.exportLeaveBalanceExcel=function(){
   var ws=XLSX.utils.aoa_to_sheet([headers].concat(rows));
   ws['!cols']=[{wch:12},{wch:10},{wch:12}].concat(KEYS.map(function(){return {wch:9};})).concat(KEYS.map(function(){return {wch:9};})).concat([{wch:18}]);
   XLSX.utils.book_append_sheet(wb,ws,'假別餘額');
-  var fn='假別餘額_'+getTodayInputValue()+'.xlsx';
+  var fn='假別餘額_'+new Date().toISOString().slice(0,10)+'.xlsx';
   XLSX.writeFile(wb,fn);
   toast('📥','假別餘額已匯出：'+fn);
 };
-
-function syncLegacyBindings(){
-  try{
-    if(window.doLogin&&typeof doLogin==='function')doLogin=window.doLogin;
-    if(window.doLogout&&typeof doLogout==='function')doLogout=window.doLogout;
-    if(window.openPunch&&typeof openPunch==='function')openPunch=window.openPunch;
-    if(window.getGPS&&typeof getGPS==='function')getGPS=window.getGPS;
-    if(window.confirmPunch&&typeof confirmPunch==='function')confirmPunch=window.confirmPunch;
-    if(window.submitLeave&&typeof submitLeave==='function')submitLeave=window.submitLeave;
-    if(window.confirmMakeupGps&&typeof confirmMakeupGps==='function')confirmMakeupGps=window.confirmMakeupGps;
-    if(window.changePassword&&typeof changePassword==='function')changePassword=window.changePassword;
-    if(window.saveSettings&&typeof saveSettings==='function')saveSettings=window.saveSettings;
-    if(window.saveQuota&&typeof saveQuota==='function')saveQuota=window.saveQuota;
-    if(window.saveEmp&&typeof saveEmp==='function')saveEmp=window.saveEmp;
-    if(window.doAddEmp&&typeof doAddEmp==='function')doAddEmp=window.doAddEmp;
-    if(window.openReview&&typeof openReview==='function')openReview=window.openReview;
-    if(window.openMakeupReview&&typeof openMakeupReview==='function')openMakeupReview=window.openMakeupReview;
-    if(window.doReview&&typeof doReview==='function')doReview=window.doReview;
-    if(window.openOvertimeSheet&&typeof openOvertimeSheet==='function')openOvertimeSheet=window.openOvertimeSheet;
-    if(window.submitOvertime&&typeof submitOvertime==='function')submitOvertime=window.submitOvertime;
-  }catch(e){
-    console.warn('[syncLegacyBindings]',e);
-  }
-}
-syncLegacyBindings();
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
 window.seedData();
