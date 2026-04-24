@@ -1687,8 +1687,11 @@ function renderApprove(s){
     if(a.status==='sup_approved' && isHR) return true;
     return false;
   });
-  const doneLeave=apps.filter(a=>a.status==='approved'||a.status==='rejected');
-  const waiting=apps.filter(a=>a.status==='pending'&&a.supId!==myId);
+  // 管理員看全公司，主管只看自己審過的（supId===myId）
+  const mgrScope=function(a){return isHR||a.supId===myId;};
+  const doneLeave=apps.filter(function(a){return (a.status==='approved'||a.status==='rejected')&&mgrScope(a);});
+  // 「等待其他主管」只給 admin 看（主管不需要窺看其他部門的待審）
+  const waiting=isHR?apps.filter(function(a){return a.status==='pending'&&a.supId!==myId;}):[];
 
   var mkps=getMakeupApps();
   var myMakeup=mkps.filter(function(a){
@@ -1696,11 +1699,11 @@ function renderApprove(s){
     if(a.status==='sup_approved' && isHR) return true;
     return false;
   });
-  var doneMakeup=mkps.filter(function(a){return a.status==='approved'||a.status==='rejected';});
+  var doneMakeup=mkps.filter(function(a){return (a.status==='approved'||a.status==='rejected')&&mgrScope(a);});
 
   var otas=(window.getOvertimeApps?window.getOvertimeApps():[]);
   var myOT=otas.filter(function(a){return a.status==='pending'&&a.supId===myId;});
-  var doneOT=otas.filter(function(a){return a.status==='approved'||a.status==='rejected';});
+  var doneOT=otas.filter(function(a){return (a.status==='approved'||a.status==='rejected')&&mgrScope(a);});
 
   // ── 篩選邏輯 ──
   function apfApply(items,dateField){
