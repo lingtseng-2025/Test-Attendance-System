@@ -1761,30 +1761,34 @@ function renderApprove(s){
   function renderLeaveCard(a){
     var sc=a.status==='approved'?'var(--green)':'var(--pd)';
     var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
-    return '<div class="list-row">'
+    var supE=getEmpById(a.supId||'');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<div class="list-row" style="border:none;padding:0">'
       +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+escapeHtml(a.empName[0]||'?')+'</div>'
       +'<div class="lr-info">'
       +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
       +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
-      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
-      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
       +'</div>'
       +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>'
+      +'<div style="margin:6px 0 2px 46px">'+(typeof renderStageResults==='function'?renderStageResults(a, supE?supE.name:''):'')+'</div>'
       +'</div>';
   }
   function renderMakeupCard(a){
     var tl=a.punchType==='in'?'上班打卡':'下班打卡';
     var sc=a.status==='approved'?'var(--green)':'var(--pd)';
     var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
-    return '<div class="list-row">'
+    var supE=getEmpById(a.supId||'');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<div class="list-row" style="border:none;padding:0">'
       +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x1F527;</div>'
       +'<div class="lr-info">'
       +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+tl+'</div>'
       +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
-      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
-      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
       +'</div>'
       +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>'
+      +'<div style="margin:6px 0 2px 46px">'+(typeof renderStageResults==='function'?renderStageResults(a, supE?supE.name:''):'')+'</div>'
       +'</div>';
   }
   function renderOTCard(a){
@@ -1823,7 +1827,20 @@ function renderApprove(s){
     doneMakeup.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
     doneOT.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
     var years=Object.keys(ys).sort().reverse();
-    var emps=getEmps().slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','zh-TW');});
+    // 員工下拉：admin 看全部；manager 看「自己目前下屬 + 歷史上自己審過的員工」
+    // 後者涵蓋「原本 sup_id=M，但員工已換主管給 B」的邊界狀況，讓 M 仍能篩到自己審過的歷史
+    var emps;
+    if(isHR){
+      emps=getEmps().slice();
+    } else {
+      var ids={};
+      doneLeave.forEach(function(a){if(a.empId)ids[a.empId]=1;});
+      doneMakeup.forEach(function(a){if(a.empId)ids[a.empId]=1;});
+      doneOT.forEach(function(a){if(a.empId)ids[a.empId]=1;});
+      getEmps().forEach(function(e){if(e.supervisorId===myId)ids[e.id]=1;});
+      emps=getEmps().filter(function(e){return ids[e.id];});
+    }
+    emps=emps.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','zh-TW');});
     var hasFilter=f.year!=='all'||f.empId!=='all'||f.status!=='all'||f.name;
     var selStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;cursor:pointer';
     var inpStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;flex:1;min-width:140px';
