@@ -1138,119 +1138,6 @@ function recentRows(emp,limit){
   }).join('');
 }
 
-// ── Employee Apply Page（請假/補打卡/加班 整合頁） ─────────
-// Phase 2: 把原本三個獨立 sheet 的表單整合成單一 page，頂部 sub-tabs 切換
-// 安全性：不動 submit 邏輯，只搬版面；表單 id 跟原本完全相同
-function renderApplyPage(s){
-  var sub=window._applyTab||'leave';
-  if(['leave','makeup','overtime'].indexOf(sub)===-1) sub='leave';
-  var today=getLocalDateString();
-
-  function tabPill(key,label){
-    var active=key===sub;
-    return '<button onclick="window._applyTab=\''+key+'\';renderApplyPage(document.getElementById(\'empScroll\'));" '
-      +'style="flex:1;padding:10px 6px;border:none;border-bottom:2px solid '+(active?'var(--pd)':'transparent')+';'
-      +'background:transparent;color:'+(active?'var(--pd)':'var(--t3)')+';font-size:13px;font-weight:'+(active?800:600)+';cursor:pointer">'
-      +label+'</button>';
-  }
-
-  var headerHtml='<div class="pc-page-header" style="margin-bottom:10px">'
-    +'<div><div class="pc-page-title">&#x270D;&#xFE0F; 申請表單</div><div class="pc-page-sub">送出後可在「申請狀態」頁查看進度</div></div>'
-    +'</div>'
-    +'<div class="card fu" style="display:flex;padding:0;margin-bottom:14px;overflow:hidden">'
-    +tabPill('leave','&#x1F334; 請假')
-    +tabPill('makeup','&#x1F527; 補打卡')
-    +tabPill('overtime','&#x23F0; 加班')
-    +'</div>';
-
-  var bodyHtml='', footerHtml='';
-  if(sub==='leave'){
-    bodyHtml=''
-      +'<div class="fg"><label>假期類型</label><select id="lType">'
-      +'<option value="annual">&#x1F334; 特休假</option>'
-      +'<option value="sick">&#x1F912; 病假</option>'
-      +'<option value="personal">&#x1F389; 事假</option>'
-      +'<option value="marriage">&#x1F490; 婚假</option>'
-      +'<option value="funeral">&#x1F622; 喪假</option>'
-      +'<option value="official">&#x1F3DB; 公假</option>'
-      +'<option value="menstrual">&#x1F338; 生理假</option>'
-      +'<option value="maternity">&#x1F931; 產假</option>'
-      +'<option value="paternity">&#x1F476; 陪產假</option>'
-      +'<option value="parental">&#x1F331; 育嬰留職停薪</option>'
-      +'<option value="makeup">&#x1F504; 補休</option>'
-      +'</select></div>'
-      +'<div class="fr2">'
-      +'<div class="fg"><label>開始日期</label><input type="date" id="lStart" value="'+today+'"></div>'
-      +'<div class="fg"><label>結束日期</label><input type="date" id="lEnd" value="'+today+'"></div>'
-      +'</div>'
-      +renderBoundSupervisorField(currentUser.id,'lSup')
-      +'<div class="fg"><label>代理人</label><input id="lProxy" placeholder="代理人姓名"></div>'
-      +'<div class="fg"><label>請假原因</label><textarea id="lReason" placeholder="請說明原因..."></textarea></div>'
-      +'<div class="fg"><label>附件（選填，如診斷書）</label>'
-      +'<input type="file" id="lAttach" accept="image/*,.pdf" style="font-size:13px;padding:8px">'
-      +'<div style="font-size:10px;color:var(--t3);margin-top:4px">支援圖片或 PDF（5MB 以內）</div>'
-      +'</div>'
-      +'<div id="leaveFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:8px"></div>';
-    footerHtml='<button class="sbtn confirm" style="width:100%;padding:14px" onclick="submitLeave()">&#x1F4E4; 送出請假申請</button>';
-  }
-  else if(sub==='makeup'){
-    bodyHtml=''
-      +'<div style="background:var(--ol);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--orange);line-height:1.6">'
-      +'&#x26A0;&#xFE0F; 補打卡需要<strong>現場定位驗證</strong>，系統會記錄申請時 GPS 座標，再送主管審核。'
-      +'</div>'
-      +'<div class="fg"><label>補打卡日期</label><input type="date" id="mk_date" value="'+today+'"></div>'
-      +'<div class="fr2">'
-      +'<div class="fg"><label>類型</label><select id="mk_type">'
-      +'<option value="in">&#x1F446; 上班打卡</option>'
-      +'<option value="out">&#x1F44B; 下班打卡</option>'
-      +'</select></div>'
-      +'<div class="fg"><label>實際時間</label><input type="time" id="mk_time"></div>'
-      +'</div>'
-      +renderBoundSupervisorField(currentUser.id,'mk_sup')
-      +'<div class="fg"><label>補打卡原因</label><textarea id="mk_reason" placeholder="請說明忘記打卡的原因..."></textarea></div>'
-      +'<div id="makeupFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:8px"></div>'
-      +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px">'
-      +'&#x1F4CD; 點「送出申請」後會先進行 GPS 定位驗證。'
-      +'</div>';
-    footerHtml='<button class="sbtn confirm" style="width:100%;padding:14px" onclick="submitMakeup()">&#x1F4E4; 送出補打卡申請</button>';
-  }
-  else { // overtime
-    bodyHtml=''
-      +'<div class="fg"><label>加班日期</label><input type="date" id="ot_date" value="'+today+'"></div>'
-      +'<div class="fr2">'
-      +'<div class="fg"><label>開始時間</label><input type="time" id="ot_start" value="18:00"></div>'
-      +'<div class="fg"><label>結束時間</label><input type="time" id="ot_end" value="20:00"></div>'
-      +'</div>'
-      +'<div class="fg" id="ot_hours_hint" style="background:var(--pl);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--pd)">預計加班時數：<strong id="ot_hours_val">2.0</strong> 小時</div>'
-      +renderBoundSupervisorField(currentUser.id,'ot_sup')
-      +'<div class="fg"><label>加班原因</label><textarea id="ot_reason" placeholder="請說明加班事由..." style="min-height:80px"></textarea></div>'
-      +'<div id="otFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:8px"></div>';
-    footerHtml='<button class="sbtn confirm" style="width:100%;padding:14px" onclick="submitOvertime()">&#x1F4E4; 送出加班申請</button>';
-  }
-
-  s.innerHTML=headerHtml
-    +'<div class="card fu fu1" style="margin-bottom:12px">'+bodyHtml+'</div>'
-    +'<div style="margin-bottom:80px">'+footerHtml+'</div>';
-
-  // 加班頁：即時計算時數（同原本邏輯）
-  if(sub==='overtime'){
-    setTimeout(function(){
-      function calcOtHours(){
-        var s2=document.getElementById('ot_start'),e2=document.getElementById('ot_end');
-        if(!s2||!e2) return;
-        var sm=s2.value.split(':'),em=e2.value.split(':');
-        if(sm.length<2||em.length<2) return;
-        var h=(parseInt(em[0])*60+parseInt(em[1]))-(parseInt(sm[0])*60+parseInt(sm[1]));
-        var hVal=document.getElementById('ot_hours_val');
-        if(hVal) hVal.textContent=(h>0?(h/60).toFixed(1):'0.0');
-      }
-      var st=document.getElementById('ot_start'),et=document.getElementById('ot_end');
-      if(st) st.addEventListener('change',calcOtHours);
-      if(et) et.addEventListener('change',calcOtHours);
-    },50);
-  }
-}
-
 // ── Employee Monthly ───────────────────────────────
 window.empMonthNav=function(dir){
   const now=new Date();
@@ -4236,7 +4123,7 @@ window.confirmMakeupGps=function(){
     } else {
       toast('✅','補打卡申請已送出！等待主管審核');
     }
-    if(window.currentUser.role==='employee')empTab('status'); // Phase 2：補打卡送出後直接切到申請狀態看結果
+    if(window.currentUser.role==='employee')empTab('clock');
     updateEmpBadge();
   });
 };
@@ -5011,7 +4898,7 @@ window.submitOvertime=function(){
   }},getAuthToken()).then(function(){return loadAllData();}).then(function(){
     closeSheet('overtimeSheet');
     toast('✅','加班申請已送出！');
-    empTab('status'); // Phase 2：加班送出後直接切到申請狀態看結果
+    empTab('overtime');
     updateEmpBadge();
     // 通知主管（LINE + Email）
     var supEmp=window.getEmpById(supId);
@@ -5048,7 +4935,7 @@ window.cancelOTApp=function(id){
   if(!confirm('確定要取消此加班申請嗎？')) return;
   edgeCall('cancelApp',{appType:'overtime',id:id},getAuthToken())
     .then(function(){return loadAllData();})
-    .then(function(){toast('✅','加班申請已取消');empTab('status');updateEmpBadge();})
+    .then(function(){toast('✅','加班申請已取消');empTab('overtime');updateEmpBadge();})
     .catch(function(e){toast('❌','取消失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
