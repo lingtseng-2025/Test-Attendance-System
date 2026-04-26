@@ -480,12 +480,13 @@ body.admin-mode > #adminScreen{
   </div>
   <div class="scroll" id="empScroll"></div>
   <div class="tabbar" id="empTabbar">
-    <div class="tb-item active" id="etab-clock" onclick="empTab('clock')"><div class="tbi">🏠</div><span>首頁</span></div>
+    <div class="tb-item active" id="etab-clock" onclick="empTab('clock')"><div class="tbi">🕐</div><span>打卡</span></div>
     <div class="tb-item" id="etab-monthly" onclick="empTab('monthly')"><div class="tbi">📊</div><span>月報</span></div>
-    <div class="tb-item" id="etab-apply" onclick="empTab('apply')"><div class="tbi">✍️</div><span>申請</span></div>
-    <div class="tb-item" id="etab-status" onclick="empTab('status')"><div class="tbi">📋</div><span>申請狀態</span><span class="tb-badge" id="empLeaveBadge" style="display:none">0</span></div>
-    <div class="tb-item" id="etab-approve" onclick="empTab('approve')" style="display:none"><div class="tbi">⏳</div><span>待我審核</span><span class="tb-badge" id="empMgrApproveBadge" style="display:none">0</span></div>
-    <div class="tb-item" id="etab-profile" onclick="empTab('profile')"><div class="tbi">👤</div><span>我的</span></div>
+    <div class="tb-item" id="etab-leave" onclick="empTab('leave')"><div class="tbi">🌴</div><span>申請假</span></div>
+    <div class="tb-item" id="etab-status" onclick="empTab('status')"><div class="tbi">📋</div><span>假期狀態</span><span class="tb-badge" id="empLeaveBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-overtime" onclick="empTab('overtime')"><div class="tbi">⏰</div><span>加班</span><span class="tb-badge" id="empOTBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-approve" onclick="empTab('approve')" style="display:none"><div class="tbi">✍️</div><span>待我審核</span><span class="tb-badge" id="empMgrApproveBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-profile" onclick="empTab('profile')"><div class="tbi">👤</div><span>帳號</span></div>
   </div>
 </div>
 
@@ -896,24 +897,15 @@ let currentEmpTab='clock';
 function empTab(tab){
   const prevTab=currentEmpTab;
   currentEmpTab=tab;
-  // 容錯：若新 tab id 不存在（例如使用者從舊書籤進來），fallback 到首頁
-  var tabEl=document.getElementById('etab-'+tab);
-  if(!tabEl){tab='clock';tabEl=document.getElementById('etab-clock');currentEmpTab='clock';}
   document.querySelectorAll('#empTabbar .tb-item').forEach(t=>t.classList.remove('active'));
-  tabEl.classList.add('active');
+  document.getElementById('etab-'+tab).classList.add('active');
   const s=document.getElementById('empScroll');
   s.innerHTML='';
   if(tab==='clock') renderEmpClock(s);
   else if(tab==='monthly'){if(prevTab!=='monthly') window._empMonthSel=null; renderEmpMonthly(s);}
-  else if(tab==='apply'){
-    // Phase 2 將實作；目前仍使用既有 renderLeaveList 暫時佔位（保留可用）
-    if(typeof renderApplyPage==='function') renderApplyPage(s);
-    else renderLeaveList(s);
-  }
+  else if(tab==='leave') renderLeaveList(s);
   else if(tab==='status') renderLeaveStatus(s);
   else if(tab==='quota') renderQuota(s);
-  // 舊 tab 名稱保留，若有外部連結還能用：
-  else if(tab==='leave') renderLeaveList(s);
   else if(tab==='overtime') renderOvertimeSection(s);
   else if(tab==='approve'){
     // 主管專用：重用 admin 的 renderApprove（後端 reviewApp 會根據 role 擋第 2 層）
@@ -961,88 +953,18 @@ function renderEmpClock(s){
   s.innerHTML=[
     buildPunchCard(inT,outT,hours,OT,emp),
     buildInfoGrid(inT,outT,mRecs.length,mOT),
-    '<div class="sec-title fu fu2"><span>&#x1F4DD; 最近活動</span></div>',
-    '<div class="card fu fu2" id="recentRowsContainer"></div>'
+    '<div class="sec-title fu fu2"><span>&#x1F4CB; 最近打卡</span></div>',
+    '<div class="card fu fu2" id="recentRowsContainer"></div>',
+    '<div class="sec-title fu fu3"><span>&#x1F527; 補打卡申請</span></div>',
+    '<div class="card fu fu3" onclick="openMakeupSheet()" style="cursor:pointer;display:flex;align-items:center;gap:12px;border:1.5px dashed var(--border)">',
+    '<div style="width:40px;height:40px;border-radius:12px;background:var(--ol);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">&#x1F527;</div>',
+    '<div><div style="font-size:13px;font-weight:700">忘記打卡？申請補打卡</div>',
+    '<div style="font-size:11px;color:var(--t3);margin-top:2px">需定位驗證 + 主管審核</div></div>',
+    '<div style="margin-left:auto;color:var(--t3);font-size:18px">›</div></div>'
   ].join('');
 
-  document.getElementById('recentRowsContainer').innerHTML=buildRecentActivity(emp,8);
+  document.getElementById('recentRowsContainer').innerHTML=recentRows(emp,5);
   startPunchClock(inT,outT,emp.workRule);
-}
-
-// 首頁「最近活動」時間軸：打卡紀錄 + 申請事件 混合排序，取最新 N 筆
-// 不影響安全性：只讀員工自己（empId === currentUser.id）的資料
-function buildRecentActivity(emp,limit){
-  var events=[]; // {ts, icon, color, title, sub}
-  var myId=currentUser.id;
-
-  // 打卡事件：上班 + 下班 各算一筆
-  var recs=getRecs().filter(function(r){return r.empId===myId;});
-  recs.forEach(function(r){
-    if(r.in){
-      var off=(r.gpsIn&&r.gpsIn.office)?'📍 '+r.gpsIn.office:'';
-      events.push({ts:r.in,icon:'✓',color:'var(--green)',title:'上班打卡成功',sub:off||fmtTime(r.in)});
-    }
-    if(r.out){
-      var h=calcHours(r.in,r.out,emp.workRule);
-      events.push({ts:r.out,icon:'✓',color:'var(--blue)',title:'下班打卡成功',sub:'工時 '+h.toFixed(1)+'h'});
-    }
-  });
-
-  // 請假申請事件
-  getApps().filter(function(a){return a.empId===myId&&a.status!=='cancelled';}).forEach(function(a){
-    var label=(typeof LEAVE_LABEL!=='undefined'&&LEAVE_LABEL[a.type])?LEAVE_LABEL[a.type]:a.type;
-    var period=a.startDate+(a.startDate!==a.endDate?'~'+a.endDate:'')+(a.days?' · '+a.days+'天':'');
-    if(a.appliedAt) events.push({ts:a.appliedAt,icon:'📝',color:'var(--pd)',title:'請假申請已送出',sub:label+' '+period});
-    if(a.supReviewedAt && a.status!=='pending') events.push({ts:a.supReviewedAt,icon:a.status==='rejected'&&a.stage==='sup'?'❌':'⏳',color:a.status==='rejected'&&a.stage==='sup'?'var(--pd)':'var(--blue)',title:a.status==='rejected'&&a.stage==='sup'?'請假申請被拒（主管）':'請假主管已初審',sub:label+' '+period});
-    if(a.hrReviewedAt && (a.status==='approved'||(a.status==='rejected'&&a.stage==='hr'))) events.push({ts:a.hrReviewedAt,icon:a.status==='approved'?'✅':'❌',color:a.status==='approved'?'var(--green)':'var(--pd)',title:a.status==='approved'?'請假申請已核准':'請假申請被拒（HR）',sub:label+' '+period});
-  });
-
-  // 補打卡申請事件
-  getMakeupApps().filter(function(a){return a.empId===myId&&a.status!=='cancelled';}).forEach(function(a){
-    var tl=a.punchType==='in'?'上班':'下班';
-    var sub='補'+tl+' '+a.date+' '+a.punchTime;
-    if(a.appliedAt) events.push({ts:a.appliedAt,icon:'🔧',color:'var(--orange)',title:'補打卡申請已送出',sub:sub});
-    if(a.supReviewedAt && a.status!=='pending') events.push({ts:a.supReviewedAt,icon:a.status==='rejected'&&a.stage==='sup'?'❌':'⏳',color:a.status==='rejected'&&a.stage==='sup'?'var(--pd)':'var(--blue)',title:a.status==='rejected'&&a.stage==='sup'?'補打卡被拒（主管）':'補打卡主管已初審',sub:sub});
-    if(a.hrReviewedAt && (a.status==='approved'||(a.status==='rejected'&&a.stage==='hr'))) events.push({ts:a.hrReviewedAt,icon:a.status==='approved'?'✅':'❌',color:a.status==='approved'?'var(--green)':'var(--pd)',title:a.status==='approved'?'補打卡已核准':'補打卡被拒（HR）',sub:sub});
-  });
-
-  // 加班申請事件
-  var otas=window.getOvertimeApps?window.getOvertimeApps():(window.DB&&DB.otas)||[];
-  otas.filter(function(a){return a.empId===myId&&a.status!=='cancelled';}).forEach(function(a){
-    var sub='加班 '+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)';
-    if(a.appliedAt) events.push({ts:a.appliedAt,icon:'⏰',color:'var(--orange)',title:'加班申請已送出',sub:sub});
-    if(a.supReviewedAt) events.push({ts:a.supReviewedAt,icon:a.status==='approved'?'✅':a.status==='rejected'?'❌':'⏳',color:a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':'var(--blue)',title:a.status==='approved'?'加班申請已核准':a.status==='rejected'?'加班申請被拒':'加班主管已審核',sub:sub});
-  });
-
-  if(!events.length) return '<div style="text-align:center;padding:18px;color:var(--t3);font-size:13px">目前無紀錄</div>';
-
-  // 依時間倒序，取最新 N 筆
-  events.sort(function(a,b){return (b.ts||'').localeCompare(a.ts||'');});
-  events=events.slice(0,limit);
-
-  return events.map(function(ev){
-    var d=ev.ts?new Date(ev.ts):null;
-    var todayKey2=(typeof getLocalDateString==='function')?getLocalDateString():new Date().toISOString().slice(0,10);
-    var evDateKey=d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'):'';
-    var when='';
-    if(d){
-      if(evDateKey===todayKey2){when=fmtTime(ev.ts);}
-      else{
-        var y=new Date();y.setDate(y.getDate()-1);
-        var yKey=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
-        if(evDateKey===yKey){when='昨天 '+fmtTime(ev.ts);}
-        else{when=(d.getMonth()+1)+'/'+d.getDate();}
-      }
-    }
-    return '<div class="list-row">'
-      +'<div class="lr-av" style="background:'+ev.color+'22;color:'+ev.color+';font-size:14px">'+ev.icon+'</div>'
-      +'<div class="lr-info">'
-      +'<div class="lr-name" style="font-size:13px">'+escapeHtml(ev.title)+'</div>'
-      +(ev.sub?'<div class="lr-sub">'+escapeHtml(ev.sub)+'</div>':'')
-      +'</div>'
-      +'<div style="font-size:11px;color:var(--t3);white-space:nowrap;align-self:center">'+escapeHtml(when)+'</div>'
-      +'</div>';
-  }).join('');
 }
 
 
@@ -1272,15 +1194,9 @@ function renderStageResults(a, supName){
   else if(a.status==='sup_approved'){s1='approved';s2='pending';}
   else if(a.status==='approved'){s1='approved';s2='approved';}
   else if(a.status==='rejected'){
-    // 優先用 a.stage 判斷；若 stage 欄位缺失（極舊資料），fallback 用兩個 timestamp 是否不同
-    // Edge Function 規則：第1層拒絕時 sup/hr 時間戳同時設為 now；第2層拒絕時 sup 時間不變、hr 時間才更新
+    // stage='hr' 表示已通過第1層後才被第2層拒絕；stage='sup' 表示第1層就拒絕
     if(a.stage==='hr'){s1='approved';s2='rejected';}
-    else if(a.stage==='sup'){s1='rejected';s2='skipped';}
-    else if(a.supReviewedAt && a.hrReviewedAt && a.supReviewedAt!==a.hrReviewedAt){
-      s1='approved';s2='rejected';
-    } else {
-      s1='rejected';s2='skipped';
-    }
+    else{s1='rejected';s2='skipped';}
   }
   else return ''; // cancelled
   return stageBlock('第1層 直屬主管',s1,supName||'',a.supReviewedAt,a.supNote)
