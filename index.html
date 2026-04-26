@@ -1149,17 +1149,16 @@ function renderApplyPage(s){
 
   function tabPill(key,label){
     var active=key===sub;
-    // 用 div 而非 button，避免可能的全域 button 樣式干擾
+    // 用 grid cell 取代 inline-block：更不容易被父層 font-size:0 / line-height 干擾
     return '<div onclick="window._applyTab=\''+key+'\';renderApplyPage(document.getElementById(\'empScroll\'));" '
-      +'style="display:inline-block;width:33.33%;box-sizing:border-box;padding:14px 8px;text-align:center;'
-      +'border-bottom:3px solid '+(active?'#3526c0':'transparent')+';'
-      +'background:'+(active?'#e8e6fb':'#fff')+';color:'+(active?'#3526c0':'#565657')+';'
-      +'font-size:14px;font-weight:'+(active?800:600)+';cursor:pointer;user-select:none">'
+      +'style="padding:14px 8px;text-align:center;cursor:pointer;user-select:none;line-height:1.4;'
+      +'background:'+(active?'#3526c0':'#f5f3fb')+';color:'+(active?'#fff':'#3526c0')+';'
+      +'font-size:14px;font-weight:'+(active?800:700)+';">'
       +label+'</div>';
   }
 
-  // tab 列容器：用 inline-block 並硬編碼顏色，避開 CSS 變數與 .card class 干擾
-  var tabsHtml='<div data-applytabs="1" style="width:100%;background:#fff;border:1.5px solid #b8b3e8;border-radius:14px;overflow:hidden;margin-bottom:14px;font-size:0;white-space:nowrap">';
+  // tab 列容器：用 CSS Grid 三等分，避開 inline-block 的 line-height / font-size 問題
+  var tabsHtml='<div data-applytabs="1" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2px;background:#b8b3e8;border:1.5px solid #b8b3e8;border-radius:14px;overflow:hidden;margin-bottom:14px">';
   tabsHtml+=tabPill('leave','&#x1F334; 請假');
   tabsHtml+=tabPill('makeup','&#x1F527; 補打卡');
   tabsHtml+=tabPill('overtime','&#x23F0; 加班');
