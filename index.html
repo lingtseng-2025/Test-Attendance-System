@@ -1150,15 +1150,16 @@ function renderApplyPage(s){
   function tabPill(key,label){
     var active=key===sub;
     return '<button onclick="window._applyTab=\''+key+'\';renderApplyPage(document.getElementById(\'empScroll\'));" '
-      +'style="flex:1;padding:10px 6px;border:none;border-bottom:2px solid '+(active?'var(--pd)':'transparent')+';'
-      +'background:transparent;color:'+(active?'var(--pd)':'var(--t3)')+';font-size:13px;font-weight:'+(active?800:600)+';cursor:pointer">'
+      +'style="flex:1 1 0;min-width:0;padding:12px 8px;border:none;border-bottom:3px solid '+(active?'var(--pd)':'transparent')+';'
+      +'background:'+(active?'var(--pl)':'#fff')+';color:'+(active?'var(--pd)':'var(--t2)')+';font-size:14px;font-weight:'+(active?800:600)+';cursor:pointer;transition:all .15s">'
       +label+'</button>';
   }
 
   var headerHtml='<div class="pc-page-header" style="margin-bottom:10px">'
     +'<div><div class="pc-page-title">&#x270D;&#xFE0F; 申請表單</div><div class="pc-page-sub">送出後可在「申請狀態」頁查看進度</div></div>'
     +'</div>'
-    +'<div class="card fu" style="display:flex;padding:0;margin-bottom:14px;overflow:hidden">'
+    // 用獨立 div + inline style，避免 .card class 干擾 display:flex
+    +'<div style="display:flex;width:100%;background:#fff;border:1.5px solid var(--border);border-radius:14px;overflow:hidden;margin-bottom:14px">'
     +tabPill('leave','&#x1F334; 請假')
     +tabPill('makeup','&#x1F527; 補打卡')
     +tabPill('overtime','&#x23F0; 加班')
