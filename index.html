@@ -480,13 +480,12 @@ body.admin-mode > #adminScreen{
   </div>
   <div class="scroll" id="empScroll"></div>
   <div class="tabbar" id="empTabbar">
-    <div class="tb-item active" id="etab-clock" onclick="empTab('clock')"><div class="tbi">🕐</div><span>打卡</span></div>
+    <div class="tb-item active" id="etab-clock" onclick="empTab('clock')"><div class="tbi">🏠</div><span>首頁</span></div>
     <div class="tb-item" id="etab-monthly" onclick="empTab('monthly')"><div class="tbi">📊</div><span>月報</span></div>
-    <div class="tb-item" id="etab-leave" onclick="empTab('leave')"><div class="tbi">🌴</div><span>申請假</span></div>
-    <div class="tb-item" id="etab-status" onclick="empTab('status')"><div class="tbi">📋</div><span>假期狀態</span><span class="tb-badge" id="empLeaveBadge" style="display:none">0</span></div>
-    <div class="tb-item" id="etab-overtime" onclick="empTab('overtime')"><div class="tbi">⏰</div><span>加班</span><span class="tb-badge" id="empOTBadge" style="display:none">0</span></div>
-    <div class="tb-item" id="etab-approve" onclick="empTab('approve')" style="display:none"><div class="tbi">✍️</div><span>待我審核</span><span class="tb-badge" id="empMgrApproveBadge" style="display:none">0</span></div>
-    <div class="tb-item" id="etab-profile" onclick="empTab('profile')"><div class="tbi">👤</div><span>帳號</span></div>
+    <div class="tb-item" id="etab-apply" onclick="empTab('apply')"><div class="tbi">✍️</div><span>申請</span></div>
+    <div class="tb-item" id="etab-status" onclick="empTab('status')"><div class="tbi">📋</div><span>申請狀態</span><span class="tb-badge" id="empLeaveBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-approve" onclick="empTab('approve')" style="display:none"><div class="tbi">⏳</div><span>待我審核</span><span class="tb-badge" id="empMgrApproveBadge" style="display:none">0</span></div>
+    <div class="tb-item" id="etab-profile" onclick="empTab('profile')"><div class="tbi">👤</div><span>我的</span></div>
   </div>
 </div>
 
@@ -897,15 +896,24 @@ let currentEmpTab='clock';
 function empTab(tab){
   const prevTab=currentEmpTab;
   currentEmpTab=tab;
+  // 容錯：若新 tab id 不存在（例如使用者從舊書籤進來），fallback 到首頁
+  var tabEl=document.getElementById('etab-'+tab);
+  if(!tabEl){tab='clock';tabEl=document.getElementById('etab-clock');currentEmpTab='clock';}
   document.querySelectorAll('#empTabbar .tb-item').forEach(t=>t.classList.remove('active'));
-  document.getElementById('etab-'+tab).classList.add('active');
+  tabEl.classList.add('active');
   const s=document.getElementById('empScroll');
   s.innerHTML='';
   if(tab==='clock') renderEmpClock(s);
   else if(tab==='monthly'){if(prevTab!=='monthly') window._empMonthSel=null; renderEmpMonthly(s);}
-  else if(tab==='leave') renderLeaveList(s);
+  else if(tab==='apply'){
+    // Phase 2 將實作；目前仍使用既有 renderLeaveList 暫時佔位（保留可用）
+    if(typeof renderApplyPage==='function') renderApplyPage(s);
+    else renderLeaveList(s);
+  }
   else if(tab==='status') renderLeaveStatus(s);
   else if(tab==='quota') renderQuota(s);
+  // 舊 tab 名稱保留，若有外部連結還能用：
+  else if(tab==='leave') renderLeaveList(s);
   else if(tab==='overtime') renderOvertimeSection(s);
   else if(tab==='approve'){
     // 主管專用：重用 admin 的 renderApprove（後端 reviewApp 會根據 role 擋第 2 層）
@@ -953,18 +961,88 @@ function renderEmpClock(s){
   s.innerHTML=[
     buildPunchCard(inT,outT,hours,OT,emp),
     buildInfoGrid(inT,outT,mRecs.length,mOT),
-    '<div class="sec-title fu fu2"><span>&#x1F4CB; 最近打卡</span></div>',
-    '<div class="card fu fu2" id="recentRowsContainer"></div>',
-    '<div class="sec-title fu fu3"><span>&#x1F527; 補打卡申請</span></div>',
-    '<div class="card fu fu3" onclick="openMakeupSheet()" style="cursor:pointer;display:flex;align-items:center;gap:12px;border:1.5px dashed var(--border)">',
-    '<div style="width:40px;height:40px;border-radius:12px;background:var(--ol);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">&#x1F527;</div>',
-    '<div><div style="font-size:13px;font-weight:700">忘記打卡？申請補打卡</div>',
-    '<div style="font-size:11px;color:var(--t3);margin-top:2px">需定位驗證 + 主管審核</div></div>',
-    '<div style="margin-left:auto;color:var(--t3);font-size:18px">›</div></div>'
+    '<div class="sec-title fu fu2"><span>&#x1F4DD; 最近活動</span></div>',
+    '<div class="card fu fu2" id="recentRowsContainer"></div>'
   ].join('');
 
-  document.getElementById('recentRowsContainer').innerHTML=recentRows(emp,5);
+  document.getElementById('recentRowsContainer').innerHTML=buildRecentActivity(emp,8);
   startPunchClock(inT,outT,emp.workRule);
+}
+
+// 首頁「最近活動」時間軸：打卡紀錄 + 申請事件 混合排序，取最新 N 筆
+// 不影響安全性：只讀員工自己（empId === currentUser.id）的資料
+function buildRecentActivity(emp,limit){
+  var events=[]; // {ts, icon, color, title, sub}
+  var myId=currentUser.id;
+
+  // 打卡事件：上班 + 下班 各算一筆
+  var recs=getRecs().filter(function(r){return r.empId===myId;});
+  recs.forEach(function(r){
+    if(r.in){
+      var off=(r.gpsIn&&r.gpsIn.office)?'📍 '+r.gpsIn.office:'';
+      events.push({ts:r.in,icon:'✓',color:'var(--green)',title:'上班打卡成功',sub:off||fmtTime(r.in)});
+    }
+    if(r.out){
+      var h=calcHours(r.in,r.out,emp.workRule);
+      events.push({ts:r.out,icon:'✓',color:'var(--blue)',title:'下班打卡成功',sub:'工時 '+h.toFixed(1)+'h'});
+    }
+  });
+
+  // 請假申請事件
+  getApps().filter(function(a){return a.empId===myId&&a.status!=='cancelled';}).forEach(function(a){
+    var label=(typeof LEAVE_LABEL!=='undefined'&&LEAVE_LABEL[a.type])?LEAVE_LABEL[a.type]:a.type;
+    var period=a.startDate+(a.startDate!==a.endDate?'~'+a.endDate:'')+(a.days?' · '+a.days+'天':'');
+    if(a.appliedAt) events.push({ts:a.appliedAt,icon:'📝',color:'var(--pd)',title:'請假申請已送出',sub:label+' '+period});
+    if(a.supReviewedAt && a.status!=='pending') events.push({ts:a.supReviewedAt,icon:a.status==='rejected'&&a.stage==='sup'?'❌':'⏳',color:a.status==='rejected'&&a.stage==='sup'?'var(--pd)':'var(--blue)',title:a.status==='rejected'&&a.stage==='sup'?'請假申請被拒（主管）':'請假主管已初審',sub:label+' '+period});
+    if(a.hrReviewedAt && (a.status==='approved'||(a.status==='rejected'&&a.stage==='hr'))) events.push({ts:a.hrReviewedAt,icon:a.status==='approved'?'✅':'❌',color:a.status==='approved'?'var(--green)':'var(--pd)',title:a.status==='approved'?'請假申請已核准':'請假申請被拒（HR）',sub:label+' '+period});
+  });
+
+  // 補打卡申請事件
+  getMakeupApps().filter(function(a){return a.empId===myId&&a.status!=='cancelled';}).forEach(function(a){
+    var tl=a.punchType==='in'?'上班':'下班';
+    var sub='補'+tl+' '+a.date+' '+a.punchTime;
+    if(a.appliedAt) events.push({ts:a.appliedAt,icon:'🔧',color:'var(--orange)',title:'補打卡申請已送出',sub:sub});
+    if(a.supReviewedAt && a.status!=='pending') events.push({ts:a.supReviewedAt,icon:a.status==='rejected'&&a.stage==='sup'?'❌':'⏳',color:a.status==='rejected'&&a.stage==='sup'?'var(--pd)':'var(--blue)',title:a.status==='rejected'&&a.stage==='sup'?'補打卡被拒（主管）':'補打卡主管已初審',sub:sub});
+    if(a.hrReviewedAt && (a.status==='approved'||(a.status==='rejected'&&a.stage==='hr'))) events.push({ts:a.hrReviewedAt,icon:a.status==='approved'?'✅':'❌',color:a.status==='approved'?'var(--green)':'var(--pd)',title:a.status==='approved'?'補打卡已核准':'補打卡被拒（HR）',sub:sub});
+  });
+
+  // 加班申請事件
+  var otas=window.getOvertimeApps?window.getOvertimeApps():(window.DB&&DB.otas)||[];
+  otas.filter(function(a){return a.empId===myId&&a.status!=='cancelled';}).forEach(function(a){
+    var sub='加班 '+a.date+' '+a.startTime+'~'+a.endTime+' ('+a.hours.toFixed(1)+'h)';
+    if(a.appliedAt) events.push({ts:a.appliedAt,icon:'⏰',color:'var(--orange)',title:'加班申請已送出',sub:sub});
+    if(a.supReviewedAt) events.push({ts:a.supReviewedAt,icon:a.status==='approved'?'✅':a.status==='rejected'?'❌':'⏳',color:a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':'var(--blue)',title:a.status==='approved'?'加班申請已核准':a.status==='rejected'?'加班申請被拒':'加班主管已審核',sub:sub});
+  });
+
+  if(!events.length) return '<div style="text-align:center;padding:18px;color:var(--t3);font-size:13px">目前無紀錄</div>';
+
+  // 依時間倒序，取最新 N 筆
+  events.sort(function(a,b){return (b.ts||'').localeCompare(a.ts||'');});
+  events=events.slice(0,limit);
+
+  return events.map(function(ev){
+    var d=ev.ts?new Date(ev.ts):null;
+    var todayKey2=(typeof getLocalDateString==='function')?getLocalDateString():new Date().toISOString().slice(0,10);
+    var evDateKey=d?d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'):'';
+    var when='';
+    if(d){
+      if(evDateKey===todayKey2){when=fmtTime(ev.ts);}
+      else{
+        var y=new Date();y.setDate(y.getDate()-1);
+        var yKey=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
+        if(evDateKey===yKey){when='昨天 '+fmtTime(ev.ts);}
+        else{when=(d.getMonth()+1)+'/'+d.getDate();}
+      }
+    }
+    return '<div class="list-row">'
+      +'<div class="lr-av" style="background:'+ev.color+'22;color:'+ev.color+';font-size:14px">'+ev.icon+'</div>'
+      +'<div class="lr-info">'
+      +'<div class="lr-name" style="font-size:13px">'+escapeHtml(ev.title)+'</div>'
+      +(ev.sub?'<div class="lr-sub">'+escapeHtml(ev.sub)+'</div>':'')
+      +'</div>'
+      +'<div style="font-size:11px;color:var(--t3);white-space:nowrap;align-self:center">'+escapeHtml(when)+'</div>'
+      +'</div>';
+  }).join('');
 }
 
 
@@ -1058,6 +1136,119 @@ function recentRows(emp,limit){
       +'<div class="lr-sub">'+(h>0?'工時 '+h.toFixed(1)+'h':'--')+'</div></div>';
     return '<div class="list-row">'+dateBox+info+badge+'</div>';
   }).join('');
+}
+
+// ── Employee Apply Page（請假/補打卡/加班 整合頁） ─────────
+// Phase 2: 把原本三個獨立 sheet 的表單整合成單一 page，頂部 sub-tabs 切換
+// 安全性：不動 submit 邏輯，只搬版面；表單 id 跟原本完全相同
+function renderApplyPage(s){
+  var sub=window._applyTab||'leave';
+  if(['leave','makeup','overtime'].indexOf(sub)===-1) sub='leave';
+  var today=getLocalDateString();
+
+  function tabPill(key,label){
+    var active=key===sub;
+    return '<button onclick="window._applyTab=\''+key+'\';renderApplyPage(document.getElementById(\'empScroll\'));" '
+      +'style="flex:1;padding:10px 6px;border:none;border-bottom:2px solid '+(active?'var(--pd)':'transparent')+';'
+      +'background:transparent;color:'+(active?'var(--pd)':'var(--t3)')+';font-size:13px;font-weight:'+(active?800:600)+';cursor:pointer">'
+      +label+'</button>';
+  }
+
+  var headerHtml='<div class="pc-page-header" style="margin-bottom:10px">'
+    +'<div><div class="pc-page-title">&#x270D;&#xFE0F; 申請表單</div><div class="pc-page-sub">送出後可在「申請狀態」頁查看進度</div></div>'
+    +'</div>'
+    +'<div class="card fu" style="display:flex;padding:0;margin-bottom:14px;overflow:hidden">'
+    +tabPill('leave','&#x1F334; 請假')
+    +tabPill('makeup','&#x1F527; 補打卡')
+    +tabPill('overtime','&#x23F0; 加班')
+    +'</div>';
+
+  var bodyHtml='', footerHtml='';
+  if(sub==='leave'){
+    bodyHtml=''
+      +'<div class="fg"><label>假期類型</label><select id="lType">'
+      +'<option value="annual">&#x1F334; 特休假</option>'
+      +'<option value="sick">&#x1F912; 病假</option>'
+      +'<option value="personal">&#x1F389; 事假</option>'
+      +'<option value="marriage">&#x1F490; 婚假</option>'
+      +'<option value="funeral">&#x1F622; 喪假</option>'
+      +'<option value="official">&#x1F3DB; 公假</option>'
+      +'<option value="menstrual">&#x1F338; 生理假</option>'
+      +'<option value="maternity">&#x1F931; 產假</option>'
+      +'<option value="paternity">&#x1F476; 陪產假</option>'
+      +'<option value="parental">&#x1F331; 育嬰留職停薪</option>'
+      +'<option value="makeup">&#x1F504; 補休</option>'
+      +'</select></div>'
+      +'<div class="fr2">'
+      +'<div class="fg"><label>開始日期</label><input type="date" id="lStart" value="'+today+'"></div>'
+      +'<div class="fg"><label>結束日期</label><input type="date" id="lEnd" value="'+today+'"></div>'
+      +'</div>'
+      +renderBoundSupervisorField(currentUser.id,'lSup')
+      +'<div class="fg"><label>代理人</label><input id="lProxy" placeholder="代理人姓名"></div>'
+      +'<div class="fg"><label>請假原因</label><textarea id="lReason" placeholder="請說明原因..."></textarea></div>'
+      +'<div class="fg"><label>附件（選填，如診斷書）</label>'
+      +'<input type="file" id="lAttach" accept="image/*,.pdf" style="font-size:13px;padding:8px">'
+      +'<div style="font-size:10px;color:var(--t3);margin-top:4px">支援圖片或 PDF（5MB 以內）</div>'
+      +'</div>'
+      +'<div id="leaveFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:8px"></div>';
+    footerHtml='<button class="sbtn confirm" style="width:100%;padding:14px" onclick="submitLeave()">&#x1F4E4; 送出請假申請</button>';
+  }
+  else if(sub==='makeup'){
+    bodyHtml=''
+      +'<div style="background:var(--ol);border-radius:10px;padding:10px 13px;margin-bottom:14px;font-size:12px;color:var(--orange);line-height:1.6">'
+      +'&#x26A0;&#xFE0F; 補打卡需要<strong>現場定位驗證</strong>，系統會記錄申請時 GPS 座標，再送主管審核。'
+      +'</div>'
+      +'<div class="fg"><label>補打卡日期</label><input type="date" id="mk_date" value="'+today+'"></div>'
+      +'<div class="fr2">'
+      +'<div class="fg"><label>類型</label><select id="mk_type">'
+      +'<option value="in">&#x1F446; 上班打卡</option>'
+      +'<option value="out">&#x1F44B; 下班打卡</option>'
+      +'</select></div>'
+      +'<div class="fg"><label>實際時間</label><input type="time" id="mk_time"></div>'
+      +'</div>'
+      +renderBoundSupervisorField(currentUser.id,'mk_sup')
+      +'<div class="fg"><label>補打卡原因</label><textarea id="mk_reason" placeholder="請說明忘記打卡的原因..."></textarea></div>'
+      +'<div id="makeupFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:8px"></div>'
+      +'<div style="background:var(--bg);border-radius:10px;padding:11px 13px;font-size:12px;color:var(--t2);line-height:1.6;margin-bottom:8px">'
+      +'&#x1F4CD; 點「送出申請」後會先進行 GPS 定位驗證。'
+      +'</div>';
+    footerHtml='<button class="sbtn confirm" style="width:100%;padding:14px" onclick="submitMakeup()">&#x1F4E4; 送出補打卡申請</button>';
+  }
+  else { // overtime
+    bodyHtml=''
+      +'<div class="fg"><label>加班日期</label><input type="date" id="ot_date" value="'+today+'"></div>'
+      +'<div class="fr2">'
+      +'<div class="fg"><label>開始時間</label><input type="time" id="ot_start" value="18:00"></div>'
+      +'<div class="fg"><label>結束時間</label><input type="time" id="ot_end" value="20:00"></div>'
+      +'</div>'
+      +'<div class="fg" id="ot_hours_hint" style="background:var(--pl);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--pd)">預計加班時數：<strong id="ot_hours_val">2.0</strong> 小時</div>'
+      +renderBoundSupervisorField(currentUser.id,'ot_sup')
+      +'<div class="fg"><label>加班原因</label><textarea id="ot_reason" placeholder="請說明加班事由..." style="min-height:80px"></textarea></div>'
+      +'<div id="otFormErr" style="display:none;background:#ede8ff;color:var(--pd);font-size:12px;font-weight:600;padding:8px 12px;border-radius:9px;margin-bottom:8px"></div>';
+    footerHtml='<button class="sbtn confirm" style="width:100%;padding:14px" onclick="submitOvertime()">&#x1F4E4; 送出加班申請</button>';
+  }
+
+  s.innerHTML=headerHtml
+    +'<div class="card fu fu1" style="margin-bottom:12px">'+bodyHtml+'</div>'
+    +'<div style="margin-bottom:80px">'+footerHtml+'</div>';
+
+  // 加班頁：即時計算時數（同原本邏輯）
+  if(sub==='overtime'){
+    setTimeout(function(){
+      function calcOtHours(){
+        var s2=document.getElementById('ot_start'),e2=document.getElementById('ot_end');
+        if(!s2||!e2) return;
+        var sm=s2.value.split(':'),em=e2.value.split(':');
+        if(sm.length<2||em.length<2) return;
+        var h=(parseInt(em[0])*60+parseInt(em[1]))-(parseInt(sm[0])*60+parseInt(sm[1]));
+        var hVal=document.getElementById('ot_hours_val');
+        if(hVal) hVal.textContent=(h>0?(h/60).toFixed(1):'0.0');
+      }
+      var st=document.getElementById('ot_start'),et=document.getElementById('ot_end');
+      if(st) st.addEventListener('change',calcOtHours);
+      if(et) et.addEventListener('change',calcOtHours);
+    },50);
+  }
 }
 
 // ── Employee Monthly ───────────────────────────────
@@ -1194,9 +1385,15 @@ function renderStageResults(a, supName){
   else if(a.status==='sup_approved'){s1='approved';s2='pending';}
   else if(a.status==='approved'){s1='approved';s2='approved';}
   else if(a.status==='rejected'){
-    // stage='hr' 表示已通過第1層後才被第2層拒絕；stage='sup' 表示第1層就拒絕
+    // 優先用 a.stage 判斷；若 stage 欄位缺失（極舊資料），fallback 用兩個 timestamp 是否不同
+    // Edge Function 規則：第1層拒絕時 sup/hr 時間戳同時設為 now；第2層拒絕時 sup 時間不變、hr 時間才更新
     if(a.stage==='hr'){s1='approved';s2='rejected';}
-    else{s1='rejected';s2='skipped';}
+    else if(a.stage==='sup'){s1='rejected';s2='skipped';}
+    else if(a.supReviewedAt && a.hrReviewedAt && a.supReviewedAt!==a.hrReviewedAt){
+      s1='approved';s2='rejected';
+    } else {
+      s1='rejected';s2='skipped';
+    }
   }
   else return ''; // cancelled
   return stageBlock('第1層 直屬主管',s1,supName||'',a.supReviewedAt,a.supNote)
@@ -1761,30 +1958,34 @@ function renderApprove(s){
   function renderLeaveCard(a){
     var sc=a.status==='approved'?'var(--green)':'var(--pd)';
     var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
-    return '<div class="list-row">'
+    var supE=getEmpById(a.supId||'');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<div class="list-row" style="border:none;padding:0">'
       +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">'+escapeHtml(a.empName[0]||'?')+'</div>'
       +'<div class="lr-info">'
       +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; '+(LEAVE_LABEL[a.type]||escapeHtml(a.type))+'</div>'
       +'<div class="lr-sub">'+a.startDate+(a.startDate!==a.endDate?' ~ '+a.endDate:'')+(a.days?' · '+a.days+'天':'')+'</div>'
-      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
-      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
       +'</div>'
       +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>'
+      +'<div style="margin:6px 0 2px 46px">'+(typeof renderStageResults==='function'?renderStageResults(a, supE?supE.name:''):'')+'</div>'
       +'</div>';
   }
   function renderMakeupCard(a){
     var tl=a.punchType==='in'?'上班打卡':'下班打卡';
     var sc=a.status==='approved'?'var(--green)':'var(--pd)';
     var sl=a.status==='approved'?'&#x2705; 已核准':'&#x274C; 已拒絕';
-    return '<div class="list-row">'
+    var supE=getEmpById(a.supId||'');
+    return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">'
+      +'<div class="list-row" style="border:none;padding:0">'
       +'<div class="lr-av" style="background:'+sc+'22;color:'+sc+'">&#x1F527;</div>'
       +'<div class="lr-info">'
       +'<div class="lr-name">'+escapeHtml(a.empName)+' &#x2014; 補'+tl+'</div>'
       +'<div class="lr-sub">'+a.date+' '+a.punchTime+'</div>'
-      +(a.supNote?'<div class="lr-sub">主管：'+escapeHtml(a.supNote)+'</div>':'')
-      +(a.hrNote?'<div class="lr-sub">HR：'+escapeHtml(a.hrNote)+'</div>':'')
       +'</div>'
       +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+      +'</div>'
+      +'<div style="margin:6px 0 2px 46px">'+(typeof renderStageResults==='function'?renderStageResults(a, supE?supE.name:''):'')+'</div>'
       +'</div>';
   }
   function renderOTCard(a){
@@ -1823,7 +2024,20 @@ function renderApprove(s){
     doneMakeup.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
     doneOT.forEach(function(a){if(a.date)ys[a.date.slice(0,4)]=true;});
     var years=Object.keys(ys).sort().reverse();
-    var emps=getEmps().slice().sort(function(a,b){return (a.name||'').localeCompare(b.name||'','zh-TW');});
+    // 員工下拉：admin 看全部；manager 看「自己目前下屬 + 歷史上自己審過的員工」
+    // 後者涵蓋「原本 sup_id=M，但員工已換主管給 B」的邊界狀況，讓 M 仍能篩到自己審過的歷史
+    var emps;
+    if(isHR){
+      emps=getEmps().slice();
+    } else {
+      var ids={};
+      doneLeave.forEach(function(a){if(a.empId)ids[a.empId]=1;});
+      doneMakeup.forEach(function(a){if(a.empId)ids[a.empId]=1;});
+      doneOT.forEach(function(a){if(a.empId)ids[a.empId]=1;});
+      getEmps().forEach(function(e){if(e.supervisorId===myId)ids[e.id]=1;});
+      emps=getEmps().filter(function(e){return ids[e.id];});
+    }
+    emps=emps.sort(function(a,b){return (a.name||'').localeCompare(b.name||'','zh-TW');});
     var hasFilter=f.year!=='all'||f.empId!=='all'||f.status!=='all'||f.name;
     var selStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;background:#fff;cursor:pointer';
     var inpStyle='padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-size:12px;flex:1;min-width:140px';
@@ -4022,7 +4236,7 @@ window.confirmMakeupGps=function(){
     } else {
       toast('✅','補打卡申請已送出！等待主管審核');
     }
-    if(window.currentUser.role==='employee')empTab('clock');
+    if(window.currentUser.role==='employee')empTab('status'); // Phase 2：補打卡送出後直接切到申請狀態看結果
     updateEmpBadge();
   });
 };
@@ -4797,7 +5011,7 @@ window.submitOvertime=function(){
   }},getAuthToken()).then(function(){return loadAllData();}).then(function(){
     closeSheet('overtimeSheet');
     toast('✅','加班申請已送出！');
-    empTab('overtime');
+    empTab('status'); // Phase 2：加班送出後直接切到申請狀態看結果
     updateEmpBadge();
     // 通知主管（LINE + Email）
     var supEmp=window.getEmpById(supId);
@@ -4834,7 +5048,7 @@ window.cancelOTApp=function(id){
   if(!confirm('確定要取消此加班申請嗎？')) return;
   edgeCall('cancelApp',{appType:'overtime',id:id},getAuthToken())
     .then(function(){return loadAllData();})
-    .then(function(){toast('✅','加班申請已取消');empTab('overtime');updateEmpBadge();})
+    .then(function(){toast('✅','加班申請已取消');empTab('status');updateEmpBadge();})
     .catch(function(e){toast('❌','取消失敗：'+(e&&e.message?e.message:'請重試'));});
 };
 
