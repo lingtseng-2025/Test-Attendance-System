@@ -925,15 +925,16 @@ function empTab(tab){
 
 function updateEmpBadge(){
   if(!currentUser) return;
+  // Phase 3：申請狀態頁籤 badge 涵蓋三種申請（請假 + 補打卡 + 加班）的 pending 筆數
   const leavePending=getApps().filter(a=>a.empId===currentUser.id&&a.status==='pending').length;
   const makeupPending=getMakeupApps().filter(a=>a.empId===currentUser.id&&a.status==='pending').length;
-  const p=leavePending+makeupPending;
+  const otPending=(window.getOvertimeApps?window.getOvertimeApps():DB.otas||[]).filter(function(a){return a.empId===currentUser.id&&a.status==='pending';}).length;
+  const p=leavePending+makeupPending+otPending;
   const b=document.getElementById('empLeaveBadge');
   if(b){b.style.display=p?'inline':'none';b.textContent=p;}
-  // OT badge
-  const otPending=(window.getOvertimeApps?window.getOvertimeApps():DB.otas||[]).filter(function(a){return a.empId===currentUser.id&&a.status==='pending';}).length;
+  // 舊 empOTBadge 已隨加班頁籤移除，但保留 setter 以防其他地方還引用（safe no-op）
   const ob=document.getElementById('empOTBadge');
-  if(ob){ob.style.display=otPending?'inline':'none';ob.textContent=otPending;}
+  if(ob){ob.style.display='none';}
   // Manager 主管審核 badge：計算 sup_id 指向自己的待審筆數（只 pending 階段）
   if(currentUser.role==='manager'){
     const myId=currentUser.id;
@@ -1402,11 +1403,15 @@ function renderStageResults(a, supName){
 
 function renderLeaveStatus(s){
   const apps=getApps().filter(a=>a.empId===currentUser.id).sort((a,b)=>b.appliedAt.localeCompare(a.appliedAt));
-  // 補打卡申請也在此頁顯示
+  // 補打卡 + 加班申請也在此頁顯示
   var makeupApps=getMakeupApps().filter(function(a){return a.empId===currentUser.id;}).sort(function(a,b){return b.appliedAt.localeCompare(a.appliedAt);});
-  var html='<div class="sec-title fu"><span>&#x1F4CB; 假期申請狀態</span></div>';
+  var otApps=(window.getOvertimeApps?window.getOvertimeApps():(window.DB&&DB.otas)||[]).filter(function(a){return a.empId===currentUser.id;}).sort(function(a,b){return (b.appliedAt||'').localeCompare(a.appliedAt||'');});
+  var html='<div class="pc-page-header" style="margin-bottom:10px">'
+    +'<div><div class="pc-page-title">&#x1F4CB; 申請狀態</div><div class="pc-page-sub">所有送出的申請與審核進度</div></div>'
+    +'</div>';
+  html+='<div class="sec-title fu"><span>&#x1F334; 請假申請（'+apps.length+'）</span></div>';
   if(!apps.length){
-    html+='<div class="card fu fu1" style="text-align:center;padding:24px;color:var(--t3)">尚無申請紀錄</div>';
+    html+='<div class="card fu fu1" style="text-align:center;padding:24px;color:var(--t3)">尚無請假紀錄</div>';
   } else {
     apps.forEach(function(a,i){
       var supEmp=getEmpById(a.supId||'');
@@ -1433,8 +1438,10 @@ function renderLeaveStatus(s){
     });
   }
   // 補打卡紀錄
-  if(makeupApps.length){
-    html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F527; 補打卡申請狀態</span></div>';
+  html+='<div class="sec-title fu fu2" style="margin-top:4px"><span>&#x1F527; 補打卡申請（'+makeupApps.length+'）</span></div>';
+  if(!makeupApps.length){
+    html+='<div class="card fu fu2" style="text-align:center;padding:24px;color:var(--t3)">尚無補打卡紀錄</div>';
+  } else {
     makeupApps.forEach(function(a,i){
       var isCancelled=a.status==='cancelled';
       var sc=isCancelled?'#999':a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':a.status==='sup_approved'?'var(--blue)':'var(--yellow)';
@@ -1456,6 +1463,34 @@ function renderLeaveStatus(s){
         +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
         +'<div style="font-size:10px;color:var(--t3)">申請：'+a.appliedAt.slice(0,16).replace('T',' ')+'</div>'
         +(a.status==='pending'?'<button onclick="window.cancelMakeupApp(\''+a.id+'\')" style="padding:4px 12px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:11px;font-weight:700;cursor:pointer">✕ 取消申請</button>':'')
+        +'</div>'
+        +'</div>';
+    });
+  }
+  // 加班紀錄（單層審核，狀態用 badge 即可）
+  html+='<div class="sec-title fu fu3" style="margin-top:4px"><span>&#x23F0; 加班申請（'+otApps.length+'）</span></div>';
+  if(!otApps.length){
+    html+='<div class="card fu fu3" style="text-align:center;padding:24px;color:var(--t3)">尚無加班紀錄</div>';
+  } else {
+    otApps.forEach(function(a,i){
+      var isCancelled=a.status==='cancelled';
+      var sc=isCancelled?'#999':a.status==='approved'?'var(--green)':a.status==='rejected'?'var(--pd)':'var(--yellow)';
+      var sl=isCancelled?'已取消':a.status==='approved'?'&#x2705; 已核准':a.status==='rejected'?'&#x274C; 已拒絕':'&#x23F3; 審核中';
+      var otSupEmp=getEmpById(a.supId||'');
+      html+='<div class="card fu" style="animation-delay:'+(i*.05)+'s'+(isCancelled?';opacity:.55':'')+';">'
+        +'<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px">'
+        +'<div><div style="font-size:14px;font-weight:700">&#x23F0; 加班</div>'
+        +'<div style="font-size:11px;color:var(--t3);margin-top:2px">'+a.date+' '+a.startTime+'~'+a.endTime+'（'+(a.hours||0).toFixed(1)+'h）</div></div>'
+        +'<span class="bgg" style="background:'+sc+'22;color:'+sc+'">'+sl+'</span>'
+        +'</div>'
+        +'<div style="font-size:12px;color:var(--t2);background:var(--bg);border-radius:8px;padding:8px 10px;line-height:1.7">'
+        +'<div>原因：'+escapeHtml(a.reason||'')+'</div>'
+        +'<div>直屬主管：'+(otSupEmp?escapeHtml(otSupEmp.name):'--')+'</div>'
+        +(a.supNote?'<div style="color:var(--t3)">主管備註：'+escapeHtml(a.supNote)+'</div>':'')
+        +'</div>'
+        +'<div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">'
+        +'<div style="font-size:10px;color:var(--t3)">申請：'+(a.appliedAt?a.appliedAt.slice(0,16).replace('T',' '):'')+'</div>'
+        +(a.status==='pending'?'<button onclick="window.cancelOTApp(\''+a.id+'\')" style="padding:4px 12px;border:1.5px solid #cc0000;border-radius:8px;background:#fff5f5;color:#cc0000;font-size:11px;font-weight:700;cursor:pointer">✕ 取消申請</button>':'')
         +'</div>'
         +'</div>';
     });
