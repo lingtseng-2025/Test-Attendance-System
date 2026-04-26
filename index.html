@@ -1158,15 +1158,14 @@ function renderApplyPage(s){
       +label+'</div>';
   }
 
-  var headerHtml='<div class="pc-page-header" style="margin-bottom:10px">'
-    +'<div><div class="pc-page-title">&#x270D;&#xFE0F; 申請表單</div><div class="pc-page-sub">送出後可在「申請狀態」頁查看進度</div></div>'
-    +'</div>'
-    // 用 inline-block 取代 flex，並用硬編碼顏色避開 CSS 變數可能的問題
-    +'<div style="width:100%;background:#fff;border:1.5px solid #b8b3e8;border-radius:14px;overflow:hidden;margin-bottom:14px;font-size:0;white-space:nowrap">'
-    +tabPill('leave','&#x1F334; 請假')
-    +tabPill('makeup','&#x1F527; 補打卡')
-    +tabPill('overtime','&#x23F0; 加班')
-    +'</div>';
+  // tab 列容器：用 inline-block 並硬編碼顏色，避開 CSS 變數與 .card class 干擾
+  var tabsHtml='<div data-applytabs="1" style="width:100%;background:#fff;border:1.5px solid #b8b3e8;border-radius:14px;overflow:hidden;margin-bottom:14px;font-size:0;white-space:nowrap">';
+  tabsHtml+=tabPill('leave','&#x1F334; 請假');
+  tabsHtml+=tabPill('makeup','&#x1F527; 補打卡');
+  tabsHtml+=tabPill('overtime','&#x23F0; 加班');
+  tabsHtml+='</div>';
+  var headerHtml='<div class="pc-page-header" style="margin-bottom:10px"><div><div class="pc-page-title">&#x270D;&#xFE0F; 申請表單</div><div class="pc-page-sub">送出後可在「申請狀態」頁查看進度</div></div></div>'
+    +tabsHtml;
 
   var bodyHtml='', footerHtml='';
   if(sub==='leave'){
