@@ -3391,6 +3391,10 @@ window.doLogout=function(){
   window.clockIntervals=[];
   window.currentUser=null;
   setAuthToken(null); // 清除 JWT
+  // 清掉跨使用者會 leak 的 UI 狀態（避免 A 登出後 B 看到 A 的 tab/篩選偏好）
+  window._applyTab=null;
+  window._approveFilter=null;
+  window._approvePage=null;
   document.body.classList.remove('admin-mode');
   document.body.classList.remove('admin-mobile-view');
   document.getElementById('loginId').value='';
