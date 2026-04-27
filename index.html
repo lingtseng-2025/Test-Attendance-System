@@ -897,8 +897,12 @@ let currentEmpTab='clock';
 function empTab(tab){
   const prevTab=currentEmpTab;
   currentEmpTab=tab;
+  // 容錯：未知 tab 名稱（例如舊書籤 'leave'/'overtime'）→ fallback 到首頁
+  var tabEl=document.getElementById('etab-'+tab);
+  if(!tabEl){tab='clock';tabEl=document.getElementById('etab-clock');currentEmpTab='clock';}
+  if(!tabEl) return; // 終極保險：連 etab-clock 也不存在就靜默退出，避免 TypeError
   document.querySelectorAll('#empTabbar .tb-item').forEach(t=>t.classList.remove('active'));
-  document.getElementById('etab-'+tab).classList.add('active');
+  tabEl.classList.add('active');
   const s=document.getElementById('empScroll');
   s.innerHTML='';
   if(tab==='clock') renderEmpClock(s);
@@ -2783,8 +2787,17 @@ function submitMakeup(){
   if(!reason){errEl.textContent='⚠️ 請填寫補打卡原因';errEl.style.display='block';return;}
 
   // 檢查日期不能是未來（用本地時區，避免凌晨時誤擋）
-  if(date>getLocalDateString()){
+  var todayLocal=getLocalDateString();
+  if(date>todayLocal){
     errEl.textContent='⚠️ 補打卡日期不能是未來日期';errEl.style.display='block';return;
+  }
+  // 若補打卡日期是今天，時間也不能在當前時間之後（避免補未來的卡）
+  if(date===todayLocal){
+    var nowD=new Date();
+    var nowHM=String(nowD.getHours()).padStart(2,'0')+':'+String(nowD.getMinutes()).padStart(2,'0');
+    if(time>nowHM){
+      errEl.textContent='⚠️ 補打卡時間不能是未來時間（目前 '+nowHM+'）';errEl.style.display='block';return;
+    }
   }
   errEl.style.display='none';
 
