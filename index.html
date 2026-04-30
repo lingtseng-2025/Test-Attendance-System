@@ -2047,7 +2047,8 @@ function renderEmployees(s){
     +'<div class="pc-page-header">'
     +'<div><div class="pc-page-title">&#x1F465; 員工管理</div><div class="pc-page-sub">共 '+emps.length+' 位員工</div></div>'
     +'<div style="display:flex;gap:8px">'
-    +'<button onclick="exportEmployeesExcel()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-family:Nunito,sans-serif;font-size:13px;font-weight:700;cursor:pointer">📥 匯出 Excel</button>'
+    +'<button onclick="exportEmployeesExcel()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-family:Nunito,sans-serif;font-size:13px;font-weight:700;cursor:pointer">📥 員工 Excel</button>'
+    +'<button onclick="exportInsuranceChangeExcel()" style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--border);background:#fff;color:var(--t2);font-family:Nunito,sans-serif;font-size:13px;font-weight:700;cursor:pointer">📋 勞健保異動</button>'
     +'<button onclick="openAddEmp()" style="padding:10px 20px;border-radius:10px;border:none;background:var(--grad);color:#fff;font-family:Nunito,sans-serif;font-size:13px;font-weight:800;cursor:pointer">&#xFF0B; 新增員工</button>'
     +'</div>'
     +'</div>'
@@ -5088,6 +5089,83 @@ window.exportLeaveBalanceExcel=function(){
   var fn='假別餘額_'+(window.getLocalDateString?window.getLocalDateString():new Date().toISOString().slice(0,10))+'.xlsx';
   XLSX.writeFile(wb,fn);
   toast('📥','假別餘額已匯出：'+fn);
+};
+
+// ── 勞健保異動清單 Excel（4 工作表：加保 / 退保 / 在職總覽 / 注意事項） ──
+window.exportInsuranceChangeExcel=function(){
+  var emps=window.getEmps();
+  var GENDER={M:'男',F:'女',other:'其他'};
+  // 本地日期格式器（避免 toISOString 在 UTC 凌晨偏移）
+  function localDateStr(d){
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  var now=new Date();
+  // 「本月 + 上月」範圍：取最近 2 個月新進員工為加保候選
+  var lastMonthStart=new Date(now.getFullYear(),now.getMonth()-1,1);
+  var nextMonthStart=new Date(now.getFullYear(),now.getMonth()+1,1);
+  var rangeFrom=localDateStr(lastMonthStart);
+  var rangeTo=localDateStr(nextMonthStart);
+
+  var active=emps.filter(function(e){return e.status!=='inactive';});
+  var inactive=emps.filter(function(e){return e.status==='inactive';});
+  var newJoiners=active.filter(function(e){
+    if(!e.hireDate) return false;
+    return e.hireDate>=rangeFrom && e.hireDate<rangeTo;
+  });
+
+  var wb=XLSX.utils.book_new();
+
+  // Sheet 1: 加保清單（最近 2 個月新進）
+  var addH=['工號','姓名','出生日期','性別','部門','職稱','到職日','月薪','Email','手機','身分證字號（請手動填入）','投保薪資（請依分級表）','備註'];
+  var addRows=newJoiners.map(function(e){
+    return [e.id,e.name,e.birthDate||'',GENDER[e.gender]||'',e.dept||'',e.pos||'',e.hireDate||'',e.salary||0,e.email||'',e.phone||'','','',''];
+  });
+  var ws1=XLSX.utils.aoa_to_sheet([addH].concat(addRows.length?addRows:[['（最近 2 個月無新進員工）','','','','','','','','','','','','']]));
+  ws1['!cols']=[{wch:12},{wch:10},{wch:12},{wch:5},{wch:12},{wch:14},{wch:12},{wch:10},{wch:22},{wch:14},{wch:20},{wch:18},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws1,'1.加保清單');
+
+  // Sheet 2: 退保清單（離職員工）
+  var dropH=['工號','姓名','出生日期','性別','部門','職稱','到職日','最後月薪','身分證字號（請手動填入）','離職日（請手動填入）','備註'];
+  var dropRows=inactive.map(function(e){
+    return [e.id,e.name,e.birthDate||'',GENDER[e.gender]||'',e.dept||'',e.pos||'',e.hireDate||'',e.salary||0,'','',''];
+  });
+  var ws2=XLSX.utils.aoa_to_sheet([dropH].concat(dropRows.length?dropRows:[['（目前無離職員工）','','','','','','','','','','']]));
+  ws2['!cols']=[{wch:12},{wch:10},{wch:12},{wch:5},{wch:12},{wch:14},{wch:12},{wch:10},{wch:20},{wch:14},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,ws2,'2.退保清單');
+
+  // Sheet 3: 在職員工總覽（對帳用）
+  var allH=['工號','姓名','出生日期','性別','部門','職稱','到職日','月薪','Email','手機','身分證字號（請手動填入）','投保薪資（請依分級表）'];
+  var allRows=active.map(function(e){
+    return [e.id,e.name,e.birthDate||'',GENDER[e.gender]||'',e.dept||'',e.pos||'',e.hireDate||'',e.salary||0,e.email||'',e.phone||'','',''];
+  });
+  var ws3=XLSX.utils.aoa_to_sheet([allH].concat(allRows));
+  ws3['!cols']=[{wch:12},{wch:10},{wch:12},{wch:5},{wch:12},{wch:14},{wch:12},{wch:10},{wch:22},{wch:14},{wch:20},{wch:18}];
+  XLSX.utils.book_append_sheet(wb,ws3,'3.在職員工總覽');
+
+  // Sheet 4: 注意事項
+  var notes=[
+    ['勞健保異動清單 — 注意事項'],
+    [''],
+    ['1. 此清單為投保異動「參考清單」，正式申報請至勞動部勞保局與衛福部健保署網站。'],
+    ['2. 身分證字號因隱私考量未存於系統，請 HR 從員工檔案手動填入後再申報。'],
+    ['3. 加保清單列出最近 2 個月新進員工（範圍 '+rangeFrom+' ～ '+rangeTo+'，不含結束日）。'],
+    ['4. 退保清單為系統內標記「離職」狀態的員工，離職日請手動填入。'],
+    ['5. 投保薪資請依勞動部最新「投保薪資分級表」對應月薪填寫。'],
+    ['6. 勞保最低投保薪資 = 當年度基本工資；健保上限高於勞保上限，請分別查詢級距表。'],
+    [''],
+    ['官方資料來源：'],
+    ['  勞動部勞保局：https://www.bli.gov.tw/'],
+    ['  衛福部健保署：https://www.nhi.gov.tw/'],
+    [''],
+    ['匯出時間：'+new Date().toLocaleString('zh-TW')]
+  ];
+  var ws4=XLSX.utils.aoa_to_sheet(notes);
+  ws4['!cols']=[{wch:80}];
+  XLSX.utils.book_append_sheet(wb,ws4,'注意事項');
+
+  var fn='勞健保異動清單_'+localDateStr(now)+'.xlsx';
+  XLSX.writeFile(wb,fn);
+  toast('📋','勞健保異動清單已匯出：'+fn);
 };
 
 // ── Init: call immediately (DOM already ready since we run after </html>) ──
