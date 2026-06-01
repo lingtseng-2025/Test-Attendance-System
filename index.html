@@ -1881,7 +1881,9 @@ function renderApprove(s){
   myOT.forEach(function(a){myPendingAll.push({kind:'ot',item:a});});
   myPendingAll.sort(function(x,y){return (y.item.appliedAt||'').localeCompare(x.item.appliedAt||'');});
 
-  html+='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPendingAll.length+'）</span></div>'
+  html+='<div class="sec-title fu"><span>&#x23F3; 待我審核（'+myPendingAll.length+'）</span>'
+    +(myPendingAll.length?'<button onclick="window.doApproveAll()" style="padding:6px 14px;border-radius:8px;border:none;background:var(--green);color:#fff;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">&#x2705; 一鍵核准全部</button>':'')
+    +'</div>'
     +'<div class="pc-section" style="margin-bottom:16px">';
   if(!myPendingAll.length){
     html+='<div style="text-align:center;padding:14px;color:var(--t3);font-size:13px">&#x1F389; 目前無待審申請</div>';
@@ -3983,6 +3985,101 @@ window.doReview=function(status){
   }).catch(function(e){
     toast('❌','審核失敗：'+(e&&e.message?e.message:'請重試'));
     console.error('[doReview leave]',e);
+  });
+};
+
+// ── 一鍵核准全部「待我審核」項目 ──────────────────────
+// 逐筆序列化呼叫 reviewApp（verdict:'approved'），避免並發寫入競態。
+// 只核准目前登入者有權限的那一階段：
+//   · 主管：pending → sup_approved（請假/補打卡），或 pending → approved（加班）
+//   · HR(admin)：sup_approved → approved
+// 全部完成後一次 loadAllData + 重繪，並批次送出 LINE 通知。
+window._queueApproveAllNotifs=function(out, it, ns){
+  var a=it.a;
+  var LEAVE_LBL={annual:'特休',sick:'病假',personal:'事假',marriage:'婚假',funeral:'喪假',official:'公假',maternity:'產假',paternity:'陪產假',other:'其他'};
+  var reviewerName=(window.currentUser&&window.currentUser.empData)?window.currentUser.empData.name:'';
+  var myUid=(window.currentUser&&window.currentUser.id)||'';
+  var empN=getEmpById(a.empId||'');
+  if(it.kind==='leave'){
+    if(empN&&empN.lineUserId){
+      var rl=ns==='approved'?'✅ 已核准':ns==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
+      if(rl) out.push({lineUserId:empN.lineUserId,message:'📋 請假審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n假別：'+(LEAVE_LBL[a.type]||a.type)+'（'+a.days+' 天）\n期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+'\n結果：'+rl});
+    }
+    if(ns==='sup_approved'){
+      (DB.emps||[]).filter(function(e){return e.role==='admin'&&e.lineUserId;}).forEach(function(ad){
+        if(ad.id===myUid)return;
+        out.push({lineUserId:ad.lineUserId,message:'📋 請假待 HR 最終審核\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n假別：'+(LEAVE_LBL[a.type]||a.type)+'（'+a.days+' 天）\n期間：'+a.startDate+(a.startDate!==a.endDate?' ～ '+a.endDate:'')+'\n初審主管：'+reviewerName+'\n\n請登入系統進行最終審核'});
+      });
+    }
+  } else if(it.kind==='makeup'){
+    var tl=a.punchType==='in'?'上班打卡':'下班打卡';
+    if(empN&&empN.lineUserId){
+      var rl2=ns==='approved'?'✅ 已核准':ns==='sup_approved'?'⏳ 主管已初審，待 HR 最終審核':'';
+      if(rl2) out.push({lineUserId:empN.lineUserId,message:'📋 補打卡審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+tl+'\n日期：'+a.date+' '+a.punchTime+'\n結果：'+rl2});
+    }
+    if(ns==='sup_approved'){
+      (DB.emps||[]).filter(function(e){return e.role==='admin'&&e.lineUserId;}).forEach(function(ad){
+        if(ad.id===myUid)return;
+        out.push({lineUserId:ad.lineUserId,message:'📋 補打卡待 HR 最終審核\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n類型：補'+tl+'\n日期：'+a.date+' '+a.punchTime+'\n初審主管：'+reviewerName+'\n\n請登入系統進行最終審核'});
+      });
+    }
+  } else if(it.kind==='ot'){
+    if(empN&&empN.lineUserId){
+      out.push({lineUserId:empN.lineUserId,message:'📋 加班申請審核結果\n━━━━━━━━━━━━━━\n申請人：'+(a.empName||'')+'\n日期：'+a.date+'\n時間：'+a.startTime+' ～ '+a.endTime+'（'+a.hours.toFixed(1)+'h）\n結果：✅ 已核准'});
+    }
+  }
+};
+
+window.doApproveAll=function(){
+  var myId=(window.currentUser&&window.currentUser.id)||'';
+  var isHR=(window.currentUser&&window.currentUser.role==='admin');
+  if(!myId) return;
+  // 收集目前「待我審核」的所有項目（與 renderApprove 的 myPending 條件一致）
+  var items=[];
+  (getApps()||[]).forEach(function(a){
+    if((a.status==='pending'&&a.supId===myId)||(a.status==='sup_approved'&&isHR))
+      items.push({kind:'leave',id:a.id,a:a});
+  });
+  (getMakeupApps()||[]).forEach(function(a){
+    if((a.status==='pending'&&a.supId===myId)||(a.status==='sup_approved'&&isHR))
+      items.push({kind:'makeup',id:a.id,a:a});
+  });
+  ((window.getOvertimeApps?window.getOvertimeApps():[])||[]).forEach(function(a){
+    if(a.status==='pending'&&a.supId===myId)
+      items.push({kind:'ot',id:a.id,a:a});
+  });
+  if(!items.length){toast('ℹ️','目前無待審申請');return;}
+  if(!confirm('確定一鍵核准以下 '+items.length+' 筆申請嗎？\n（將逐筆核准，核准後無法復原）')) return;
+
+  var tok=getAuthToken();
+  var appTypeMap={leave:'leave',makeup:'makeup',ot:'overtime'};
+  var ok=0, fail=0;
+  var notifications=[];
+
+  // 序列化逐筆處理，避免並發寫入競態
+  var chain=Promise.resolve();
+  items.forEach(function(it){
+    chain=chain.then(function(){
+      return edgeCall('reviewApp',{appType:appTypeMap[it.kind],id:it.id,verdict:'approved',note:''},tok)
+        .then(function(res){
+          ok++;
+          var ns=res&&res.newStatus?res.newStatus:(it.kind==='ot'?'approved':(it.a.status==='pending'?'sup_approved':'approved'));
+          window._queueApproveAllNotifs(notifications,it,ns);
+        })
+        .catch(function(e){fail++;console.error('[doApproveAll]',it.kind,it.id,e);});
+    });
+  });
+
+  chain.then(function(){
+    return loadAllData();
+  }).then(function(){
+    notifications.forEach(function(n){
+      edgeCall('sendLine',{lineUserId:n.lineUserId,message:n.message},tok).catch(function(){});
+    });
+    toast(fail?'⚠️':'✅', fail?('核准 '+ok+' 筆，失敗 '+fail+' 筆'):('✅ 已核准全部 '+ok+' 筆申請'));
+    renderApprove(document.getElementById('adminScroll'));
+    updateAdminBadge();
+    if(typeof empTab==='function'){var _ea=document.querySelector('#empTabbar .tb-item.active');empTab(_ea?_ea.id.replace('etab-',''):'status');}
   });
 };
 
