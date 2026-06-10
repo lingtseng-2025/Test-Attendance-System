@@ -617,7 +617,7 @@ body.admin-mode > #adminScreen{
     <div class="sh-body" id="leaveFormBody"></div>
     <div class="sh-btns two">
       <button class="sbtn cancel" onclick="closeSheet('leaveSheet')">取消</button>
-      <button class="sbtn confirm" onclick="submitLeave()">📤 送出</button>
+      <button class="sbtn confirm" id="leaveSubmitBtn" onclick="submitLeave()">📤 送出</button>
     </div>
   </div>
 </div>
@@ -703,7 +703,7 @@ body.admin-mode > #adminScreen{
     <div class="sh-body" id="overtimeFormBody"></div>
     <div class="sh-btns two">
       <button class="sbtn cancel" onclick="closeSheet('overtimeSheet')">取消</button>
-      <button class="sbtn confirm" onclick="submitOvertime()">📤 送出申請</button>
+      <button class="sbtn confirm" id="otSubmitBtn" onclick="submitOvertime()">📤 送出申請</button>
     </div>
   </div>
 </div>
@@ -983,7 +983,7 @@ function buildPunchCard(inT,outT,hours,OT,emp,extraClass){
   const OTval=OT>0?OT.toFixed(1)+' h':'--';
 
   const btnIn='<button class="pb in'+(inT?'':' pulse')+'" onclick="openPunch(\'in\')"'+(inT?' disabled':'')+'>&#x1F446; 上班打卡</button>';
-  const btnOut='<button class="pb out" onclick="openPunch(\'out\')"'+((!inT||outT)?' disabled':'')+'>&#x1F44B; 下班打卡</button>';
+  const btnOut='<button class="pb out" onclick="openPunch(\'out\')"'+(outT?' disabled':'')+'>&#x1F44B; 下班打卡</button>';
 
   return '<div class="punch-card fu '+extraClass+'">'
     +'<div class="pc-bg1"></div><div class="pc-bg2"></div>'
@@ -3529,11 +3529,11 @@ window.confirmPunch=function(){
       .then(function(){toast('✅','上班打卡 '+fmtTime(now.toISOString())+' ✓ '+officeName);empTab('clock');})
       .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗：'+(err&&err.message?err.message:'請重試'));});
   }else{
-    if(!existing||!existing.in){toast('⚠️','請先上班打卡');return;}
-    var h=calcHours(existing.in,now.toISOString(),emp.workRule);
+    // 已移除「請先上班打卡」限制：無上班卡也能打下班卡（工時無上班卡時以 0 計）
+    var h=(existing&&existing.in)?calcHours(existing.in,now.toISOString(),emp.workRule):0;
     edgeCall('clockPunch',{punchType:'out',date:dateStr,timeISO:now.toISOString(),gps:window.currentGPS},getAuthToken())
       .then(function(){return loadAllData();})
-      .then(function(){toast('🎉','下班打卡！工時 '+h.toFixed(1)+'h');empTab('clock');})
+      .then(function(){toast('🎉',h>0?'下班打卡！工時 '+h.toFixed(1)+'h':'下班打卡完成！（今日無上班卡）');empTab('clock');})
       .catch(function(err){console.error('[confirmPunch] error:',err);toast('❌','打卡失敗：'+(err&&err.message?err.message:'請重試'));});
   }
 };
@@ -3699,6 +3699,11 @@ window.submitLeave=function(){
   if(!reason){errEl.textContent='⚠️ 請填寫原因';errEl.style.display='block';return;}
   if(!supId){errEl.textContent='⚠️ 請選擇直屬主管';errEl.style.display='block';return;}
   errEl.style.display='none';
+  // 防重複送出：連點兩次或網路慢時再點，避免送出兩筆一樣的請假
+  if(window._submitLeaveInflight)return;
+  window._submitLeaveInflight=true;
+  var _leaveBtn=document.getElementById('leaveSubmitBtn');
+  if(_leaveBtn)_leaveBtn.disabled=true;
   var emp=window.currentUser.empData;
   var fileInput=document.getElementById('lAttach');
   var file=fileInput&&fileInput.files&&fileInput.files[0];
@@ -3757,6 +3762,8 @@ window.submitLeave=function(){
       balance_at_apply:balSnap
     }},getAuthToken())
     .then(function(){return loadAllData();}).then(function(){
+      window._submitLeaveInflight=false;
+      if(_leaveBtn)_leaveBtn.disabled=false;
       closeSheet('leaveSheet');
       // LINE 通知主管（非同步，不影響主流程）
       var supLineId=supEmp?supEmp.lineUserId||'':'';
@@ -3780,10 +3787,18 @@ window.submitLeave=function(){
       }
       if(window.currentUser.role==='employee')empTab('status');
       updateEmpBadge();
+    }).catch(function(e){
+      // 送出失敗（含後端擋重複的 409）：解除鎖定、還原按鈕、提示原因
+      window._submitLeaveInflight=false;
+      if(_leaveBtn)_leaveBtn.disabled=false;
+      var emsg=(e&&e.message)?e.message:'送出失敗，請重試';
+      errEl.textContent='⚠️ '+emsg;errEl.style.display='block';
+      toast('❌',emsg);
+      console.error('[submitLeave]',e);
     });
   }
   if(file){
-    if(file.size>5*1024*1024){errEl.textContent='⚠️ 附件過大，請上傳 5 MB 以內的檔案';errEl.style.display='block';return;}
+    if(file.size>5*1024*1024){errEl.textContent='⚠️ 附件過大，請上傳 5 MB 以內的檔案';errEl.style.display='block';window._submitLeaveInflight=false;if(_leaveBtn)_leaveBtn.disabled=false;return;}
     var r=new FileReader();r.onload=function(e){saveLeave(e.target.result);};r.onerror=function(){saveLeave('');};r.readAsDataURL(file);
   } else saveLeave('');
 };
@@ -4086,6 +4101,11 @@ window.doApproveAll=function(){
 // ── Override confirmMakeupGps ─────────────────────
 window.confirmMakeupGps=function(){
   if(!window.makeupPendingData)return;
+  // 防重複送出：連點兩次或網路慢時再點，避免送出兩筆一模一樣的補打卡
+  if(window._submitMakeupInflight)return;
+  window._submitMakeupInflight=true;
+  var _mkConfirmBtn=document.getElementById('makeupGpsConfirmBtn');
+  if(_mkConfirmBtn)_mkConfirmBtn.disabled=true;
   var d=window.makeupPendingData;
   var emp=window.currentUser.empData;
   var supEmp=getEmpById(d.supId);
@@ -4131,6 +4151,7 @@ window.confirmMakeupGps=function(){
     gps:window.makeupGpsData
   }},getAuthToken())
   .then(function(){return loadAllData();}).then(function(){
+    window._submitMakeupInflight=false;
     closeSheet('makeupGpsSheet');
     window.makeupPendingData=null;window.makeupGpsData=null;
     // LINE 通知主管（非同步，不影響主流程）
@@ -4156,6 +4177,15 @@ window.confirmMakeupGps=function(){
     }
     if(window.currentUser.role==='employee')empTab('clock');
     updateEmpBadge();
+  }).catch(function(e){
+    // 送出失敗（含後端擋重複的 409）：解除鎖定、還原按鈕、提示原因
+    window._submitMakeupInflight=false;
+    if(_mkConfirmBtn)_mkConfirmBtn.disabled=false;
+    var emsg=(e&&e.message)?e.message:'送出失敗，請重試';
+    var ferr=document.getElementById('makeupFormErr');
+    if(ferr){ferr.textContent='⚠️ '+emsg;ferr.style.display='block';}
+    toast('❌',emsg);
+    console.error('[confirmMakeupGps]',e);
   });
 };
 
@@ -4920,6 +4950,11 @@ window.submitOvertime=function(){
   if(existH+hours>46){
     if(!confirm('⚠️ 申請後本月加班時數將超過 46 小時（勞基法第32條上限），確定要繼續送出？')) return;
   }
+  // 防重複送出：連點兩次或網路慢時再點，避免送出兩筆一樣的加班
+  if(window._submitOtInflight)return;
+  window._submitOtInflight=true;
+  var _otBtn=document.getElementById('otSubmitBtn');
+  if(_otBtn)_otBtn.disabled=true;
   var emp=window.currentUser.empData;
   // 改用 Edge Function（service_role）寫入，解決 anon key RLS 擋寫入問題
   edgeCall('submitApp',{appType:'overtime',data:{
@@ -4927,6 +4962,8 @@ window.submitOvertime=function(){
     date:date,start_time:start,end_time:end,hours:hours,
     reason:reason,sup_id:supId
   }},getAuthToken()).then(function(){return loadAllData();}).then(function(){
+    window._submitOtInflight=false;
+    if(_otBtn)_otBtn.disabled=false;
     closeSheet('overtimeSheet');
     toast('✅','加班申請已送出！');
     empTab('overtime');
@@ -4956,8 +4993,13 @@ window.submitOvertime=function(){
       }
     }
   }).catch(function(err){
+    // 送出失敗（含後端擋重複的 409）：解除鎖定、還原按鈕、提示原因
+    window._submitOtInflight=false;
+    if(_otBtn)_otBtn.disabled=false;
     console.error('[submitOvertime]',err);
-    errEl.textContent='⚠️ 送出失敗，請重試';errEl.style.display='block';
+    var emsg=(err&&err.message)?err.message:'送出失敗，請重試';
+    errEl.textContent='⚠️ '+emsg;errEl.style.display='block';
+    toast('❌',emsg);
   });
 };
 
